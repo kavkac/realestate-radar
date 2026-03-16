@@ -1,6 +1,64 @@
 const BASE_RPE = "https://storitve.eprostor.gov.si/ows-pub-wfs/wfs";
 const BASE_KN = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn-osnovni/wfs";
 
+// --- Šifranti ---
+
+const NOSILNA_KONSTRUKCIJA: Record<number, string> = {
+  1: "Masivna (kamen, opeka)",
+  2: "Montažna",
+  3: "Lesena",
+  4: "Kombinirana",
+  5: "Armiran beton",
+  6: "Jeklo",
+  9: "Neznano",
+};
+
+const TIP_STAVBE: Record<number, string> = {
+  1: "Enostanovanjska",
+  2: "Dvostanovanjska",
+  3: "Večstanovanjska",
+  4: "Poslovna",
+  5: "Industrijska",
+  6: "Kmetijska",
+  9: "Drugo",
+};
+
+const VRSTA_DEJANSKE_RABE: Record<number, string> = {
+  1: "Stanovanje",
+  2: "Pisarna",
+  3: "Trgovina",
+  4: "Gostinstvo",
+  5: "Industrijsko",
+  47: "Stanovanje",
+};
+
+// --- Types ---
+
+export interface StavbaData {
+  koId: number;
+  stStavbe: number;
+  eidStavba: string;
+  letoIzgradnje: number | null;
+  letoObnoveFasade: number | null;
+  letoObnoveStrehe: number | null;
+  steviloEtaz: number | null;
+  steviloStanovanj: number | null;
+  brutoTlorisnaPovrsina: number | null;
+  elektrika: boolean;
+  plin: boolean;
+  vodovod: boolean;
+  kanalizacija: boolean;
+  nosilnaKonstrukcija: string | null;
+  tipStavbe: string | null;
+}
+
+export interface DelStavbeData {
+  stDelaStavbe: number;
+  povrsina: number | null;
+  uporabnaPovrsina: number | null;
+  vrsta: string | null;
+}
+
 interface WfsFeature {
   type: string;
   properties: Record<string, unknown>;
@@ -12,120 +70,170 @@ interface WfsResponse {
   features: WfsFeature[];
 }
 
+// --- WFS helpers ---
+
 function buildWfsUrl(
   base: string,
   typeName: string,
-  cqlFilter: string
+  cqlFilter: string,
 ): string {
   const params = new URLSearchParams({
-    service: "WFS",
-    version: "2.0.0",
-    request: "GetFeature",
-    typeNames: typeName,
-    outputFormat: "application/json",
+    SERVICE: "WFS",
+    VERSION: "2.0.0",
+    REQUEST: "GetFeature",
+    TYPENAMES: typeName,
+    OUTPUTFORMAT: "application/json",
     CQL_FILTER: cqlFilter,
   });
   return `${base}?${params.toString()}`;
 }
 
-async function fetchWfs(url: string): Promise<WfsResponse> {
-  const res = await fetch(url, {
-    headers: { Accept: "application/json" },
-    next: { revalidate: 3600 },
+async function fetchWfs(url: string): Promise<WfsResponse | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+// --- Public API ---
+
+export async function getStreetId(streetName: string): Promise<number | null> {
+  const url = buildWfsUrl(
+    BASE_RPE,
+    "SI.GURS.RPE:UL_G",
+    `UL_UIME LIKE '${streetName}'`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return null;
+  return data.features[0].properties.UL_MID as number;
+}
+
+export async function getHouseNumberId(
+  ulMid: number,
+  houseNumber: string,
+  suffix?: string,
+): Promise<number | null> {
+  let filter = `UL_MID=${ulMid} AND HS=${houseNumber}`;
+  if (suffix) {
+    filter += ` AND HD='${suffix}'`;
+  }
+  const url = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:HS_G", filter);
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return null;
+  return data.features[0].properties.HS_MID as number;
+}
+
+export async function getBuildingEid(hsMid: number): Promise<string | null> {
+  const url = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:HISNE_STEVILKE_TABELA",
+    `ST_HS=${hsMid}`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return null;
+  return String(data.features[0].properties.EID_STAVBA);
+}
+
+export async function getBuilding(
+  eidStavba: string,
+): Promise<StavbaData | null> {
+  const url = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:STAVBE_TABELA",
+    `EID_STAVBA='${eidStavba}'`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return null;
+
+  const p = data.features[0].properties;
+  return {
+    koId: p.KO_ID as number,
+    stStavbe: p.ST_STAVBE as number,
+    eidStavba,
+    letoIzgradnje: (p.LETO_IZGRADNJE as number) || null,
+    letoObnoveFasade: (p.LETO_OBNOVE_FASADE as number) || null,
+    letoObnoveStrehe: (p.LETO_OBNOVE_STREHE as number) || null,
+    steviloEtaz: (p.STEVILO_ETAZ as number) || null,
+    steviloStanovanj: (p.STEVILO_STANOVANJ as number) || null,
+    brutoTlorisnaPovrsina: (p.BRUTO_TLORISNA_POVRSINA as number) || null,
+    elektrika: Boolean(p.ELEKTRIKA),
+    plin: Boolean(p.PLIN),
+    vodovod: Boolean(p.VODOVOD),
+    kanalizacija: Boolean(p.KANALIZACIJA),
+    nosilnaKonstrukcija:
+      NOSILNA_KONSTRUKCIJA[p.NOSILNA_KONSTRUKCIJA_ID as number] ?? null,
+    tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
+  };
+}
+
+export async function getBuildingParts(
+  eidStavba: string,
+): Promise<DelStavbeData[]> {
+  const url = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:DELI_STAVB_TABELA",
+    `EID_STAVBA='${eidStavba}'`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return [];
+
+  return data.features.map((f) => {
+    const p = f.properties;
+    return {
+      stDelaStavbe: p.ST_DELA_STAVBE as number,
+      povrsina: (p.POVRSINA as number) || null,
+      uporabnaPovrsina: (p.UPORABNA_POVRSINA as number) || null,
+      vrsta:
+        VRSTA_DEJANSKE_RABE[p.VRSTA_DEJANSKE_RABE_DEL_ST_ID as number] ?? null,
+    };
   });
-
-  if (!res.ok) {
-    throw new Error(`WFS request failed: ${res.status} ${res.statusText}`);
-  }
-
-  return res.json();
 }
 
-export class GursAPI {
-  /**
-   * Poišče ID ulice po imenu.
-   * Returns UL_MID from RPE ulice layer.
-   */
-  async getStreetId(streetName: string): Promise<number | null> {
-    const url = buildWfsUrl(
-      BASE_RPE,
-      "SI.GURS.RPE:ULICA",
-      `UL_UIME='${streetName}'`
-    );
-    const data = await fetchWfs(url);
-
-    if (data.features.length === 0) return null;
-    return data.features[0].properties.UL_MID as number;
-  }
-
-  /**
-   * Poišče hišno številko po UL_MID in številki.
-   * Returns HS_MID.
-   */
-  async getHouseNumber(
-    ulMid: number,
-    houseNumber: string,
-    houseSuffix?: string
-  ): Promise<number | null> {
-    let filter = `UL_MID=${ulMid} AND HS=${houseNumber}`;
-    if (houseSuffix) {
-      filter += ` AND HD='${houseSuffix}'`;
-    }
-
-    const url = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:HISNA_STEVILKA", filter);
-    const data = await fetchWfs(url);
-
-    if (data.features.length === 0) return null;
-    return data.features[0].properties.HS_MID as number;
-  }
-
-  /**
-   * Poišče ID stavbe (EID_STAVBA) po HS_MID.
-   */
-  async getBuildingId(hsMid: number): Promise<number | null> {
-    const url = buildWfsUrl(
-      BASE_RPE,
-      "SI.GURS.RPE:NASLOV_STAVBA",
-      `HS_MID=${hsMid}`
-    );
-    const data = await fetchWfs(url);
-
-    if (data.features.length === 0) return null;
-    return data.features[0].properties.EID_STAVBA as number;
-  }
-
-  /**
-   * Pridobi podatke o stavbi iz katastra.
-   */
-  async getBuilding(
-    eidStavba: number
-  ): Promise<WfsFeature | null> {
-    const url = buildWfsUrl(
-      BASE_KN,
-      "SI.GURS.KN.STAVBE:STAVBA_OSNOVNI",
-      `EID_STAVBA=${eidStavba}`
-    );
-    const data = await fetchWfs(url);
-
-    if (data.features.length === 0) return null;
-    return data.features[0];
-  }
-
-  /**
-   * Pridobi dele stavbe (enote).
-   */
-  async getBuildingParts(
-    eidStavba: number
-  ): Promise<WfsFeature[]> {
-    const url = buildWfsUrl(
-      BASE_KN,
-      "SI.GURS.KN.STAVBE:DEL_STAVBE_OSNOVNI",
-      `EID_STAVBA=${eidStavba}`
-    );
-    const data = await fetchWfs(url);
-
-    return data.features;
-  }
+/** Parse "Slovenčeva ulica 4A" → { street, number, suffix } */
+export function parseAddress(raw: string): {
+  street: string;
+  number: string;
+  suffix?: string;
+} | null {
+  const trimmed = raw.trim();
+  // Match: street name, then space, then digits, then optional letter suffix
+  const match = trimmed.match(/^(.+?)\s+(\d+)\s*([A-Za-z]?)$/);
+  if (!match) return null;
+  return {
+    street: match[1].trim(),
+    number: match[2],
+    suffix: match[3] ? match[3].toUpperCase() : undefined,
+  };
 }
 
-export const gursApi = new GursAPI();
+/** Full lookup chain: address string → building + parts */
+export async function lookupByAddress(address: string): Promise<{
+  stavba: StavbaData;
+  deliStavbe: DelStavbeData[];
+} | null> {
+  const parsed = parseAddress(address);
+  if (!parsed) return null;
+
+  const ulMid = await getStreetId(parsed.street);
+  if (!ulMid) return null;
+
+  const hsMid = await getHouseNumberId(ulMid, parsed.number, parsed.suffix);
+  if (!hsMid) return null;
+
+  const eidStavba = await getBuildingEid(hsMid);
+  if (!eidStavba) return null;
+
+  const [stavba, deliStavbe] = await Promise.all([
+    getBuilding(eidStavba),
+    getBuildingParts(eidStavba),
+  ]);
+
+  if (!stavba) return null;
+  return { stavba, deliStavbe };
+}
