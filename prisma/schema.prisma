@@ -1,0 +1,104 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model Property {
+  id           String                          @id @default(cuid())
+  koId         Int
+  stStavbe     Int
+  stDelaStavbe Int?
+  address      String
+  municipality String
+  postCode     String
+  geometry     Unsupported("geometry(Point,4326)")?
+
+  @@unique([koId, stStavbe, stDelaStavbe])
+  @@map("properties")
+}
+
+model Building {
+  id                    String   @id @default(cuid())
+  eidStavba             Int      @unique
+  koId                  Int
+  stStavbe              Int
+  yearBuilt             Int?
+  yearFacadeRenovated   Int?
+  yearRoofRenovated     Int?
+  floors                Int?
+  units                 Int?
+  grossArea             Float?
+  electricity           Boolean  @default(false)
+  gas                   Boolean  @default(false)
+  water                 Boolean  @default(false)
+  sewage                Boolean  @default(false)
+  constructionType      String?
+  buildingType          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  parts BuildingPart[]
+
+  @@unique([koId, stStavbe])
+  @@map("buildings")
+}
+
+model BuildingPart {
+  id            String   @id @default(cuid())
+  eidDelStavbe  Int      @unique
+  eidStavba     Int
+  partNumber    Int
+  area          Float?
+  usableArea    Float?
+  useType       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  building Building @relation(fields: [eidStavba], references: [eidStavba])
+
+  @@map("building_parts")
+}
+
+model EnergyCertificate {
+  id            String   @id @default(cuid())
+  koId          Int
+  stStavbe      Int
+  stDelaStavbe  Int?
+  certificateId String   @unique
+  issueDate     DateTime
+  validUntil    DateTime
+  energyClass   String
+  heatingNeed   Float?
+  primaryEnergy Float?
+  co2Emissions  Float?
+  area          Float?
+  type          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([koId, stStavbe, stDelaStavbe])
+  @@map("energy_certificates")
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  koId          Int
+  stStavbe      Int
+  stDelaStavbe  Int?
+  price         Float
+  pricePerM2    Float?
+  date          DateTime
+  type          String
+  area          Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([koId, stStavbe, stDelaStavbe])
+  @@map("transactions")
+}
