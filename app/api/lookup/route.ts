@@ -81,6 +81,10 @@ export async function POST(request: NextRequest) {
         povrsina: d.povrsina,
         uporabnaPovrsina: d.uporabnaPovrsina,
         vrsta: d.vrsta,
+        letoObnoveInstalacij: d.letoObnoveInstalacij,
+        letoObnoveOken: d.letoObnoveOken,
+        dvigalo: d.dvigalo,
+        prostori: d.prostori,
       })),
       energetskaIzkaznica,
     });

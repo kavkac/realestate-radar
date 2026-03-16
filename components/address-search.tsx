@@ -4,6 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { PropertyCard } from "./property-card";
 
+interface Prostor {
+  vrsta: string;
+  povrsina: number | null;
+}
+
 interface LookupResult {
   success: boolean;
   error?: string;
@@ -29,6 +34,10 @@ interface LookupResult {
     povrsina: number | null;
     uporabnaPovrsina: number | null;
     vrsta: string | null;
+    letoObnoveInstalacij: number | null;
+    letoObnoveOken: number | null;
+    dvigalo: boolean;
+    prostori: Prostor[];
   }[];
   energetskaIzkaznica?: {
     razred: string;

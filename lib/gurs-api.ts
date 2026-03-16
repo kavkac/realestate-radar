@@ -49,6 +49,22 @@ export const VRSTA_DEJANSKE_RABE: Record<number, string> = {
   47: "Stanovanje (starejši zapis)",
 };
 
+export const VRSTA_PROSTORA: Record<number, string> = {
+  1: "Bivalni prostor",
+  2: "Kuhinja",
+  3: "Kopalnica, WC",
+  4: "Shramba, sušilnica, pralnica",
+  5: "Odprta terasa, balkon, loža",
+  6: "Zaprta terasa, balkon, loža",
+  7: "Garaža",
+  8: "Tehnični prostor",
+  9: "Klet",
+  10: "Podstrešje",
+  11: "Skupni prostor",
+  12: "Poslovni prostor",
+  13: "Drugo",
+};
+
 // --- Types ---
 
 export interface StavbaData {
@@ -69,11 +85,21 @@ export interface StavbaData {
   tipStavbe: string | null;
 }
 
+export interface ProstorData {
+  vrsta: string;
+  povrsina: number | null;
+}
+
 export interface DelStavbeData {
   stDelaStavbe: number;
+  eidDelStavbe: string;
   povrsina: number | null;
   uporabnaPovrsina: number | null;
   vrsta: string | null;
+  letoObnoveInstalacij: number | null;
+  letoObnoveOken: number | null;
+  dvigalo: boolean;
+  prostori: ProstorData[];
 }
 
 interface WfsFeature {
@@ -88,6 +114,11 @@ interface WfsResponse {
 }
 
 // --- WFS helpers ---
+
+/** GURS WFS uses 1=Da, 2=Ne for boolean fields */
+function wfsBool(val: unknown): boolean {
+  return val === 1 || val === "1";
+}
 
 function buildWfsUrl(
   base: string,
@@ -179,14 +210,32 @@ export async function getBuilding(
     steviloEtaz: (p.STEVILO_ETAZ as number) || null,
     steviloStanovanj: (p.STEVILO_STANOVANJ as number) || null,
     brutoTlorisnaPovrsina: (p.BRUTO_TLORISNA_POVRSINA as number) || null,
-    elektrika: Boolean(p.ELEKTRIKA),
-    plin: Boolean(p.PLIN),
-    vodovod: Boolean(p.VODOVOD),
-    kanalizacija: Boolean(p.KANALIZACIJA),
+    elektrika: wfsBool(p.ELEKTRIKA),
+    plin: wfsBool(p.PLIN),
+    vodovod: wfsBool(p.VODOVOD),
+    kanalizacija: wfsBool(p.KANALIZACIJA),
     nosilnaKonstrukcija:
       NOSILNA_KONSTRUKCIJA[p.NOSILNA_KONSTRUKCIJA_ID as number] ?? null,
     tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
   };
+}
+
+export async function getRooms(eidDelStavbe: string): Promise<ProstorData[]> {
+  const url = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:PROSTORI_TABELA",
+    `EID_DEL_STAVBE='${eidDelStavbe}'`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return [];
+
+  return data.features.map((f) => {
+    const p = f.properties;
+    return {
+      vrsta: VRSTA_PROSTORA[p.VRSTA_PROSTORA_ID as number] ?? "Drugo",
+      povrsina: (p.POVRSINA as number) || null,
+    };
+  });
 }
 
 export async function getBuildingParts(
@@ -200,16 +249,33 @@ export async function getBuildingParts(
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return [];
 
-  return data.features.map((f) => {
+  // First pass: parse parts and collect EIDs for room queries
+  const parts = data.features.map((f) => {
     const p = f.properties;
     return {
       stDelaStavbe: p.ST_DELA_STAVBE as number,
+      eidDelStavbe: String(p.EID_DEL_STAVBE),
       povrsina: (p.POVRSINA as number) || null,
       uporabnaPovrsina: (p.UPORABNA_POVRSINA as number) || null,
       vrsta:
-        VRSTA_DEJANSKE_RABE[p.VRSTA_DEJANSKE_RABE_DEL_ST_ID as number] ?? "Neznano",
+        VRSTA_DEJANSKE_RABE[p.VRSTA_DEJANSKE_RABE_DEL_ST_ID as number] ??
+        "Neznano",
+      letoObnoveInstalacij: (p.LETO_OBNOVE_INSTALACIJ as number) || null,
+      letoObnoveOken: (p.LETO_OBNOVE_OKEN as number) || null,
+      dvigalo: wfsBool(p.DVIGALO),
+      prostori: [] as ProstorData[],
     };
   });
+
+  // Fetch rooms for all parts in parallel
+  const roomResults = await Promise.all(
+    parts.map((part) => getRooms(part.eidDelStavbe)),
+  );
+  for (let i = 0; i < parts.length; i++) {
+    parts[i].prostori = roomResults[i];
+  }
+
+  return parts;
 }
 
 /** Parse "Slovenčeva ulica 4A" → { street, number, suffix } */
@@ -219,7 +285,6 @@ export function parseAddress(raw: string): {
   suffix?: string;
 } | null {
   const trimmed = raw.trim();
-  // Match: street name, then space, then digits, then optional letter suffix
   const match = trimmed.match(/^(.+?)\s+(\d+)\s*([A-Za-z]?)$/);
   if (!match) return null;
   return {
@@ -229,7 +294,7 @@ export function parseAddress(raw: string): {
   };
 }
 
-/** Full lookup chain: address string → building + parts */
+/** Full lookup chain: address string → building + parts with rooms */
 export async function lookupByAddress(address: string): Promise<{
   stavba: StavbaData;
   deliStavbe: DelStavbeData[];
