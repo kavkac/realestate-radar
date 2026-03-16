@@ -35,6 +35,13 @@ npm run dev
 - **Portal energetskih izkaznic** — energetske izkaznice stavb
 - **ETN** — evidenca trga nepremičnin (transakcije)
 
+## Vercel deployment
+
+Set these environment variables in Vercel project settings:
+
+- `DATABASE_URL` — PostgreSQL connection string
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Google Maps API key with Places API enabled (for address autocomplete). Use: `AIzaSyBdsTqzdIZ8MTDnnrvtelugoEYXjS-V1wQ`
+
 ## Tehnologije
 
 - Next.js 14 (App Router)

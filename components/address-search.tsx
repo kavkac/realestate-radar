@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { PropertyCard } from "./property-card";
 
 interface LookupResult {
@@ -47,6 +48,50 @@ export function AddressSearch() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<LookupResult | null>(null);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  const handlePlaceSelect = useCallback(() => {
+    const place = autocompleteRef.current?.getPlace();
+    if (!place?.address_components) return;
+
+    let street = "";
+    let streetNumber = "";
+
+    for (const comp of place.address_components) {
+      if (comp.types.includes("route")) {
+        street = comp.long_name;
+      }
+      if (comp.types.includes("street_number")) {
+        streetNumber = comp.long_name;
+      }
+    }
+
+    if (street && streetNumber) {
+      setAddress(`${street} ${streetNumber}`);
+    } else if (street) {
+      setAddress(street);
+    }
+  }, []);
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey || !inputRef.current) return;
+
+    setOptions({ key: apiKey, v: "weekly" });
+
+    importLibrary("places").then(() => {
+      if (!inputRef.current) return;
+      const ac = new google.maps.places.Autocomplete(inputRef.current, {
+        componentRestrictions: { country: "si" },
+        types: ["address"],
+        fields: ["address_components"],
+      });
+      ac.addListener("place_changed", handlePlaceSelect);
+      autocompleteRef.current = ac;
+    });
+  }, [handlePlaceSelect]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -85,6 +130,7 @@ export function AddressSearch() {
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="flex gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
