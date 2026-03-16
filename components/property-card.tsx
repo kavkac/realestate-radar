@@ -18,6 +18,20 @@ interface DelStavbe {
   prostori: Prostor[];
 }
 
+interface Parcela {
+  parcelnaStevila: string;
+  povrsina: number | null;
+  vrstaRabe: string | null;
+  boniteta: number | null;
+  katastrskiRazred: number | null;
+  katastrskiDohodek: number | null;
+}
+
+interface RenVrednost {
+  vrednost: number;
+  datumOcene: string;
+}
+
 interface EnergyData {
   razred: string;
   tip: string | null;
@@ -52,6 +66,8 @@ interface PropertyCardProps {
   };
   deliStavbe: DelStavbe[];
   energetskaIzkaznica: EnergyData | null;
+  parcele?: Parcela[];
+  renVrednost?: RenVrednost | null;
   requestedDel?: number;
 }
 
@@ -81,6 +97,8 @@ export function PropertyCard({
   stavba,
   deliStavbe,
   energetskaIzkaznica,
+  parcele,
+  renVrednost,
   requestedDel,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
@@ -182,7 +200,9 @@ export function PropertyCard({
               </button>
             </div>
             <PartDetail part={activePart} />
-            <div className="mt-6">
+            <div className="mt-6 space-y-6">
+              <ParceleSection parcele={parcele} />
+              <RenVrednostSection data={renVrednost} />
               <EnergyCertificateSection data={energetskaIzkaznica} />
             </div>
           </section>
@@ -202,7 +222,13 @@ export function PropertyCard({
           </section>
         )}
 
-        {!isMultiUnit && <EnergyCertificateSection data={energetskaIzkaznica} />}
+        {!isMultiUnit && (
+          <>
+            <ParceleSection parcele={parcele} />
+            <RenVrednostSection data={renVrednost} />
+            <EnergyCertificateSection data={energetskaIzkaznica} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -366,6 +392,57 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
           Ni energetske izkaznice
         </p>
       )}
+    </section>
+  );
+}
+
+function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
+  if (!parcele || parcele.length === 0) return null;
+  return (
+    <section>
+      <SectionTitle>Zemljišče</SectionTitle>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="pb-2 pr-4">Parcela</th>
+              <th className="pb-2 pr-4 text-right">Površina</th>
+              <th className="pb-2 pr-4">Vrsta rabe</th>
+              <th className="pb-2 text-right">Boniteta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parcele.map((p, i) => (
+              <tr key={i} className="border-b last:border-0">
+                <td className="py-1.5 pr-4">{p.parcelnaStevila}</td>
+                <td className="py-1.5 pr-4 text-right">
+                  {p.povrsina != null ? `${p.povrsina} m\u00B2` : "\u2014"}
+                </td>
+                <td className="py-1.5 pr-4">{p.vrstaRabe ?? "\u2014"}</td>
+                <td className="py-1.5 text-right">
+                  {p.boniteta != null ? p.boniteta : "\u2014"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function RenVrednostSection({ data }: { data?: RenVrednost | null }) {
+  if (!data) return null;
+  return (
+    <section>
+      <SectionTitle>Posplošena tržna vrednost (REN)</SectionTitle>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <Field
+          label="Vrednost"
+          value={`${data.vrednost.toLocaleString("sl-SI")} \u20AC`}
+        />
+        <Field label="Datum ocene" value={data.datumOcene} />
+      </div>
     </section>
   );
 }

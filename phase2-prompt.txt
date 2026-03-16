@@ -1,0 +1,81 @@
+You are implementing Phase 2 features for the RealEstateRadar Next.js project.
+Work in /Users/jaka/.openclaw/workspace-rer-ceo/realestate-radar/
+
+Read the existing code first:
+- lib/gurs-api.ts (the WFS helpers and types)
+- app/api/lookup/route.ts (the API route)
+- Find the main property card component
+
+## TASK 1: In-memory WFS cache (lib/wfs-cache.ts)
+
+Create a simple Map-based cache with 1-hour TTL:
+- Export: getCached(key: string): string | undefined
+- Export: setCached(key: string, value: string): void
+- Auto-expire entries after 3600 seconds
+
+Then modify lib/gurs-api.ts fetchWfs() function to use this cache: before fetch, check cache by URL; after fetch, store raw response text in cache.
+
+## TASK 2: Zemljisce lookup (add to lib/gurs-api.ts)
+
+Add VRSTA_RABE map and ParcelaData interface:
+
+export interface ParcelaData {
+  parcelnaStevila: string;
+  povrsina: number | null;
+  vrstaRabe: string | null;
+  boniteta: number | null;
+  katastrskiRazred: number | null;
+  katastrskiDohodek: number | null;
+}
+
+Add function getParcele(koId: number, stStavbe: number): Promise<ParcelaData[]>
+
+The PARCELE_TABELA WFS is at BASE_KN (https://ipi.eprostor.gov.si/wfs-si-gurs-kn-osnovni/wfs)
+Layer: SI.GURS.KN:PARCELE_TABELA
+
+To link building to parcels:
+1. First fetch STAVBE_TABELA with filter: KO_ID={koId} AND ST_STAVBE={stStavbe}
+2. Check if the feature has a PARCELA or ST_PARCELE field
+3. If yes, use that to fetch PARCELE_TABELA with: KO_ID={koId} AND ST_PARCELE='{value}'
+4. Otherwise try fetching PARCELE_TABELA with: KO_ID={koId} AND ST_STAVBE={stStavbe}
+5. Parse fields: ST_PARCELE, POVRSINA, VRSTA_RABE_ID, BONITETA_TALA, KATASTRSKI_RAZRED, KATASTRSKI_DOHODEK
+6. Return array (may be empty - that's fine)
+
+VRSTA_RABE map (common values): 1=Njiva, 2=Vrt, 6=Travnik, 21=Gozd, 30=Pozidano stavisca, 31=Cesta, 39=Park, 41=Ostalo
+
+## TASK 3: REN vrednost (add to lib/gurs-api.ts)
+
+Add function getRenVrednost(koId: number, stStavbe: number): Promise<{vrednost: number; datumOcene: string} | null>
+
+Try WFS at BASE_RPE (https://storitve.eprostor.gov.si/ows-pub-wfs/wfs)
+Try layer: SI.GURS.REN:VREDNOST_NEPREMICNINE with filter: KO_ID={koId} AND ST_STAVBE={stStavbe}
+Look for fields: POSPLOŠENA_TRŽNA_VREDNOST or VREDNOST, and DATUM_OCENE
+If any fetch fails or returns no features, return null gracefully.
+
+## TASK 4: Rate limiting in app/api/lookup/route.ts
+
+Add at module scope: const rateLimitMap = new Map()
+In POST handler:
+- Get IP from x-forwarded-for or x-real-ip header
+- If IP has made > 10 requests in last 60s, return 429 with error message
+- Reset window per IP every 60 seconds
+
+## TASK 5: Update API response
+
+Fetch parcele and renVrednost in parallel after stavba is found.
+Add both to the JSON response.
+
+## TASK 6: Display in property card
+
+Find the main property card React component. Add:
+- Zemljisce section: show parcel info if parcele.length > 0
+- REN vrednost section: show official value if renVrednost !== null
+
+## AFTER ALL CHANGES:
+1. Run: cd /Users/jaka/.openclaw/workspace-rer-ceo/realestate-radar && npx tsc --noEmit
+2. Fix any TypeScript errors
+3. Run: git add -A && git commit -m 'feat: Phase 2 - zemljisce, REN vrednost, WFS cache, rate limiting'
+4. Run: git push origin main
+
+When completely finished, run:
+openclaw system event --text "Done: Phase 2 - zemljisce parcele, REN vrednost, WFS cache, rate limiting" --mode now

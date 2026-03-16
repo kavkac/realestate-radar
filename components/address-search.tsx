@@ -52,6 +52,18 @@ interface LookupResult {
     co2: number | null;
     kondicionirana: number | null;
   } | null;
+  parcele?: {
+    parcelnaStevila: string;
+    povrsina: number | null;
+    vrstaRabe: string | null;
+    boniteta: number | null;
+    katastrskiRazred: number | null;
+    katastrskiDohodek: number | null;
+  }[];
+  renVrednost?: {
+    vrednost: number;
+    datumOcene: string;
+  } | null;
 }
 
 export function AddressSearch() {
@@ -192,6 +204,8 @@ export function AddressSearch() {
           stavba={result.stavba}
           deliStavbe={result.deliStavbe ?? []}
           energetskaIzkaznica={result.energetskaIzkaznica ?? null}
+          parcele={result.parcele}
+          renVrednost={result.renVrednost}
           requestedDel={submittedDel}
         />
       )}

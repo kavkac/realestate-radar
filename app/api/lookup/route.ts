@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lookupByAddress } from "@/lib/gurs-api";
+import { lookupByAddress, getParcele, getRenVrednost } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 
 const LookupSchema = z.object({
@@ -8,7 +8,35 @@ const LookupSchema = z.object({
   delStavbe: z.number().optional(),
 });
 
+// --- Rate limiting ---
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT_MAX;
+}
+
 export async function POST(request: NextRequest) {
+  // Rate limit by IP
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { success: false, error: "Preveč zahtevkov. Poskusite znova čez minuto." },
+      { status: 429 },
+    );
+  }
+
   try {
     const body = await request.json();
     const { address, delStavbe } = LookupSchema.parse(body);
@@ -27,31 +55,33 @@ export async function POST(request: NextRequest) {
     const stDelaStavbe =
       delStavbe ?? (deliStavbe.length === 1 ? deliStavbe[0].stDelaStavbe : undefined);
 
-    // Fetch energy certificate from DB
-    let energetskaIzkaznica = null;
-    try {
-      const cert = await lookupEnergyCertificate({
+    // Fetch energy certificate, parcele, and REN vrednost in parallel
+    const [energyCertResult, parcele, renVrednost] = await Promise.all([
+      lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
         stDelaStavbe,
-      });
-      if (cert) {
-        energetskaIzkaznica = {
-          razred: cert.energyClass,
-          tip: cert.type,
-          datumIzdaje: cert.issueDate.toISOString().split("T")[0],
-          veljaDo: cert.validUntil.toISOString().split("T")[0],
-          potrebnaTopota: cert.heatingNeed,
-          dovedenaEnergija: cert.deliveredEnergy,
-          celotnaEnergija: cert.totalEnergy,
-          elektricnaEnergija: cert.electricEnergy,
-          primaryEnergy: cert.primaryEnergy,
-          co2: cert.co2Emissions,
-          kondicionirana: cert.conditionedArea,
-        };
-      }
-    } catch {
-      // DB not available — skip silently
+      }).catch(() => null),
+      getParcele(stavba.koId, stavba.stStavbe),
+      getRenVrednost(stavba.koId, stavba.stStavbe),
+    ]);
+
+    let energetskaIzkaznica = null;
+    if (energyCertResult) {
+      const cert = energyCertResult;
+      energetskaIzkaznica = {
+        razred: cert.energyClass,
+        tip: cert.type,
+        datumIzdaje: cert.issueDate.toISOString().split("T")[0],
+        veljaDo: cert.validUntil.toISOString().split("T")[0],
+        potrebnaTopota: cert.heatingNeed,
+        dovedenaEnergija: cert.deliveredEnergy,
+        celotnaEnergija: cert.totalEnergy,
+        elektricnaEnergija: cert.electricEnergy,
+        primaryEnergy: cert.primaryEnergy,
+        co2: cert.co2Emissions,
+        kondicionirana: cert.conditionedArea,
+      };
     }
 
     return NextResponse.json({
@@ -91,6 +121,8 @@ export async function POST(request: NextRequest) {
         prostori: d.prostori,
       })),
       energetskaIzkaznica,
+      parcele,
+      renVrednost,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

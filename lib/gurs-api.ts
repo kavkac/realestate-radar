@@ -1,3 +1,5 @@
+import { getCached, setCached } from "./wfs-cache";
+
 const BASE_RPE = "https://storitve.eprostor.gov.si/ows-pub-wfs/wfs";
 const BASE_KN = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn-osnovni/wfs";
 
@@ -138,12 +140,18 @@ function buildWfsUrl(
 
 async function fetchWfs(url: string): Promise<WfsResponse | null> {
   try {
+    const cached = getCached(url);
+    if (cached) {
+      return JSON.parse(cached) as WfsResponse;
+    }
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
       next: { revalidate: 3600 },
     });
     if (!res.ok) return null;
-    return res.json();
+    const text = await res.text();
+    setCached(url, text);
+    return JSON.parse(text) as WfsResponse;
   } catch {
     return null;
   }
@@ -276,6 +284,119 @@ export async function getBuildingParts(
   }
 
   return parts;
+}
+
+// --- Zemljišče šifrant ---
+
+const VRSTA_RABE: Record<number, string> = {
+  1: "Njiva",
+  2: "Vrt",
+  6: "Travnik",
+  21: "Gozd",
+  30: "Pozidano stavišče",
+  31: "Cesta",
+  39: "Park",
+  41: "Ostalo",
+};
+
+// --- Parcele & REN types ---
+
+export interface ParcelaData {
+  parcelnaStevila: string;
+  povrsina: number | null;
+  vrstaRabe: string | null;
+  boniteta: number | null;
+  katastrskiRazred: number | null;
+  katastrskiDohodek: number | null;
+}
+
+export interface RenVrednostData {
+  vrednost: number;
+  datumOcene: string;
+}
+
+// --- Parcele lookup ---
+
+export async function getParcele(
+  koId: number,
+  stStavbe: number,
+): Promise<ParcelaData[]> {
+  // First: get STAVBE_TABELA to find parcel link
+  const stavbaUrl = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:STAVBE_TABELA",
+    `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`,
+  );
+  const stavbaData = await fetchWfs(stavbaUrl);
+
+  let parceleData: WfsResponse | null = null;
+
+  if (stavbaData && stavbaData.features.length > 0) {
+    const p = stavbaData.features[0].properties;
+    const parcelaRef = p.PARCELA ?? p.ST_PARCELE;
+
+    if (parcelaRef != null) {
+      const parceleUrl = buildWfsUrl(
+        BASE_KN,
+        "SI.GURS.KN:PARCELE_TABELA",
+        `KO_ID=${koId} AND ST_PARCELE='${parcelaRef}'`,
+      );
+      parceleData = await fetchWfs(parceleUrl);
+    }
+  }
+
+  // Fallback: try linking by ST_STAVBE
+  if (!parceleData || parceleData.features.length === 0) {
+    const fallbackUrl = buildWfsUrl(
+      BASE_KN,
+      "SI.GURS.KN:PARCELE_TABELA",
+      `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`,
+    );
+    parceleData = await fetchWfs(fallbackUrl);
+  }
+
+  if (!parceleData || parceleData.features.length === 0) return [];
+
+  return parceleData.features.map((f) => {
+    const fp = f.properties;
+    return {
+      parcelnaStevila: String(fp.ST_PARCELE ?? ""),
+      povrsina: (fp.POVRSINA as number) || null,
+      vrstaRabe: VRSTA_RABE[fp.VRSTA_RABE_ID as number] ?? null,
+      boniteta: (fp.BONITETA_TALA as number) || null,
+      katastrskiRazred: (fp.KATASTRSKI_RAZRED as number) || null,
+      katastrskiDohodek: (fp.KATASTRSKI_DOHODEK as number) || null,
+    };
+  });
+}
+
+// --- REN vrednost ---
+
+export async function getRenVrednost(
+  koId: number,
+  stStavbe: number,
+): Promise<RenVrednostData | null> {
+  try {
+    const url = buildWfsUrl(
+      BASE_RPE,
+      "SI.GURS.REN:VREDNOST_NEPREMICNINE",
+      `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`,
+    );
+    const data = await fetchWfs(url);
+    if (!data || data.features.length === 0) return null;
+
+    const p = data.features[0].properties;
+    const vrednost =
+      (p["POSPLOŠENA_TRŽNA_VREDNOST"] as number) ??
+      (p.VREDNOST as number) ??
+      null;
+    const datumOcene = p.DATUM_OCENE ? String(p.DATUM_OCENE) : "";
+
+    if (vrednost == null) return null;
+    return { vrednost, datumOcene };
+  } catch {
+    return null;
+  }
 }
 
 /** Parse "Slovenčeva ulica 4A" → { street, number, suffix } */
