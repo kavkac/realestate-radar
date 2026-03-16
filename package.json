@@ -11,7 +11,9 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "import:eiz": "npx ts-node scripts/import-eiz.ts",
+    "import:etn": "npx ts-node scripts/import-etn.ts"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.0.2",
@@ -20,6 +22,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "csv-parse": "^6.1.0",
     "lucide-react": "^0.460.0",
     "next": "14.2.18",
     "react": "^18.3.1",

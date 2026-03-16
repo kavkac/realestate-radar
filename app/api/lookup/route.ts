@@ -38,12 +38,16 @@ export async function POST(request: NextRequest) {
       if (cert) {
         energetskaIzkaznica = {
           razred: cert.energyClass,
+          tip: cert.type,
           datumIzdaje: cert.issueDate.toISOString().split("T")[0],
           veljaDo: cert.validUntil.toISOString().split("T")[0],
           potrebnaTopota: cert.heatingNeed,
+          dovedenaEnergija: cert.deliveredEnergy,
+          celotnaEnergija: cert.totalEnergy,
+          elektricnaEnergija: cert.electricEnergy,
           primaryEnergy: cert.primaryEnergy,
           co2: cert.co2Emissions,
-          povrsina: cert.area,
+          kondicionirana: cert.conditionedArea,
         };
       }
     } catch {

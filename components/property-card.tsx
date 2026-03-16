@@ -20,12 +20,16 @@ interface DelStavbe {
 
 interface EnergyData {
   razred: string;
+  tip: string | null;
   datumIzdaje: string;
   veljaDo: string;
   potrebnaTopota: number | null;
+  dovedenaEnergija: number | null;
+  celotnaEnergija: number | null;
+  elektricnaEnergija: number | null;
   primaryEnergy: number | null;
   co2: number | null;
-  povrsina: number | null;
+  kondicionirana: number | null;
 }
 
 interface PropertyCardProps {
@@ -300,13 +304,14 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <span
-              className={`inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-bold text-white ${ENERGY_COLORS[data.razred] ?? "bg-gray-400"}`}
+              className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-base font-bold text-white ${ENERGY_COLORS[data.razred] ?? "bg-gray-400"}`}
             >
               {data.razred}
             </span>
-            <span className="text-sm text-muted-foreground">
-              Veljavna do {data.veljaDo}
-            </span>
+            <div className="text-sm text-muted-foreground">
+              <p>Veljavna do {data.veljaDo}</p>
+              {data.tip && <p>Tip: {data.tip}</p>}
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
             <Field
@@ -314,6 +319,22 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
               value={
                 data.potrebnaTopota != null
                   ? `${data.potrebnaTopota} kWh/m\u00B2a`
+                  : null
+              }
+            />
+            <Field
+              label="Dovedena energija"
+              value={
+                data.dovedenaEnergija != null
+                  ? `${data.dovedenaEnergija} kWh/m\u00B2a`
+                  : null
+              }
+            />
+            <Field
+              label="Električna energija"
+              value={
+                data.elektricnaEnergija != null
+                  ? `${data.elektricnaEnergija} kWh/m\u00B2a`
                   : null
               }
             />
@@ -330,9 +351,11 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
               value={data.co2 != null ? `${data.co2} kg/m\u00B2a` : null}
             />
             <Field
-              label="Površina"
+              label="Kondicionirana površina"
               value={
-                data.povrsina != null ? `${data.povrsina} m\u00B2` : null
+                data.kondicionirana != null
+                  ? `${data.kondicionirana} m\u00B2`
+                  : null
               }
             />
             <Field label="Datum izdaje" value={data.datumIzdaje} />

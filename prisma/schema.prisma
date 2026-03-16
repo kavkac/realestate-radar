@@ -67,21 +67,24 @@ model BuildingPart {
 }
 
 model EnergyCertificate {
-  id            String   @id @default(cuid())
-  koId          Int
-  stStavbe      Int
-  stDelaStavbe  Int?
-  certificateId String   @unique
-  issueDate     DateTime
-  validUntil    DateTime
-  energyClass   String
-  heatingNeed   Float?
-  primaryEnergy Float?
-  co2Emissions  Float?
-  area          Float?
-  type          String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default(cuid())
+  certificateId     String   @unique
+  koId              Int
+  stStavbe          Int
+  stDelaStavbe      Int?
+  issueDate         DateTime
+  validUntil        DateTime
+  energyClass       String
+  type              String?
+  heatingNeed       Float?
+  deliveredEnergy   Float?
+  totalEnergy       Float?
+  electricEnergy    Float?
+  primaryEnergy     Float?
+  co2Emissions      Float?
+  conditionedArea   Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([koId, stStavbe, stDelaStavbe])
   @@map("energy_certificates")
@@ -94,9 +97,10 @@ model Transaction {
   stDelaStavbe  Int?
   price         Float
   pricePerM2    Float?
-  date          DateTime
-  type          String
   area          Float?
+  date          DateTime
+  type          String?
+  municipality  String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

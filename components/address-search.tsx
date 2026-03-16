@@ -41,12 +41,16 @@ interface LookupResult {
   }[];
   energetskaIzkaznica?: {
     razred: string;
+    tip: string | null;
     datumIzdaje: string;
     veljaDo: string;
     potrebnaTopota: number | null;
+    dovedenaEnergija: number | null;
+    celotnaEnergija: number | null;
+    elektricnaEnergija: number | null;
     primaryEnergy: number | null;
     co2: number | null;
-    povrsina: number | null;
+    kondicionirana: number | null;
   } | null;
 }
 
