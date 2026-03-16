@@ -1,3 +1,24 @@
+"use client";
+
+import { useState } from "react";
+
+interface DelStavbe {
+  stDela: number;
+  povrsina: number | null;
+  uporabnaPovrsina: number | null;
+  vrsta: string | null;
+}
+
+interface EnergyData {
+  razred: string;
+  datumIzdaje: string;
+  veljaDo: string;
+  potrebnaTopota: number | null;
+  primaryEnergy: number | null;
+  co2: number | null;
+  povrsina: number | null;
+}
+
 interface PropertyCardProps {
   naslov: string;
   enolicniId: { koId: number; stStavbe: number; stDelaStavbe: number | null };
@@ -16,21 +37,9 @@ interface PropertyCardProps {
       kanalizacija: boolean;
     };
   };
-  deliStavbe: {
-    stDela: number;
-    povrsina: number | null;
-    uporabnaPovrsina: number | null;
-    vrsta: string | null;
-  }[];
-  energetskaIzkaznica: {
-    razred: string;
-    datumIzdaje: string;
-    veljaDo: string;
-    potrebnaTopota: number | null;
-    primaryEnergy: number | null;
-    co2: number | null;
-    povrsina: number | null;
-  } | null;
+  deliStavbe: DelStavbe[];
+  energetskaIzkaznica: EnergyData | null;
+  requestedDel?: number;
 }
 
 const ENERGY_COLORS: Record<string, string> = {
@@ -46,7 +55,11 @@ const ENERGY_COLORS: Record<string, string> = {
 };
 
 function Check({ on }: { on: boolean }) {
-  return <span className={on ? "text-green-600" : "text-red-400"}>{on ? "\u2713" : "\u2717"}</span>;
+  return (
+    <span className={on ? "text-green-600" : "text-red-400"}>
+      {on ? "\u2713" : "\u2717"}
+    </span>
+  );
 }
 
 export function PropertyCard({
@@ -55,11 +68,25 @@ export function PropertyCard({
   stavba,
   deliStavbe,
   energetskaIzkaznica,
+  requestedDel,
 }: PropertyCardProps) {
+  const [selectedDel, setSelectedDel] = useState<number | null>(null);
+
+  // If user requested a specific part, filter to just that one
+  const filteredParts =
+    requestedDel != null
+      ? deliStavbe.filter((d) => d.stDela === requestedDel)
+      : deliStavbe;
+
+  const isMultiUnit = !requestedDel && deliStavbe.length > 1;
+  const activePart = selectedDel != null
+    ? deliStavbe.find((d) => d.stDela === selectedDel) ?? null
+    : null;
+
   const idStr = [
     enolicniId.koId,
     enolicniId.stStavbe,
-    enolicniId.stDelaStavbe,
+    selectedDel ?? enolicniId.stDelaStavbe,
   ]
     .filter((v) => v != null)
     .join(" / ");
@@ -74,30 +101,11 @@ export function PropertyCard({
 
       <div className="p-6 space-y-6">
         {/* Podatki o stavbi */}
-        <section>
-          <h4 className="text-sm font-semibold text-[#2d6a4f] uppercase tracking-wide mb-3">
-            Podatki o stavbi
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-            <Field label="Leto izgradnje" value={stavba.letoIzgradnje} />
-            <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
-            <Field label="Obnova strehe" value={stavba.letoObnove.strehe} />
-            <Field label="Etaže" value={stavba.steviloEtaz} />
-            <Field label="Stanovanj" value={stavba.steviloStanovanj} />
-            <Field
-              label="Bruto površina"
-              value={stavba.povrsina != null ? `${stavba.povrsina} m\u00B2` : null}
-            />
-            <Field label="Tip stavbe" value={stavba.tip} />
-            <Field label="Konstrukcija" value={stavba.konstrukcija} />
-          </div>
-        </section>
+        <BuildingSection stavba={stavba} />
 
         {/* Priključki */}
         <section>
-          <h4 className="text-sm font-semibold text-[#2d6a4f] uppercase tracking-wide mb-3">
-            Priključki
-          </h4>
+          <SectionTitle>Priključki</SectionTitle>
           <div className="flex flex-wrap gap-4 text-sm">
             <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
             <span><Check on={stavba.prikljucki.plin} /> Plin</span>
@@ -106,102 +114,193 @@ export function PropertyCard({
           </div>
         </section>
 
-        {/* Deli stavbe */}
-        {deliStavbe.length > 0 && (
+        {/* Multi-unit: show selectable list */}
+        {isMultiUnit && !activePart && (
           <section>
-            <h4 className="text-sm font-semibold text-[#2d6a4f] uppercase tracking-wide mb-3">
-              Deli stavbe ({deliStavbe.length})
-            </h4>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 pr-4">Št. dela</th>
-                    <th className="pb-2 pr-4">Površina</th>
-                    <th className="pb-2 pr-4">Uporabna površina</th>
-                    <th className="pb-2">Vrsta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deliStavbe.map((d) => (
-                    <tr key={d.stDela} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-medium">{d.stDela}</td>
-                      <td className="py-2 pr-4">
-                        {d.povrsina != null ? `${d.povrsina} m\u00B2` : "\u2014"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {d.uporabnaPovrsina != null ? `${d.uporabnaPovrsina} m\u00B2` : "\u2014"}
-                      </td>
-                      <td className="py-2">{d.vrsta ?? "\u2014"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <SectionTitle>
+              Deli stavbe ({deliStavbe.length}) — izberite enoto
+            </SectionTitle>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {deliStavbe.map((d) => (
+                <button
+                  key={d.stDela}
+                  onClick={() => setSelectedDel(d.stDela)}
+                  className="flex items-center justify-between rounded-lg border px-4 py-3 text-sm text-left hover:border-[#2d6a4f] hover:bg-[#2d6a4f]/5 transition-colors"
+                >
+                  <div>
+                    <span className="font-medium">Del stavbe {d.stDela}</span>
+                    {d.vrsta && (
+                      <span className="ml-2 text-muted-foreground">
+                        — {d.vrsta}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground text-right">
+                    {d.povrsina != null && (
+                      <span>{d.povrsina} m&sup2;</span>
+                    )}
+                    {d.uporabnaPovrsina != null && (
+                      <span className="ml-2 text-xs">
+                        (upor. {d.uporabnaPovrsina} m&sup2;)
+                      </span>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
           </section>
         )}
 
-        {/* Energetska izkaznica */}
-        <section>
-          <h4 className="text-sm font-semibold text-[#2d6a4f] uppercase tracking-wide mb-3">
-            Energetska izkaznica
-          </h4>
-          {energetskaIzkaznica ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span
-                  className={`inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-bold text-white ${ENERGY_COLORS[energetskaIzkaznica.razred] ?? "bg-gray-400"}`}
-                >
-                  {energetskaIzkaznica.razred}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  Veljavna do {energetskaIzkaznica.veljaDo}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-                <Field
-                  label="Potrebna toplota"
-                  value={
-                    energetskaIzkaznica.potrebnaTopota != null
-                      ? `${energetskaIzkaznica.potrebnaTopota} kWh/m\u00B2a`
-                      : null
-                  }
-                />
-                <Field
-                  label="Primarna energija"
-                  value={
-                    energetskaIzkaznica.primaryEnergy != null
-                      ? `${energetskaIzkaznica.primaryEnergy} kWh/m\u00B2a`
-                      : null
-                  }
-                />
-                <Field
-                  label="CO\u2082 emisije"
-                  value={
-                    energetskaIzkaznica.co2 != null
-                      ? `${energetskaIzkaznica.co2} kg/m\u00B2a`
-                      : null
-                  }
-                />
-                <Field
-                  label="Površina"
-                  value={
-                    energetskaIzkaznica.povrsina != null
-                      ? `${energetskaIzkaznica.povrsina} m\u00B2`
-                      : null
-                  }
-                />
-                <Field label="Datum izdaje" value={energetskaIzkaznica.datumIzdaje} />
-              </div>
+        {/* Multi-unit: selected unit detail */}
+        {isMultiUnit && activePart && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <SectionTitle>
+                Del stavbe {activePart.stDela}
+              </SectionTitle>
+              <button
+                onClick={() => setSelectedDel(null)}
+                className="text-sm text-[#2d6a4f] hover:underline"
+              >
+                &larr; Nazaj na seznam
+              </button>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">
-              Ni energetske izkaznice
-            </p>
-          )}
-        </section>
+            <PartDetail part={activePart} />
+            <div className="mt-6">
+              <EnergyCertificateSection data={energetskaIzkaznica} />
+            </div>
+          </section>
+        )}
+
+        {/* Single unit or filtered: show parts directly */}
+        {!isMultiUnit && filteredParts.length > 0 && (
+          <section>
+            <SectionTitle>
+              {filteredParts.length === 1
+                ? `Del stavbe ${filteredParts[0].stDela}`
+                : `Deli stavbe (${filteredParts.length})`}
+            </SectionTitle>
+            {filteredParts.map((d) => (
+              <PartDetail key={d.stDela} part={d} />
+            ))}
+          </section>
+        )}
+
+        {/* Energy cert: show at bottom for single-unit or filtered views */}
+        {!isMultiUnit && <EnergyCertificateSection data={energetskaIzkaznica} />}
       </div>
     </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 className="text-sm font-semibold text-[#2d6a4f] uppercase tracking-wide mb-3">
+      {children}
+    </h4>
+  );
+}
+
+function BuildingSection({
+  stavba,
+}: {
+  stavba: PropertyCardProps["stavba"];
+}) {
+  return (
+    <section>
+      <SectionTitle>Podatki o stavbi</SectionTitle>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+        <Field label="Leto izgradnje" value={stavba.letoIzgradnje} />
+        <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
+        <Field label="Obnova strehe" value={stavba.letoObnove.strehe} />
+        <Field label="Etaže" value={stavba.steviloEtaz} />
+        <Field label="Stanovanj" value={stavba.steviloStanovanj} />
+        <Field
+          label="Bruto površina"
+          value={stavba.povrsina != null ? `${stavba.povrsina} m\u00B2` : null}
+        />
+        <Field label="Tip stavbe" value={stavba.tip} />
+        <Field label="Konstrukcija" value={stavba.konstrukcija} />
+      </div>
+    </section>
+  );
+}
+
+function PartDetail({ part }: { part: DelStavbe }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+      <Field label="Številka dela" value={part.stDela} />
+      <Field
+        label="Površina"
+        value={part.povrsina != null ? `${part.povrsina} m\u00B2` : null}
+      />
+      <Field
+        label="Uporabna površina"
+        value={
+          part.uporabnaPovrsina != null
+            ? `${part.uporabnaPovrsina} m\u00B2`
+            : null
+        }
+      />
+      <Field label="Vrsta rabe" value={part.vrsta} />
+    </div>
+  );
+}
+
+function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
+  return (
+    <section>
+      <SectionTitle>Energetska izkaznica</SectionTitle>
+      {data ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center justify-center rounded-md px-3 py-1 text-sm font-bold text-white ${ENERGY_COLORS[data.razred] ?? "bg-gray-400"}`}
+            >
+              {data.razred}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              Veljavna do {data.veljaDo}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+            <Field
+              label="Potrebna toplota"
+              value={
+                data.potrebnaTopota != null
+                  ? `${data.potrebnaTopota} kWh/m\u00B2a`
+                  : null
+              }
+            />
+            <Field
+              label="Primarna energija"
+              value={
+                data.primaryEnergy != null
+                  ? `${data.primaryEnergy} kWh/m\u00B2a`
+                  : null
+              }
+            />
+            <Field
+              label="CO\u2082 emisije"
+              value={
+                data.co2 != null ? `${data.co2} kg/m\u00B2a` : null
+              }
+            />
+            <Field
+              label="Površina"
+              value={
+                data.povrsina != null ? `${data.povrsina} m\u00B2` : null
+              }
+            />
+            <Field label="Datum izdaje" value={data.datumIzdaje} />
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground italic">
+          Ni energetske izkaznice
+        </p>
+      )}
+    </section>
   );
 }
 

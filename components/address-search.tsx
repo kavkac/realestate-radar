@@ -47,6 +47,7 @@ export function AddressSearch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<LookupResult | null>(null);
+  const [submittedDel, setSubmittedDel] = useState<number | undefined>(undefined);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -98,10 +99,13 @@ export function AddressSearch() {
     setResult(null);
     setLoading(true);
 
+    const parsedDel = delStavbe.trim() ? parseInt(delStavbe, 10) : undefined;
+    setSubmittedDel(parsedDel);
+
     try {
       const body: Record<string, unknown> = { address };
-      if (delStavbe.trim()) {
-        body.delStavbe = parseInt(delStavbe, 10);
+      if (parsedDel != null) {
+        body.delStavbe = parsedDel;
       }
 
       const res = await fetch("/api/lookup", {
@@ -175,6 +179,7 @@ export function AddressSearch() {
           stavba={result.stavba}
           deliStavbe={result.deliStavbe ?? []}
           energetskaIzkaznica={result.energetskaIzkaznica ?? null}
+          requestedDel={submittedDel}
         />
       )}
     </div>
