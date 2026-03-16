@@ -23,13 +23,30 @@ const TIP_STAVBE: Record<number, string> = {
   9: "Drugo",
 };
 
-const VRSTA_DEJANSKE_RABE: Record<number, string> = {
+export const VRSTA_DEJANSKE_RABE: Record<number, string> = {
   1: "Stanovanje",
   2: "Pisarna",
-  3: "Trgovina",
-  4: "Gostinstvo",
-  5: "Industrijsko",
-  47: "Stanovanje",
+  3: "Trgovska ali storitvena dejavnost",
+  4: "Gostinska dejavnost",
+  5: "Industrijska dejavnost",
+  6: "Garaža",
+  7: "Klet",
+  8: "Shramba",
+  9: "Skupni prostori",
+  10: "Drugo",
+  11: "Poslovni prostor",
+  12: "Gostinski lokal",
+  13: "Turistična nastanitev",
+  14: "Zdravstveni prostor",
+  15: "Izobraževalni prostor",
+  16: "Kulturni prostor",
+  17: "Športni prostor",
+  18: "Verski prostor",
+  19: "Pokopališki prostor",
+  20: "Kmetijski prostor",
+  21: "Gozdarski prostor",
+  22: "Vodna površina",
+  47: "Stanovanje (starejši zapis)",
 };
 
 // --- Types ---
@@ -190,7 +207,7 @@ export async function getBuildingParts(
       povrsina: (p.POVRSINA as number) || null,
       uporabnaPovrsina: (p.UPORABNA_POVRSINA as number) || null,
       vrsta:
-        VRSTA_DEJANSKE_RABE[p.VRSTA_DEJANSKE_RABE_DEL_ST_ID as number] ?? null,
+        VRSTA_DEJANSKE_RABE[p.VRSTA_DEJANSKE_RABE_DEL_ST_ID as number] ?? "Neznano",
     };
   });
 }
