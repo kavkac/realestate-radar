@@ -1,23 +1,24 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  extensions = [postgis]
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// PostGIS geometry columns will be added in Phase 2 via raw SQL migrations
+
 model Property {
-  id           String                          @id @default(cuid())
+  id           String  @id @default(cuid())
   koId         Int
   stStavbe     Int
   stDelaStavbe Int?
   address      String
   municipality String
   postCode     String
-  geometry     Unsupported("geometry(Point,4326)")?
+  lat          Float?
+  lng          Float?
 
   @@unique([koId, stStavbe, stDelaStavbe])
   @@map("properties")
