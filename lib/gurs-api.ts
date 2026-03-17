@@ -1,7 +1,7 @@
 import { getCached, setCached } from "./wfs-cache";
 
 const BASE_RPE = "https://storitve.eprostor.gov.si/ows-pub-wfs/wfs";
-const BASE_KN = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn-osnovni/wfs";
+const BASE_KN = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn/wfs";
 const BASE_KN_JV = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn/wfs";
 
 // --- Šifranti ---
@@ -135,6 +135,7 @@ function buildWfsUrl(
     TYPENAMES: typeName,
     OUTPUTFORMAT: "application/json",
     CQL_FILTER: cqlFilter,
+    ...(base.includes("wfs-si-gurs-kn") ? { REFERER_APP_CODE: "JV" } : {}),
   });
   return `${base}?${params.toString()}`;
 }
@@ -203,7 +204,7 @@ export async function getHouseNumberId(
 export async function getBuildingEid(hsMid: number): Promise<string | null> {
   const url = buildWfsUrl(
     BASE_KN,
-    "SI.GURS.KN:HISNE_STEVILKE_TABELA",
+    "SI.GURS.KN:HISNE_STEVILKE_H",
     `ST_HS=${hsMid}`,
   );
   const data = await fetchWfs(url);
@@ -216,7 +217,7 @@ export async function getBuilding(
 ): Promise<StavbaData | null> {
   const url = buildWfsUrl(
     BASE_KN,
-    "SI.GURS.KN:STAVBE_TABELA",
+    "SI.GURS.KN:STAVBE_H",
     `EID_STAVBA='${eidStavba}'`,
   );
   const data = await fetchWfs(url);
@@ -246,7 +247,7 @@ export async function getBuilding(
 export async function getRooms(eidDelStavbe: string): Promise<ProstorData[]> {
   const url = buildWfsUrl(
     BASE_KN,
-    "SI.GURS.KN:PROSTORI_TABELA",
+    "SI.GURS.KN:PROSTORI_H",
     `EID_DEL_STAVBE='${eidDelStavbe}'`,
   );
   const data = await fetchWfs(url);
@@ -266,7 +267,7 @@ export async function getBuildingParts(
 ): Promise<DelStavbeData[]> {
   const url = buildWfsUrl(
     BASE_KN,
-    "SI.GURS.KN:DELI_STAVB_TABELA",
+    "SI.GURS.KN:DELI_STAVB",
     `EID_STAVBA='${eidStavba}'`,
   );
   const data = await fetchWfs(url);
@@ -339,7 +340,7 @@ export async function getParcele(
   // First: get STAVBE_TABELA to find parcel link
   const stavbaUrl = buildWfsUrl(
     BASE_KN,
-    "SI.GURS.KN:STAVBE_TABELA",
+    "SI.GURS.KN:STAVBE_H",
     `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`,
   );
   const stavbaData = await fetchWfs(stavbaUrl);
@@ -353,7 +354,7 @@ export async function getParcele(
     if (parcelaRef != null) {
       const parceleUrl = buildWfsUrl(
         BASE_KN,
-        "SI.GURS.KN:PARCELE_TABELA",
+        "SI.GURS.KN:PARCELE_H",
         `KO_ID=${koId} AND ST_PARCELE='${parcelaRef}'`,
       );
       parceleData = await fetchWfs(parceleUrl);
@@ -364,7 +365,7 @@ export async function getParcele(
   if (!parceleData || parceleData.features.length === 0) {
     const fallbackUrl = buildWfsUrl(
       BASE_KN,
-      "SI.GURS.KN:PARCELE_TABELA",
+      "SI.GURS.KN:PARCELE_H",
       `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`,
     );
     parceleData = await fetchWfs(fallbackUrl);
