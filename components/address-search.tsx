@@ -106,7 +106,7 @@ function friendlyError(err: string): string {
   return err || "Prišlo je do neznane napake. Poskusite znova.";
 }
 
-function truncateAddress(naslov: string, max = 25): string {
+function truncateAddress(naslov: string, max = 20): string {
   if (naslov.length <= max) return naslov;
   return naslov.slice(0, max) + "\u2026";
 }
@@ -381,12 +381,13 @@ export function AddressSearch() {
           <label className="sr-only" htmlFor="del-input">Številka dela stavbe</label>
           <input
             id="del-input"
-            type="number"
-            min="1"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={delStavbe}
-            onChange={(e) => setDelStavbe(e.target.value)}
-            placeholder="Enota — neobvezno"
-            className="sm:w-40 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onChange={(e) => setDelStavbe(e.target.value.replace(/\D/g, ""))}
+            placeholder="Enota"
+            className="sm:w-32 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield]"
             disabled={isLoading}
           />
           <button
@@ -426,65 +427,74 @@ export function AddressSearch() {
         )}
       </form>
 
-      {/* Tab bar */}
+      {/* Tab bar + card wrapper — no gap between tabs and card */}
       {tabs.length > 0 && (
-        <div className="flex items-center gap-1 overflow-x-auto flex-nowrap pb-1 -mb-2 scrollbar-none">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleSwitchTab(tab.id)}
-              className={`group flex items-center gap-1.5 rounded-t-md border px-3 py-2 text-sm whitespace-nowrap transition-colors min-h-[44px] ${
-                tab.id === activeTabId && !addingNew
-                  ? "border-[#2d6a4f] border-b-white bg-white text-gray-900 font-medium"
-                  : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-              }`}
-            >
-              <span>{truncateAddress(tab.naslov || "Iskanje\u2026")}</span>
-              {tab.loading && (
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-[#2d6a4f]" />
-              )}
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCloseTab(tab.id);
-                }}
-                className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs text-gray-400 hover:bg-gray-200 hover:text-gray-700 cursor-pointer"
-                role="button"
-                aria-label={`Zapri ${tab.naslov}`}
+        <div>
+          <div className="relative bg-gray-50 border-b border-gray-200 px-4 pt-3 pb-0 flex items-end gap-1 overflow-x-auto scrollbar-none">
+            {tabs.map((tab) => {
+              const isActive = tab.id === activeTabId && !addingNew;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleSwitchTab(tab.id)}
+                  className={`group relative flex items-center gap-1.5 rounded-t-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
+                    isActive
+                      ? "border-t-2 border-t-[#2d6a4f] border-l border-r border-gray-200 border-b-0 bg-white text-[#1a1a1a] z-10 -mb-px"
+                      : "border border-gray-200 bg-gray-100 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                  }`}
+                >
+                  <span className="truncate">{truncateAddress(tab.naslov || "Iskanje\u2026")}</span>
+                  {tab.loading && (
+                    <span className="inline-block h-3 w-3 flex-shrink-0 animate-spin rounded-full border-2 border-gray-300 border-t-[#2d6a4f]" />
+                  )}
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCloseTab(tab.id);
+                    }}
+                    className={`ml-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-xs cursor-pointer transition-opacity ${
+                      isActive
+                        ? "text-gray-400 hover:bg-gray-200 hover:text-gray-700 opacity-100"
+                        : "text-gray-400 hover:bg-gray-200 hover:text-gray-700 opacity-0 group-hover:opacity-100"
+                    }`}
+                    role="button"
+                    aria-label={`Zapri ${tab.naslov}`}
+                  >
+                    &times;
+                  </span>
+                </button>
+              );
+            })}
+            {tabs.length < MAX_TABS && (
+              <button
+                onClick={handleAddTab}
+                className="flex-shrink-0 ml-2 border border-gray-200 bg-white rounded-md px-2.5 py-1.5 text-sm text-gray-400 hover:text-gray-600 hover:border-gray-400 transition-colors mb-1"
+                title="Dodaj nepremičnino"
+                aria-label="Dodaj novo nepremičnino"
               >
-                &times;
-              </span>
-            </button>
-          ))}
-          {tabs.length < MAX_TABS && (
-            <button
-              onClick={handleAddTab}
-              className="flex-shrink-0 flex items-center justify-center rounded-t-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors min-h-[44px] sticky right-0"
-              title="Dodaj nepremičnino"
-              aria-label="Dodaj novo nepremičnino"
-            >
-              +
-            </button>
+                +
+              </button>
+            )}
+          </div>
+
+          {activeTab?.loading && <LoadingProgress />}
+
+          {activeTab?.data?.success && activeTab.data.naslov && activeTab.data.stavba && (
+            <PropertyCard
+              naslov={activeTab.data.naslov}
+              enolicniId={activeTab.data.enolicniId!}
+              stavba={activeTab.data.stavba}
+              deliStavbe={activeTab.data.deliStavbe ?? []}
+              energetskaIzkaznica={activeTab.data.energetskaIzkaznica ?? null}
+              parcele={activeTab.data.parcele}
+              renVrednost={activeTab.data.renVrednost}
+              etnAnaliza={activeTab.data.etnAnaliza}
+              lat={activeTab.data.lat}
+              lng={activeTab.data.lng}
+              requestedDel={activeTab.del}
+            />
           )}
         </div>
-      )}
-
-      {activeTab?.loading && <LoadingProgress />}
-
-      {activeTab?.data?.success && activeTab.data.naslov && activeTab.data.stavba && (
-        <PropertyCard
-          naslov={activeTab.data.naslov}
-          enolicniId={activeTab.data.enolicniId!}
-          stavba={activeTab.data.stavba}
-          deliStavbe={activeTab.data.deliStavbe ?? []}
-          energetskaIzkaznica={activeTab.data.energetskaIzkaznica ?? null}
-          parcele={activeTab.data.parcele}
-          renVrednost={activeTab.data.renVrednost}
-          etnAnaliza={activeTab.data.etnAnaliza}
-          lat={activeTab.data.lat}
-          lng={activeTab.data.lng}
-          requestedDel={activeTab.del}
-        />
       )}
     </div>
   );
