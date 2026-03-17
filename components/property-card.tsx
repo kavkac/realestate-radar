@@ -443,7 +443,7 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
         {stats.map((s) => (
           <div key={s.label} className="flex-1 min-w-0 px-4 py-4 text-center">
             <p className="text-xs text-gray-400 mb-1 whitespace-nowrap">{s.label}</p>
-            <p className="font-semibold text-gray-900 leading-tight text-sm sm:text-base break-words">{s.value}</p>
+            <p className="font-semibold text-gray-900 leading-tight text-sm truncate" title={s.value}>{s.value}</p>
           </div>
         ))}
       </div>
