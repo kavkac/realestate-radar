@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Prostor {
   vrsta: string;
@@ -135,12 +135,45 @@ export function PropertyCard({
     .filter((v) => v != null)
     .join(" / ");
 
+  // Structured data (schema.org/RealEstateListing)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateListing",
+    name: naslov,
+    description: `Pregled nepremičnine: ${naslov}`,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: naslov,
+      addressCountry: "SI",
+    },
+    ...(stavba.letoIzgradnje && { yearBuilt: stavba.letoIzgradnje }),
+    ...(stavba.povrsina && { floorSize: { "@type": "QuantitativeValue", value: stavba.povrsina, unitText: "m2" } }),
+  };
+
   return (
-    <div className="rounded-xl border bg-card shadow-sm overflow-hidden text-left">
+    <div className="rounded-xl border bg-card shadow-sm overflow-hidden text-left print:shadow-none print:border-0">
+      {/* JSON-LD structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Header */}
-      <div className="bg-[#2d6a4f] px-6 py-4 text-white">
-        <h3 className="text-lg font-semibold">{naslov}</h3>
-        <p className="text-sm text-green-200">KO / stavba / del: {idStr}</p>
+      <div className="bg-[#2d6a4f] px-6 py-4 text-white print:bg-white print:text-black print:border-b-2 print:border-[#2d6a4f]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold print:text-[#2d6a4f]">{naslov}</h3>
+            <p className="text-sm text-green-200 print:text-gray-500">KO / stavba / del: {idStr}</p>
+          </div>
+          <button
+            onClick={() => window.print()}
+            title="Natisni poročilo"
+            className="print:hidden flex-shrink-0 rounded-md bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+            aria-label="Natisni poročilo o nepremičnini"
+          >
+            🖨️ Natisni
+          </button>
+        </div>
       </div>
 
       <div className="p-6 space-y-6">

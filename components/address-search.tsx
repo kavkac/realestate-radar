@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { PropertyCard } from "./property-card";
+import { PropertySkeleton } from "./property-skeleton";
 
 interface Prostor {
   vrsta: string;
@@ -76,13 +78,34 @@ interface LookupResult {
   } | null;
 }
 
+const ERROR_MESSAGES: Record<string, string> = {
+  "Address not found": "Naslova ni bilo mogoče najti v registru GURS. Preverite zapis naslova.",
+  "Rate limit exceeded": "Preveč zahtev. Počakajte minuto in poskusite znova.",
+  "GURS API error": "Napaka pri komunikaciji z GURS API. Poskusite čez nekaj sekund.",
+  "No building found": "Na tem naslovu ni bila najdena nobena stavba v registru.",
+};
+
+function friendlyError(err: string): string {
+  for (const [key, msg] of Object.entries(ERROR_MESSAGES)) {
+    if (err.includes(key)) return msg;
+  }
+  return err || "Prišlo je do neznane napake. Poskusite znova.";
+}
+
 export function AddressSearch() {
-  const [address, setAddress] = useState("");
-  const [delStavbe, setDelStavbe] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const initialAddress = searchParams.get("naslov") ?? "";
+  const initialDel = searchParams.get("del") ?? "";
+
+  const [address, setAddress] = useState(initialAddress);
+  const [delStavbe, setDelStavbe] = useState(initialDel);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<LookupResult | null>(null);
   const [submittedDel, setSubmittedDel] = useState<number | undefined>(undefined);
+  const [copied, setCopied] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -128,20 +151,29 @@ export function AddressSearch() {
     });
   }, [handlePlaceSelect]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Auto-search if address in URL on first load
+  useEffect(() => {
+    if (initialAddress && initialAddress.length >= 3) {
+      performSearch(initialAddress, initialDel ? parseInt(initialDel, 10) : undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function performSearch(addr: string, del?: number) {
     setError(null);
     setResult(null);
     setLoading(true);
+    setSubmittedDel(del);
 
-    const parsedDel = delStavbe.trim() ? parseInt(delStavbe, 10) : undefined;
-    setSubmittedDel(parsedDel);
+    // Update URL
+    const params = new URLSearchParams();
+    params.set("naslov", addr);
+    if (del != null) params.set("del", String(del));
+    router.replace(`?${params.toString()}`, { scroll: false });
 
     try {
-      const body: Record<string, unknown> = { address };
-      if (parsedDel != null) {
-        body.delStavbe = parsedDel;
-      }
+      const body: Record<string, unknown> = { address: addr };
+      if (del != null) body.delStavbe = del;
 
       const res = await fetch("/api/lookup", {
         method: "POST",
@@ -152,60 +184,98 @@ export function AddressSearch() {
       const data: LookupResult = await res.json();
 
       if (!data.success) {
-        setError(data.error ?? "Napaka pri iskanju");
+        setError(friendlyError(data.error ?? "Napaka pri iskanju"));
         return;
       }
 
       setResult(data);
     } catch {
-      setError("Napaka pri povezovanju s strežnikom");
+      setError("Napaka pri povezovanju s strežnikom. Preverite internetno povezavo.");
     } finally {
       setLoading(false);
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsedDel = delStavbe.trim() ? parseInt(delStavbe, 10) : undefined;
+    await performSearch(address, parsedDel);
+  }
+
+  async function handleShare() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("naslov", address);
+    if (delStavbe.trim()) url.searchParams.set("del", delStavbe.trim());
+    await navigator.clipboard.writeText(url.toString());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-3" aria-label="Iskanje nepremičnine">
         <div className="flex gap-2">
+          <label className="sr-only" htmlFor="address-input">Vnesite naslov nepremičnine</label>
           <input
+            id="address-input"
             ref={inputRef}
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="npr. Slovenčeva ulica 4"
+            placeholder="npr. Slovenčeva ulica 4, Ljubljana"
             className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             disabled={loading}
+            autoComplete="off"
+            aria-autocomplete="list"
           />
           <button
             type="submit"
             disabled={loading || address.length < 3}
-            className="rounded-md bg-[#2d6a4f] px-6 py-3 text-sm font-medium text-white hover:bg-[#245a42] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="rounded-md bg-[#2d6a4f] px-5 py-3 text-sm font-medium text-white hover:bg-[#245a42] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+            aria-label="Poišči nepremičnino"
           >
-            {loading ? "Iščem..." : "Poišči"}
+            {loading ? "Iščem…" : "Poišči"}
           </button>
         </div>
 
-        <input
-          type="text"
-          value={delStavbe}
-          onChange={(e) => setDelStavbe(e.target.value)}
-          placeholder="Številka dela stavbe (stanovanja) — neobvezno"
-          className="w-full rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          disabled={loading}
-        />
+        <div className="flex gap-2">
+          <label className="sr-only" htmlFor="del-input">Številka dela stavbe</label>
+          <input
+            id="del-input"
+            type="number"
+            min="1"
+            value={delStavbe}
+            onChange={(e) => setDelStavbe(e.target.value)}
+            placeholder="Številka dela stavbe / stanovanja — neobvezno"
+            className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            disabled={loading}
+          />
+          {result?.success && (
+            <button
+              type="button"
+              onClick={handleShare}
+              title="Kopiraj delljivo povezavo"
+              className="flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-[#2d6a4f] transition-colors"
+              aria-label="Kopiraj delljivo povezavo"
+            >
+              {copied ? (
+                <>✓ <span className="hidden sm:inline">Kopirano!</span></>
+              ) : (
+                <>🔗 <span className="hidden sm:inline">Deli</span></>
+              )}
+            </button>
+          )}
+        </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <div role="alert" className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+            <span aria-hidden="true">⚠️</span>
+            <span>{error}</span>
+          </div>
+        )}
       </form>
 
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2d6a4f] border-t-transparent" />
-          <span className="ml-3 text-sm text-muted-foreground">
-            Pridobivam podatke iz GURS...
-          </span>
-        </div>
-      )}
+      {loading && <PropertySkeleton />}
 
       {result?.success && result.naslov && result.stavba && (
         <PropertyCard

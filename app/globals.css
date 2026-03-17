@@ -35,3 +35,30 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  header, footer, nav, form, button {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+  .rounded-xl {
+    border-radius: 0 !important;
+  }
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #666;
+  }
+  /* Force print button hidden */
+  [aria-label="Natisni poročilo o nepremičnini"] {
+    display: none !important;
+  }
+  /* Page break control */
+  section {
+    break-inside: avoid;
+  }
+}

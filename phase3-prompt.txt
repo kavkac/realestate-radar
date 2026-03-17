@@ -1,0 +1,145 @@
+You are implementing Phase 3 features for RealEstateRadar, a Slovenian real estate data platform.
+
+## Stack
+- Next.js 14 app router, TypeScript, Tailwind CSS
+- Prisma ORM with PostgreSQL
+- All components in components/, API routes in app/api/
+
+## Task: Implement 4 Phase 3 features
+
+### 1. Energetska analiza (Energy Analysis)
+
+In components/property-card.tsx, add a new EnergetskiIzracunSection component after EnergyCertificateSection.
+
+The component receives energetskaIzkaznica: EnergyData | null.
+
+Energy class heating needs (kWh/m2a):
+A1=10, A2=25, B1=50, B2=75, C=110, D=150, E=200, F=250, G=300
+
+Price: EUR 0.12/kWh (Slovenian avg heating energy price)
+
+Calculate from actual heatingNeed (potrebnaTopota) and kondicionirana area:
+- Annual heating cost = heatingNeed * kondicionirana * 0.12
+- Target class B2: heatingNeed = 75 kWh/m2a -- show savings vs current
+- Target class A2: heatingNeed = 25 kWh/m2a -- show savings vs current
+- ROI = midpoint investment / annual savings (in years)
+
+Show improvements list with estimated costs and ROI:
+- Toplotna izolacija fasade: EUR 80-120/m2  (fasada area estimate = sqrt(kondicionirana) * 12)
+- Menjava oken: EUR 400-800/okno  (window count estimate = floor(kondicionirana/15))
+- Toplotna crpalka: EUR 8000-15000
+- Stresna izolacija: EUR 40-80/m2  (stresna area estimate = kondicionirana * 0.8)
+
+Only show if energetskaIzkaznica has heatingNeed != null and kondicionirana != null.
+Section title: "Energetska analiza"
+
+### 2. Vrednostna analiza (ETN Market Value)
+
+Create lib/etn-lookup.ts:
+
+import { prisma } from "./prisma";
+
+export interface EtnAnaliza {
+  steviloTransakcij: number;
+  povprecnaCenaM2: number;
+  minCenaM2: number;
+  maxCenaM2: number;
+  ocenjenaTrznaVrednost: number | null;
+  trend: "rast" | "padec" | "stabilno" | null;
+  zadnjeLeto: number | null;
+  predLeto: number | null;
+}
+
+export async function getEtnAnaliza(koId: number, area: number | null): Promise<EtnAnaliza | null> {
+  const transactions = await prisma.transaction.findMany({
+    where: { koId, pricePerM2: { not: null } },
+    orderBy: { date: "desc" },
+    take: 50,
+  });
+  if (transactions.length === 0) return null;
+  const prices = transactions.map((t) => t.pricePerM2!);
+  const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const now = new Date();
+  const lastYear = now.getFullYear() - 1;
+  const yearBefore = now.getFullYear() - 2;
+  const lastYearTx = transactions.filter(t => t.date.getFullYear() === lastYear);
+  const yearBeforeTx = transactions.filter(t => t.date.getFullYear() === yearBefore);
+  let trend: EtnAnaliza["trend"] = null;
+  let zadnjeLeto: number | null = null;
+  let predLeto: number | null = null;
+  if (lastYearTx.length > 0 && yearBeforeTx.length > 0) {
+    const lastAvg = lastYearTx.map(t => t.pricePerM2!).reduce((a,b) => a+b,0) / lastYearTx.length;
+    const prevAvg = yearBeforeTx.map(t => t.pricePerM2!).reduce((a,b) => a+b,0) / yearBeforeTx.length;
+    zadnjeLeto = Math.round(lastAvg);
+    predLeto = Math.round(prevAvg);
+    const diff = (lastAvg - prevAvg) / prevAvg;
+    trend = diff > 0.02 ? "rast" : diff < -0.02 ? "padec" : "stabilno";
+  }
+  return {
+    steviloTransakcij: transactions.length,
+    povprecnaCenaM2: Math.round(avg),
+    minCenaM2: Math.round(min),
+    maxCenaM2: Math.round(max),
+    ocenjenaTrznaVrednost: area ? Math.round(avg * area) : null,
+    trend,
+    zadnjeLeto,
+    predLeto,
+  };
+}
+
+In app/api/lookup/route.ts: import getEtnAnaliza, call with (stavba.koId, useableArea) where useableArea = deliStavbe[0]?.uporabnaPovrsina ?? deliStavbe[0]?.povrsina ?? null. Include etnAnaliza in the JSON response.
+
+In components/property-card.tsx:
+- Add EtnAnaliza interface
+- Add etnAnaliza?: EtnAnaliza | null to PropertyCardProps
+- Add VrednostnaAnalizaSection showing: avg/min/max price per m2, transaction count, trend (up/down/stable arrow), estimated market value
+- Show after RenVrednostSection
+- Section title: "Vrednostna analiza (ETN)"
+
+### 3. Vzdrževalni posegi (Predictive Maintenance)
+
+Add VzdrževalniPosegiSection to property-card.tsx.
+
+Receives: stavba (letoIzgradnje, letoObnove.fasade, letoObnove.strehe) + optional part data (letoObnoveInstalacij, letoObnoveOken).
+
+Current year: 2026.
+Lifespans: Fasada=30yr, Stresna kritina=40yr, Instalacije=30yr, Okna=25yr.
+Use renovation year if available, otherwise fall back to letoIzgradnje.
+age = 2026 - yearInstalled
+
+Urgency thresholds:
+- age >= lifespan -> "Nujno" (red)
+- age >= lifespan * 0.85 -> "Priporoceno" (yellow/amber)
+- age >= lifespan * 0.70 -> "Planirati" (blue)
+- else -> hide
+
+If no items: show "Ni nujnih vzdrzevalnih posegov" in green.
+
+For single-unit, pass deliStavbe[0] data. For multi-unit with activePart, pass activePart data.
+Section title: "Vzdrzevalni posegi"
+
+### 4. Affiliate Placeholders
+
+Add AffiliateSectionPlaceholder (always shown at bottom).
+
+3 cards in grid-cols-1 sm:grid-cols-3:
+1. Kredit za prenovo - "Primerjajte ponudbe bank za stanovanjski kredit" - emoji bank
+2. Zavarovanje nepremicnine - "Zavarovajte svojo nalozbo po ugodni ceni" - emoji lock
+3. Energetska sanacija - "Preverite subvencije Eko sklada za energetsko prenovo" - emoji lightning
+
+Each card: border rounded-lg p-4, icon + title + description + disabled button with "Kmalu" badge text.
+Section title: "Storitve"
+
+## Steps
+
+1. Create lib/etn-lookup.ts
+2. Update app/api/lookup/route.ts (import + call getEtnAnaliza + add to response)
+3. Update components/property-card.tsx (add interfaces, props, 4 new section components, wire into layout)
+4. Update app/page.tsx to pass etnAnaliza={data.etnAnaliza} prop to PropertyCard
+
+After all changes: npx tsc --noEmit, fix all TypeScript errors.
+Then: git add -A && git commit -m "feat: Phase 3 - energetska analiza, vrednostna analiza, vzdrzevalni posegi, affiliate placeholders" && git push origin main
+
+When completely done: openclaw system event --text "Phase 3 complete: energetska analiza + vrednostna analiza + vzdrzevalni posegi + affiliate placeholders" --mode now
