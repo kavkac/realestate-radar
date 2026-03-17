@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { stavba, deliStavbe } = result;
+    const { stavba, deliStavbe, lat, lng } = result;
 
     // Determine stDelaStavbe for energy cert lookup
     const stDelaStavbe =
@@ -93,6 +93,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       naslov: address,
+      lat,
+      lng,
       enolicniId: {
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,

@@ -15,6 +15,8 @@ interface LookupResult {
   success: boolean;
   error?: string;
   naslov?: string;
+  lat?: number | null;
+  lng?: number | null;
   enolicniId?: { koId: number; stStavbe: number; stDelaStavbe: number | null };
   stavba?: {
     letoIzgradnje: number | null;
@@ -286,6 +288,8 @@ export function AddressSearch() {
           parcele={result.parcele}
           renVrednost={result.renVrednost}
           etnAnaliza={result.etnAnaliza}
+          lat={result.lat}
+          lng={result.lng}
           requestedDel={submittedDel}
         />
       )}

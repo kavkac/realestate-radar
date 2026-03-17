@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CreditCalculator } from "./credit-calculator";
 
 interface Prostor {
   vrsta: string;
@@ -80,6 +81,8 @@ interface PropertyCardProps {
   parcele?: Parcela[];
   renVrednost?: RenVrednost | null;
   etnAnaliza?: EtnAnaliza | null;
+  lat?: number | null;
+  lng?: number | null;
   requestedDel?: number;
 }
 
@@ -114,6 +117,8 @@ export function PropertyCard({
   parcele,
   renVrednost,
   etnAnaliza,
+  lat,
+  lng,
   requestedDel,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
@@ -186,6 +191,9 @@ export function PropertyCard({
         </div>
       </div>
 
+      {/* Aerial map */}
+      <AerialMap lat={lat} lng={lng} naslov={naslov} />
+
       <div className="p-6 space-y-8">
         <BuildingSection stavba={stavba} />
 
@@ -256,6 +264,7 @@ export function PropertyCard({
               <EnergyCertificateSection data={energetskaIzkaznica} />
               <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
               <MaintenanceSection stavba={stavba} part={activePart} />
+              <CreditCalculator />
               <ServicesSection />
             </div>
           </section>
@@ -286,6 +295,7 @@ export function PropertyCard({
               stavba={stavba}
               part={filteredParts[0] ?? null}
             />
+            <CreditCalculator />
             <ServicesSection />
           </div>
         )}
@@ -808,6 +818,54 @@ function MaintenanceSection({
         </div>
       )}
     </section>
+  );
+}
+
+function AerialMap({
+  lat,
+  lng,
+  naslov,
+}: {
+  lat?: number | null;
+  lng?: number | null;
+  naslov: string;
+}) {
+  const apiKey = typeof window !== "undefined"
+    ? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    : null;
+
+  const mapsUrl = lat && lng
+    ? `https://www.google.com/maps?q=${lat},${lng}`
+    : `https://www.google.com/maps/search/${encodeURIComponent(naslov)}`;
+
+  if (!lat || !lng || !apiKey) {
+    return (
+      <div className="px-6 pt-4 print:hidden">
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-center text-sm text-[#2d6a4f] hover:underline py-3 border border-gray-100 rounded-md bg-gray-50"
+        >
+          Odpri v Google Maps
+        </a>
+      </div>
+    );
+  }
+
+  const staticUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=17&size=600x200&scale=2&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${apiKey}`;
+
+  return (
+    <div className="print:hidden">
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+        <img
+          src={staticUrl}
+          alt={`Zračni posnetek: ${naslov}`}
+          className="w-full h-[200px] object-cover"
+          loading="lazy"
+        />
+      </a>
+    </div>
   );
 }
 

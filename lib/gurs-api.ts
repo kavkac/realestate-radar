@@ -174,15 +174,29 @@ export async function getHouseNumberId(
   ulMid: number,
   houseNumber: string,
   suffix?: string,
-): Promise<number | null> {
+): Promise<{ hsMid: number; lat: number | null; lng: number | null } | null> {
   let filter = `UL_MID=${ulMid} AND HS=${houseNumber}`;
   if (suffix) {
     filter += ` AND HD='${suffix}'`;
   }
-  const url = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:HS_G", filter);
+  // Request WGS84 coordinates for Google Maps
+  const baseUrl = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:HS_G", filter);
+  const url = `${baseUrl}&SRSNAME=EPSG:4326`;
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return null;
-  return data.features[0].properties.HS_MID as number;
+
+  const feature = data.features[0];
+  const hsMid = feature.properties.HS_MID as number;
+
+  let lat: number | null = null;
+  let lng: number | null = null;
+  const geom = feature.geometry as { type?: string; coordinates?: number[] } | null;
+  if (geom?.type === "Point" && geom.coordinates) {
+    lng = geom.coordinates[0];
+    lat = geom.coordinates[1];
+  }
+
+  return { hsMid, lat, lng };
 }
 
 export async function getBuildingEid(hsMid: number): Promise<string | null> {
@@ -419,6 +433,8 @@ export function parseAddress(raw: string): {
 export async function lookupByAddress(address: string): Promise<{
   stavba: StavbaData;
   deliStavbe: DelStavbeData[];
+  lat: number | null;
+  lng: number | null;
 } | null> {
   const parsed = parseAddress(address);
   if (!parsed) return null;
@@ -426,10 +442,10 @@ export async function lookupByAddress(address: string): Promise<{
   const ulMid = await getStreetId(parsed.street);
   if (!ulMid) return null;
 
-  const hsMid = await getHouseNumberId(ulMid, parsed.number, parsed.suffix);
-  if (!hsMid) return null;
+  const hsResult = await getHouseNumberId(ulMid, parsed.number, parsed.suffix);
+  if (!hsResult) return null;
 
-  const eidStavba = await getBuildingEid(hsMid);
+  const eidStavba = await getBuildingEid(hsResult.hsMid);
   if (!eidStavba) return null;
 
   const [stavba, deliStavbe] = await Promise.all([
@@ -438,5 +454,5 @@ export async function lookupByAddress(address: string): Promise<{
   ]);
 
   if (!stavba) return null;
-  return { stavba, deliStavbe };
+  return { stavba, deliStavbe, lat: hsResult.lat, lng: hsResult.lng };
 }
