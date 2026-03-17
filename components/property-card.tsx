@@ -963,18 +963,29 @@ function AerialMap({
   }
 
   const staticUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=17&size=600x200&scale=2&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${apiKey}`;
+  const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=600x200&location=${lat},${lng}&fov=90&pitch=0&key=${apiKey}`;
+  const streetViewPageUrl = `https://www.google.com/maps?q=${lat},${lng}&layer=c`;
 
   return (
-    <div className="print:hidden">
-      <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+    <div className="print:hidden space-y-2">
+      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="block">
         <img
           src={staticUrl}
           alt={`Zračni posnetek: ${naslov}`}
-          className="w-full h-[200px] object-cover rounded-lg"
+          className="w-full h-[180px] object-cover rounded-lg"
           loading="lazy"
         />
       </a>
-      <p className="text-[10px] text-gray-400 mt-1.5">Vir: Google Maps &middot; GURS koordinate</p>
+      <a href={streetViewPageUrl} target="_blank" rel="noopener noreferrer" className="block">
+        <img
+          src={streetViewUrl}
+          alt={`Street View: ${naslov}`}
+          className="w-full h-[150px] object-cover rounded-lg"
+          loading="lazy"
+          onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+        />
+      </a>
+      <p className="text-[10px] text-gray-400">Vir: Google Maps &middot; GURS koordinate</p>
     </div>
   );
 }
