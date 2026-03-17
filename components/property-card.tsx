@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
+
+const CadastralMap = dynamic(() => import("./cadastral-map"), { ssr: false });
 
 interface Prostor {
   vrsta: string;
@@ -119,6 +122,7 @@ function Check({ on }: { on: boolean }) {
 
 export function PropertyCard({
   naslov,
+  enolicniId,
   stavba,
   deliStavbe,
   energetskaIzkaznica,
@@ -193,9 +197,13 @@ export function PropertyCard({
         </div>
       </div>
 
-      {/* Aerial map - full width on mobile, hidden on desktop (shown in right col) */}
+      {/* Cadastral map - full width on mobile, hidden on desktop (shown in right col) */}
       <div className="lg:hidden border-b border-gray-100">
-        <AerialMap lat={lat} lng={lng} naslov={naslov} />
+        {lat && lng ? (
+          <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} />
+        ) : (
+          <AerialMap lat={lat} lng={lng} naslov={naslov} />
+        )}
       </div>
 
       <div className="lg:flex overflow-hidden">
@@ -295,7 +303,11 @@ export function PropertyCard({
 
         {/* Right column: aerial map (40% on desktop) */}
         <div className="hidden lg:block lg:w-[40%] min-w-0 overflow-hidden lg:border-l lg:border-gray-100 p-6 space-y-6 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
-          <AerialMap lat={lat} lng={lng} naslov={naslov} />
+          {lat && lng ? (
+            <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} />
+          ) : (
+            <AerialMap lat={lat} lng={lng} naslov={naslov} />
+          )}
         </div>
       </div>
 
