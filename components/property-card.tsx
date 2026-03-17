@@ -302,6 +302,65 @@ export function PropertyCard({
       <div className="border-t border-gray-100 p-6">
         <CreditCalculator />
       </div>
+
+      {/* Lead capture - low-key, bottom of card */}
+      <LeadCaptureSection naslov={naslov} />
+    </div>
+  );
+}
+
+// --- Lead capture ---
+
+function LeadCaptureSection({ naslov }: { naslov: string }) {
+  const [email, setEmail] = React.useState("");
+  const [sent, setSent] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email) return;
+    setLoading(true);
+    try {
+      await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, naslov }),
+      });
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="border-t border-gray-100 bg-gray-50 px-6 py-5 print:hidden">
+      {sent ? (
+        <p className="text-sm text-[#2d6a4f]">Hvala! Obvestili vas bomo, ko bodo podatki dostopni.</p>
+      ) : (
+        <>
+          <p className="text-sm text-gray-500 mb-3">
+            Manjkajo podatki za to nepremičnino? Obvestimo vas, ko bodo energetska izkaznica ali transakcijske cene dostopne.
+          </p>
+          <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm">
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="vas@email.si"
+              required
+              className="flex-1 rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2d6a4f]"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded bg-[#2d6a4f] px-4 py-2 text-sm text-white hover:bg-[#245a42] disabled:opacity-50 transition-colors"
+            >
+              {loading ? "..." : "Obvestite me"}
+            </button>
+          </form>
+          <p className="text-xs text-gray-400 mt-2">Brez registracije. E-pošto uporabimo samo za to obvestilo.</p>
+        </>
+      )}
     </div>
   );
 }
