@@ -164,7 +164,7 @@ export async function getStreetId(streetName: string): Promise<number | null> {
   const url = buildWfsUrl(
     BASE_RPE,
     "SI.GURS.RPE:UL_G",
-    `UL_UIME LIKE '${streetName}'`,
+    `UL_UIME ILIKE '${streetName.trim()}'`,
   );
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return null;
