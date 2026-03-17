@@ -387,9 +387,9 @@ function KljucniPodatki({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         {boxes.map((b) => (
           <div
             key={b.label}
-            className="rounded-lg border border-gray-100 bg-gray-50 p-6 text-center"
+            className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-center"
           >
-            <p className="text-2xl font-bold text-gray-900">{b.value}</p>
+            <p className={`font-bold text-gray-900 leading-tight ${b.value.length > 10 ? "text-base" : b.value.length > 6 ? "text-xl" : "text-2xl"}`}>{b.value}</p>
             <p className="text-xs font-medium tracking-wider text-gray-500 uppercase mt-1">{b.label}</p>
           </div>
         ))}
