@@ -283,7 +283,11 @@ export function PropertyCard({
           <CollapsibleValueSection>
             <RenVrednostSection data={renVrednost} />
             <VrednostnaAnalizaSection data={etnAnaliza} />
-            <LastnistvoSection data={currentPart?.lastnistvo} />
+            {isMultiUnit && !activePart ? (
+              <LastnistvoMultiSection deliStavbe={deliStavbe} />
+            ) : (
+              <LastnistvoSection data={currentPart?.lastnistvo} />
+            )}
             <ParceleSection parcele={parcele} />
             <ServicesSection />
           </CollapsibleValueSection>
@@ -674,6 +678,42 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
               <td className="py-2 text-right tabular-nums">
                 {p.boniteta != null ? fmtDec(p.boniteta) : "\u2014"}
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps["deliStavbe"] }) {
+  const all = deliStavbe.flatMap(d => (d.lastnistvo ?? []).map(l => ({ ...l, enota: d.stDela })));
+  if (all.length === 0) return (
+    <section>
+      <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
+      <p className="text-sm text-gray-400 italic">Podatki o lastništvu niso dostopni za to stavbo.</p>
+    </section>
+  );
+  return (
+    <section>
+      <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
+      <p className="text-xs text-gray-400 mb-3">Prikazano lastništvo za vse enote stavbe. Za podrobnosti izberite enoto.</p>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
+            <th className="pb-2 pr-4 font-medium">Enota</th>
+            <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
+            <th className="pb-2 pr-4 font-medium">Delež</th>
+            <th className="pb-2 font-medium">Vrsta pravice</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {all.map((r, i) => (
+            <tr key={i} className="text-gray-700">
+              <td className="py-2 pr-4 text-gray-500">{r.enota}</td>
+              <td className="py-2 pr-4">{r.tipOsebe}</td>
+              <td className="py-2 pr-4 tabular-nums">{r.delez}</td>
+              <td className="py-2">{r.tipLastnistva}</td>
             </tr>
           ))}
         </tbody>
