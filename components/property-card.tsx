@@ -178,19 +178,9 @@ export function PropertyCard({
             <h3 className="text-2xl font-semibold print:text-[#2d6a4f]">
               {naslov}
             </h3>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <p className="text-sm text-green-200 print:text-gray-500">
-                Pregled podatkov o nepremičnini
-              </p>
-              <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-medium tracking-wide uppercase text-white/80 print:border-gray-300 print:text-gray-500">
-                Uradni podatki
-              </span>
-              {stavba?.tip && (
-                <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-medium text-white/80 print:border-gray-300 print:text-gray-500">
-                  {stavba.tip}
-                </span>
-              )}
-            </div>
+            <p className="text-sm text-green-200 print:text-gray-500 mt-0.5">
+              Pregled podatkov o nepremičnini
+            </p>
           </div>
           <button
             onClick={() => window.print()}
@@ -211,6 +201,9 @@ export function PropertyCard({
       <div className="lg:flex overflow-hidden">
         {/* Left column: main data (60% on desktop) */}
         <div className="lg:w-[60%] min-w-0 p-6 space-y-8">
+          {/* L1: Kratek opis */}
+          <PropertySummary stavba={stavba} deliStavbe={deliStavbe} />
+
           {/* L1: Ključni podatki */}
           <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} />
 
@@ -424,6 +417,49 @@ function fmtDate(raw: string): string {
 }
 
 // --- Sections ---
+
+function PropertySummary({ stavba, deliStavbe }: { stavba: PropertyCardProps["stavba"]; deliStavbe: PropertyCardProps["deliStavbe"] }) {
+  if (!stavba) return null;
+
+  // Površina: bruto ali vsota enot
+  const povrsina = stavba.povrsina ?? (
+    deliStavbe.length > 0 ? deliStavbe.reduce((s, d) => s + (d.povrsina ?? 0), 0) || null : null
+  );
+
+  // Stavek 1: tip, etaže, stanovanja, leto
+  const parts1: string[] = [];
+  if (stavba.tip) parts1.push(stavba.tip);
+  const etaze = stavba.steviloEtaz ? `z ${stavba.steviloEtaz} etažami` : null;
+  const stanovanja = stavba.steviloStanovanj ? `in ${stavba.steviloStanovanj} stanovanji` : null;
+  if (etaze && stanovanja) parts1.push(`${etaze} ${stanovanja}`);
+  else if (etaze) parts1.push(etaze);
+  const leto = stavba.letoIzgradnje ? `zgrajena leta ${stavba.letoIzgradnje}` : null;
+  if (leto) parts1.push(leto);
+  const stavek1 = parts1.length > 0 ? parts1.join(", ") + "." : null;
+
+  // Stavek 2: površina, konstrukcija, priključki
+  const parts2: string[] = [];
+  if (povrsina) parts2.push(`Skupna površina znaša ${fmtDec(povrsina)} m²`);
+  if (stavba.konstrukcija) parts2.push(`konstrukcija ${stavba.konstrukcija.toLowerCase()}`);
+  const prikljucki = [
+    stavba.prikljucki?.elektrika && "elektrika",
+    stavba.prikljucki?.plin && "plin",
+    stavba.prikljucki?.vodovod && "vodovod",
+    stavba.prikljucki?.kanalizacija && "kanalizacija",
+  ].filter(Boolean) as string[];
+  if (prikljucki.length > 0) parts2.push(`priključena na ${prikljucki.join(", ")}`);
+  const stavek2 = parts2.length > 0 ? parts2.join(", ") + "." : null;
+
+  if (!stavek1 && !stavek2) return null;
+
+  return (
+    <div className="text-sm text-gray-600 leading-relaxed border-l-4 border-gray-200 pl-4 py-1 space-y-0.5">
+      {stavek1 && <p>{stavek1}</p>}
+      {stavek2 && <p>{stavek2}</p>}
+      <p className="text-[10px] text-gray-400 mt-1">Vir: Kataster nepremičnin · GURS</p>
+    </div>
+  );
+}
 
 function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["stavba"]; deliStavbe: PropertyCardProps["deliStavbe"] }) {
   // Površina: bruto iz stavbe, fallback = vsota enot
