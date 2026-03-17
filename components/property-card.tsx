@@ -439,11 +439,11 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Ključni podatki</Label>
-      <div className="flex divide-x divide-gray-100 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x divide-gray-100 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
         {stats.map((s) => (
-          <div key={s.label} className="flex-1 min-w-0 px-4 py-4 text-center">
-            <p className="text-xs text-gray-400 mb-1 whitespace-nowrap">{s.label}</p>
-            <p className="font-semibold text-gray-900 leading-tight text-sm truncate" title={s.value}>{s.value}</p>
+          <div key={s.label} className="px-4 py-4 text-center">
+            <p className="text-[11px] text-gray-400 mb-1 uppercase tracking-wide">{s.label}</p>
+            <p className="font-semibold text-gray-900 leading-snug text-sm">{s.value}</p>
           </div>
         ))}
       </div>
