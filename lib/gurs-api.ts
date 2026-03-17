@@ -671,3 +671,47 @@ export async function getOwnership(
     };
   });
 }
+
+// --- ZK GJI: Gas Infrastructure ---
+
+const BASE_KGI = "https://ipi.eprostor.gov.si/wfs-si-gurs-kgi/wfs";
+
+/**
+ * Check if gas infrastructure (pipeline) exists within 100m of a location.
+ * Uses ZK GJI WFS layer LINIJE_ZEMELJSKI_PLIN_G.
+ * @param lat WGS84 latitude
+ * @param lng WGS84 longitude
+ * @returns true if gas line found within ~100m radius, false otherwise
+ */
+export async function checkGasInfrastructure(
+  lat: number,
+  lng: number,
+): Promise<boolean> {
+  // ~100m in degrees: 0.0009 lat, 0.0013 lng (at Slovenia's latitude)
+  const latBuf = 0.0009;
+  const lngBuf = 0.0013;
+  const minLng = lng - lngBuf;
+  const minLat = lat - latBuf;
+  const maxLng = lng + lngBuf;
+  const maxLat = lat + latBuf;
+
+  const params = new URLSearchParams({
+    SERVICE: "WFS",
+    VERSION: "2.0.0",
+    REQUEST: "GetFeature",
+    TYPENAMES: "SI.GURS.KGI:LINIJE_ZEMELJSKI_PLIN_G",
+    OUTPUTFORMAT: "application/json",
+    COUNT: "1",
+    CQL_FILTER: `BBOX(GEOM,${minLng},${minLat},${maxLng},${maxLat},'EPSG:4326')`,
+  });
+
+  try {
+    const url = `${BASE_KGI}?${params.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 86400 } });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return (data?.totalFeatures ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}

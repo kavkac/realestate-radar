@@ -88,6 +88,7 @@ interface PropertyCardProps {
       vodovod: boolean;
       kanalizacija: boolean;
     };
+    gasInfrastructure?: boolean | null;
   };
   deliStavbe: DelStavbe[];
   energetskaIzkaznica: EnergyData | null;
@@ -548,7 +549,10 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
-        <span><Check on={stavba.prikljucki.plin} /> Plin</span>
+        <span>
+          <Check on={stavba.gasInfrastructure ?? stavba.prikljucki.plin} /> Plin
+          <span className="ml-1 text-xs text-gray-400">{stavba.gasInfrastructure != null ? "ZK GJI · GURS" : "GURS"}</span>
+        </span>
         <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
         <span><Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija</span>
       </div>

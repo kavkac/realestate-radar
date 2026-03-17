@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts } from "@/lib/gurs-api";
+import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
 import { prisma } from "@/lib/prisma";
@@ -154,6 +154,12 @@ export async function POST(request: NextRequest) {
     const useableArea =
       deliStavbe[0]?.uporabnaPovrsina ?? deliStavbe[0]?.povrsina ?? null;
 
+    // Check gas infrastructure via ZK GJI
+    const gasInfrastructure =
+      lat != null && lng != null
+        ? await checkGasInfrastructure(lat, lng).catch(() => null)
+        : null;
+
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, and EV in parallel
     const [energyCertResult, parcele, renVrednost, etnAnaliza, evResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
@@ -220,6 +226,7 @@ export async function POST(request: NextRequest) {
           vodovod: stavba.vodovod,
           kanalizacija: stavba.kanalizacija,
         },
+        gasInfrastructure,
       },
       deliStavbe: deliStavbe.map((d, i) => ({
         stDela: d.stDelaStavbe,
