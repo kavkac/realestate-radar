@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lookupByAddress, getParcele, getRenVrednost } from "@/lib/gurs-api";
+import { lookupByAddress, getParcele, getRenVrednost, getOwnership } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
 
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
     const useableArea =
       deliStavbe[0]?.uporabnaPovrsina ?? deliStavbe[0]?.povrsina ?? null;
 
-    // Fetch energy certificate, parcele, REN vrednost, and ETN analysis in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza] = await Promise.all([
+    // Fetch energy certificate, parcele, REN vrednost, ETN analysis, and ownership in parallel
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       getParcele(stavba.koId, stavba.stStavbe),
       getRenVrednost(stavba.koId, stavba.stStavbe),
       getEtnAnaliza(stavba.koId, useableArea).catch(() => null),
+      ...deliStavbe.map((d) => getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>)),
     ]);
 
     let energetskaIzkaznica = null;
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
           kanalizacija: stavba.kanalizacija,
         },
       },
-      deliStavbe: deliStavbe.map((d) => ({
+      deliStavbe: deliStavbe.map((d, i) => ({
         stDela: d.stDelaStavbe,
         povrsina: d.povrsina,
         uporabnaPovrsina: d.uporabnaPovrsina,
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
         letoObnoveOken: d.letoObnoveOken,
         dvigalo: d.dvigalo,
         prostori: d.prostori,
+        lastnistvo: ownershipResults[i] ?? [],
       })),
       energetskaIzkaznica,
       parcele,

@@ -8,6 +8,14 @@ interface Prostor {
   povrsina: number | null;
 }
 
+interface LastnistvoRecord {
+  tipLastnistva: string;
+  tipOsebe: "Pravna oseba" | "Fizična oseba";
+  delez: string;
+  datumVpisa: string;
+  nazivPravneOsebe: string | null;
+}
+
 interface DelStavbe {
   stDela: number;
   povrsina: number | null;
@@ -17,6 +25,7 @@ interface DelStavbe {
   letoObnoveOken: number | null;
   dvigalo: boolean;
   prostori: Prostor[];
+  lastnistvo?: LastnistvoRecord[];
 }
 
 interface Parcela {
@@ -267,7 +276,10 @@ export function PropertyCard({
           </section>
         )}
 
-        {/* 8. Zemljišče */}
+        {/* 8. Lastništvo */}
+        <LastnistvoSection data={currentPart?.lastnistvo} />
+
+        {/* 9. Zemljišče */}
         <ParceleSection parcele={parcele} />
 
         {/* 9. Kdaj je potrebno vzdrževanje */}
@@ -324,6 +336,13 @@ function fmt(n: number): string {
 
 function fmtDec(n: number): string {
   return n.toLocaleString("sl-SI");
+}
+
+function fmtDate(raw: string): string {
+  if (!raw) return "\u2014";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString("sl-SI", { day: "numeric", month: "numeric", year: "numeric" });
 }
 
 // --- Sections ---
@@ -547,6 +566,41 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
           ))}
         </tbody>
       </table>
+    </section>
+  );
+}
+
+function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
+  if (!data || data.length === 0) return null;
+  return (
+    <section>
+      <Label>Lastništvo</Label>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
+            <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
+            <th className="pb-2 pr-4 font-medium">Delež</th>
+            <th className="pb-2 pr-4 font-medium">Vrsta pravice</th>
+            <th className="pb-2 font-medium">Datum vpisa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((r, i) => (
+            <tr key={i} className="border-b border-gray-50 last:border-0">
+              <td className="py-2 pr-4 text-gray-700">
+                {r.tipOsebe}
+                {r.nazivPravneOsebe && (
+                  <span className="block text-xs text-gray-400">{r.nazivPravneOsebe}</span>
+                )}
+              </td>
+              <td className="py-2 pr-4 tabular-nums text-gray-700">{r.delez}</td>
+              <td className="py-2 pr-4 text-gray-700">{r.tipLastnistva}</td>
+              <td className="py-2 text-gray-700">{r.datumVpisa ? fmtDate(r.datumVpisa) : "\u2014"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-xs text-gray-400 mt-2">Vir: GURS zemljiška knjiga. Imena fizičnih oseb niso prikazana (GDPR).</p>
     </section>
   );
 }

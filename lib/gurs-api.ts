@@ -2,6 +2,7 @@ import { getCached, setCached } from "./wfs-cache";
 
 const BASE_RPE = "https://storitve.eprostor.gov.si/ows-pub-wfs/wfs";
 const BASE_KN = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn-osnovni/wfs";
+const BASE_KN_JV = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn/wfs";
 
 // --- Šifranti ---
 
@@ -455,4 +456,97 @@ export async function lookupByAddress(address: string): Promise<{
 
   if (!stavba) return null;
   return { stavba, deliStavbe, lat: hsResult.lat, lng: hsResult.lng };
+}
+
+// --- Ownership (JV WFS endpoint) ---
+
+const TIP_LASTNISTVA: Record<number, string> = {
+  1: "Lastninsko pravo",
+  2: "Solastninsko pravo",
+  3: "Skupna lastnina",
+};
+
+export interface OwnershipRight {
+  tipLastnistva: string;
+  tipOsebe: "Pravna oseba" | "Fizična oseba";
+  delez: string;
+  datumVpisa: string;
+  nazivPravneOsebe: string | null;
+}
+
+function buildJvWfsUrl(typeName: string, cqlFilter: string): string {
+  const params = new URLSearchParams({
+    SERVICE: "WFS",
+    VERSION: "2.0.0",
+    REQUEST: "GetFeature",
+    TYPENAMES: typeName,
+    OUTPUTFORMAT: "application/json",
+    REFERER_APP_CODE: "JV",
+    CQL_FILTER: cqlFilter,
+  });
+  return `${BASE_KN_JV}?${params.toString()}`;
+}
+
+export async function getOwnership(
+  eidDelStavbe: string,
+): Promise<OwnershipRight[]> {
+  // Fetch ownership rights and legal entity ownership in parallel
+  const rightsUrl = buildJvWfsUrl(
+    "SI.GURS.KN:PRAVICE_LASTNISTVA_H",
+    `EID_DEL_STAVBE='${eidDelStavbe}' AND STATUS_VELJAVNOSTI='V'`,
+  );
+  const legalUrl = buildJvWfsUrl(
+    "SI.GURS.KN:LASTNISTVO_PRAVNIH_OSEB",
+    `EID_DEL_STAVBE='${eidDelStavbe}'`,
+  );
+
+  const [rightsData, legalData] = await Promise.all([
+    fetchWfs(rightsUrl),
+    fetchWfs(legalUrl),
+  ]);
+
+  // Build set of legal entity ownership IDs for cross-reference
+  const legalMap = new Map<number, string>();
+  if (legalData) {
+    for (const f of legalData.features) {
+      const p = f.properties;
+      legalMap.set(
+        p.OSEBA_ID as number,
+        (p.NAZIV as string) ?? "Pravna oseba",
+      );
+    }
+  }
+
+  if (!rightsData || rightsData.features.length === 0) {
+    // If no rights data but we have legal entity data, show that
+    if (legalData && legalData.features.length > 0) {
+      return legalData.features.map((f) => {
+        const p = f.properties;
+        return {
+          tipLastnistva: TIP_LASTNISTVA[p.TIP_LASTNISTVA as number] ?? "Lastninsko pravo",
+          tipOsebe: "Pravna oseba",
+          delez: "1/1",
+          datumVpisa: "",
+          nazivPravneOsebe: (p.NAZIV as string) ?? null,
+        };
+      });
+    }
+    return [];
+  }
+
+  return rightsData.features.map((f) => {
+    const p = f.properties;
+    const stevec = (p.DELEZ_STEVEC as number) ?? 1;
+    const imenovalec = (p.DELEZ_IMENOVALEC as number) ?? 1;
+    const datumVpisa = p.DATUM_VPISA ? String(p.DATUM_VPISA) : "";
+    const isLegal = legalMap.size > 0;
+
+    return {
+      tipLastnistva: TIP_LASTNISTVA[p.TIP_LASTNISTVA as number] ?? "Lastninsko pravo",
+      tipOsebe: isLegal ? ("Pravna oseba" as const) : ("Fizična oseba" as const),
+      delez: `${stevec}/${imenovalec}`,
+      datumVpisa,
+      nazivPravneOsebe: isLegal ? (legalMap.values().next().value ?? null) : null,
+    };
+  });
 }
