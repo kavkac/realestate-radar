@@ -419,10 +419,10 @@ export function AddressSearch() {
                 <button
                   key={tab.id}
                   onClick={() => handleSwitchTab(tab.id)}
-                  className={`group relative flex items-center gap-1.5 rounded-t-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
+                  className={`group relative flex items-center gap-1.5 rounded-t-md px-3 text-sm whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
                     isActive
-                      ? "border-t-2 border-t-[#2d6a4f] border-l border-r border-gray-200 border-b-0 bg-white text-[#1a1a1a] z-10 -mb-px"
-                      : "border border-gray-200 bg-gray-100 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                      ? "py-2.5 border-t-2 border-t-[#2d6a4f] border-l border-r border-gray-200 border-b-0 bg-white font-medium text-gray-800 relative z-10 -mb-px"
+                      : "py-1.5 border border-gray-200 bg-gray-100 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}
                 >
                   <span className="truncate">{truncateAddress(tab.naslov || "Iskanje\u2026")}</span>
@@ -436,8 +436,8 @@ export function AddressSearch() {
                     }}
                     className={`ml-1 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-xs cursor-pointer transition-opacity ${
                       isActive
-                        ? "text-gray-400 hover:bg-gray-200 hover:text-gray-700 opacity-100"
-                        : "text-gray-400 hover:bg-gray-200 hover:text-gray-700 opacity-0 group-hover:opacity-100"
+                        ? "text-gray-400 hover:text-gray-600 opacity-100"
+                        : "text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100"
                     }`}
                     role="button"
                     aria-label={`Zapri ${tab.naslov}`}
@@ -448,14 +448,16 @@ export function AddressSearch() {
               );
             })}
             {tabs.length < MAX_TABS && (
-              <button
-                onClick={handleAddTab}
-                className="flex-shrink-0 ml-2 border border-gray-200 bg-white rounded-md px-2.5 py-1.5 text-sm text-gray-400 hover:text-gray-600 hover:border-gray-400 transition-colors mb-1"
-                title="Dodaj nepremičnino"
-                aria-label="Dodaj novo nepremičnino"
-              >
-                +
-              </button>
+              <div className="flex-shrink-0 ml-2 border-l border-gray-200 pl-2 flex items-end mb-1">
+                <button
+                  onClick={handleAddTab}
+                  className="border border-gray-200 bg-white rounded-md px-2.5 py-1.5 text-sm text-gray-400 hover:text-gray-600 hover:border-gray-400 transition-colors"
+                  title="Dodaj nepremičnino"
+                  aria-label="Dodaj novo nepremičnino"
+                >
+                  + Nov
+                </button>
+              </div>
             )}
           </div>
 
