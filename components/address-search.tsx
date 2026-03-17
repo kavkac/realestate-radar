@@ -423,12 +423,12 @@ export function AddressSearch() {
 
       {/* Tab bar */}
       {tabs.length > 0 && (
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-2">
+        <div className="flex items-center gap-1 overflow-x-auto flex-nowrap pb-1 -mb-2 scrollbar-none">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => handleSwitchTab(tab.id)}
-              className={`group flex items-center gap-1.5 rounded-t-md border px-3 py-2 text-sm whitespace-nowrap transition-colors ${
+              className={`group flex items-center gap-1.5 rounded-t-md border px-3 py-2 text-sm whitespace-nowrap transition-colors min-h-[44px] ${
                 tab.id === activeTabId && !addingNew
                   ? "border-[#2d6a4f] border-b-white bg-white text-gray-900 font-medium"
                   : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
@@ -443,7 +443,7 @@ export function AddressSearch() {
                   e.stopPropagation();
                   handleCloseTab(tab.id);
                 }}
-                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-xs text-gray-400 hover:bg-gray-200 hover:text-gray-700 cursor-pointer"
+                className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs text-gray-400 hover:bg-gray-200 hover:text-gray-700 cursor-pointer"
                 role="button"
                 aria-label={`Zapri ${tab.naslov}`}
               >
@@ -454,7 +454,7 @@ export function AddressSearch() {
           {tabs.length < MAX_TABS && (
             <button
               onClick={handleAddTab}
-              className="flex items-center justify-center rounded-t-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              className="flex-shrink-0 flex items-center justify-center rounded-t-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors min-h-[44px] sticky right-0"
               title="Dodaj nepremičnino"
               aria-label="Dodaj novo nepremičnino"
             >

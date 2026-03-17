@@ -107,7 +107,7 @@ export function CreditCalculator() {
 
         {/* Results */}
         <div className="border-t border-gray-100 pt-4">
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-xs text-gray-500">Mesečni obrok</p>
               <p className="text-lg font-semibold text-gray-900 tabular-nums">

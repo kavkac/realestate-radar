@@ -174,8 +174,8 @@ export function PropertyCard({
       {/* Header */}
       <div className="bg-[#2d6a4f] px-6 py-5 text-white print:bg-white print:text-gray-900 print:border-b-2 print:border-[#2d6a4f]">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-2xl font-semibold print:text-[#2d6a4f]">
+          <div className="min-w-0">
+            <h3 className="text-xl sm:text-2xl font-semibold print:text-[#2d6a4f] break-words">
               {naslov}
             </h3>
             <p className="text-sm text-green-200 print:text-gray-500 mt-0.5">
@@ -294,7 +294,7 @@ export function PropertyCard({
         </div>
 
         {/* Right column: aerial map (40% on desktop) */}
-        <div className="lg:w-[40%] min-w-0 overflow-hidden lg:border-l lg:border-gray-100 p-6 space-y-6 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+        <div className="hidden lg:block lg:w-[40%] min-w-0 overflow-hidden lg:border-l lg:border-gray-100 p-6 space-y-6 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
           <AerialMap lat={lat} lng={lng} naslov={naslov} />
         </div>
       </div>
@@ -342,7 +342,7 @@ function LeadCaptureSection({ naslov }: { naslov: string }) {
           <p className="text-sm text-gray-500 mb-3">
             Manjkajo podatki za to nepremičnino? Obvestimo vas, ko bodo energetska izkaznica ali transakcijske cene dostopne.
           </p>
-          <form onSubmit={handleSubmit} className="flex gap-2 max-w-sm">
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 max-w-sm">
             <input
               type="email"
               value={email}
@@ -493,9 +493,9 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Ključni podatki</Label>
-      <div className="flex divide-x divide-gray-100 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
-        {stats.map((s) => (
-          <div key={s.label} className="flex-1 px-4 py-5 text-center">
+      <div className="grid grid-cols-2 sm:grid-cols-3 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden divide-y sm:divide-y-0 divide-gray-100">
+        {stats.map((s, i) => (
+          <div key={s.label} className={`px-4 py-5 text-center ${i > 0 ? "sm:border-l sm:border-gray-100" : ""} ${i === stats.length - 1 && stats.length % 2 !== 0 ? "col-span-2 sm:col-span-1" : ""}`}>
             <p className="text-[11px] text-gray-400 mb-2 uppercase tracking-wider">{s.label}</p>
             <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
           </div>
@@ -555,6 +555,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
       {part.prostori.length > 0 && (
         <div>
           <SubLabel>Prostori</SubLabel>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
@@ -573,6 +574,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
@@ -658,30 +660,32 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
   return (
     <section>
       <Label vir="Zemljiški kataster · GURS">Zemljišče</Label>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
-            <th className="pb-2 pr-4 font-medium">Parcela</th>
-            <th className="pb-2 pr-4 text-right font-medium">Površina</th>
-            <th className="pb-2 pr-4 font-medium">Vrsta rabe</th>
-            <th className="pb-2 text-right font-medium">Boniteta</th>
-          </tr>
-        </thead>
-        <tbody>
-          {parcele.map((p, i) => (
-            <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
-              <td className="py-2 pr-4">{p.parcelnaStevila}</td>
-              <td className="py-2 pr-4 text-right tabular-nums">
-                {p.povrsina != null ? `${fmtDec(p.povrsina)} m\u00B2` : "\u2014"}
-              </td>
-              <td className="py-2 pr-4">{p.vrstaRabe ?? "\u2014"}</td>
-              <td className="py-2 text-right tabular-nums">
-                {p.boniteta != null ? fmtDec(p.boniteta) : "\u2014"}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[400px]">
+          <thead>
+            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
+              <th className="pb-2 pr-4 font-medium">Parcela</th>
+              <th className="pb-2 pr-4 text-right font-medium">Površina</th>
+              <th className="pb-2 pr-4 font-medium">Vrsta rabe</th>
+              <th className="pb-2 text-right font-medium">Boniteta</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {parcele.map((p, i) => (
+              <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
+                <td className="py-2 pr-4">{p.parcelnaStevila}</td>
+                <td className="py-2 pr-4 text-right tabular-nums">
+                  {p.povrsina != null ? `${fmtDec(p.povrsina)} m\u00B2` : "\u2014"}
+                </td>
+                <td className="py-2 pr-4">{p.vrstaRabe ?? "\u2014"}</td>
+                <td className="py-2 text-right tabular-nums">
+                  {p.boniteta != null ? fmtDec(p.boniteta) : "\u2014"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -698,26 +702,28 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
       <p className="text-xs text-gray-400 mb-3">Prikazano lastništvo za vse enote stavbe. Za podrobnosti izberite enoto.</p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
-            <th className="pb-2 pr-4 font-medium">Enota</th>
-            <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
-            <th className="pb-2 pr-4 font-medium">Delež</th>
-            <th className="pb-2 font-medium">Vrsta pravice</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {all.map((r, i) => (
-            <tr key={i} className="text-gray-700">
-              <td className="py-2 pr-4 text-gray-500">{r.enota}</td>
-              <td className="py-2 pr-4">{r.tipOsebe}</td>
-              <td className="py-2 pr-4 tabular-nums">{r.delez}</td>
-              <td className="py-2">{r.tipLastnistva}</td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[400px]">
+          <thead>
+            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
+              <th className="pb-2 pr-4 font-medium">Enota</th>
+              <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
+              <th className="pb-2 pr-4 font-medium">Delež</th>
+              <th className="pb-2 font-medium">Vrsta pravice</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {all.map((r, i) => (
+              <tr key={i} className="text-gray-700">
+                <td className="py-2 pr-4 text-gray-500">{r.enota}</td>
+                <td className="py-2 pr-4">{r.tipOsebe}</td>
+                <td className="py-2 pr-4 tabular-nums">{r.delez}</td>
+                <td className="py-2">{r.tipLastnistva}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -727,31 +733,33 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
   return (
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
-            <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
-            <th className="pb-2 pr-4 font-medium">Delež</th>
-            <th className="pb-2 pr-4 font-medium">Vrsta pravice</th>
-            <th className="pb-2 font-medium">Datum vpisa</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((r, i) => (
-            <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
-              <td className="py-2 pr-4 text-gray-700">
-                {r.tipOsebe}
-                {r.nazivPravneOsebe && (
-                  <span className="block text-xs text-gray-400">{r.nazivPravneOsebe}</span>
-                )}
-              </td>
-              <td className="py-2 pr-4 tabular-nums text-gray-700">{r.delez}</td>
-              <td className="py-2 pr-4 text-gray-700">{r.tipLastnistva}</td>
-              <td className="py-2 text-gray-700">{r.datumVpisa ? fmtDate(r.datumVpisa) : "\u2014"}</td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[420px]">
+          <thead>
+            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
+              <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
+              <th className="pb-2 pr-4 font-medium">Delež</th>
+              <th className="pb-2 pr-4 font-medium">Vrsta pravice</th>
+              <th className="pb-2 font-medium">Datum vpisa</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((r, i) => (
+              <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
+                <td className="py-2 pr-4 text-gray-700">
+                  {r.tipOsebe}
+                  {r.nazivPravneOsebe && (
+                    <span className="block text-xs text-gray-400">{r.nazivPravneOsebe}</span>
+                  )}
+                </td>
+                <td className="py-2 pr-4 tabular-nums text-gray-700">{r.delez}</td>
+                <td className="py-2 pr-4 text-gray-700">{r.tipLastnistva}</td>
+                <td className="py-2 text-gray-700">{r.datumVpisa ? fmtDate(r.datumVpisa) : "\u2014"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <p className="text-xs text-gray-400 mt-2">Vir: GURS zemljiška knjiga. Imena fizičnih oseb niso prikazana (GDPR).</p>
     </section>
   );
@@ -850,14 +858,15 @@ function EnergetskiIzracunSection({
 
         <div>
           <SubLabel>Predlagane izboljšave</SubLabel>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[380px]">
             <thead>
               <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
                 <th className="pb-2 pr-4 font-medium">Ukrep</th>
-                <th className="pb-2 pr-4 text-right font-medium">
+                <th className="pb-2 pr-4 text-right font-medium whitespace-nowrap">
                   Ocena stroška
                 </th>
-                <th className="pb-2 text-right font-medium">ROI (let)</th>
+                <th className="pb-2 text-right font-medium whitespace-nowrap">ROI (let)</th>
               </tr>
             </thead>
             <tbody>
@@ -881,6 +890,7 @@ function EnergetskiIzracunSection({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </section>
@@ -1042,17 +1052,16 @@ function MaintenanceSection({
           {items.map((item) => (
             <div
               key={item.name}
-              className={`flex items-center justify-between rounded border border-gray-100 border-l-4 ${item.borderColor} bg-white px-4 py-3 text-sm`}
+              className={`flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 border-l-4 ${item.borderColor} bg-white px-4 py-3 text-sm`}
             >
-              <div className="text-gray-700">
+              <div className="text-gray-700 min-w-0">
                 <span className="font-medium">{item.name}</span>
                 <span className="ml-2 text-xs text-gray-400">
-                  (starost: {item.age} let / življenjska doba: {item.lifespan}{" "}
-                  let)
+                  ({item.age}/{item.lifespan} let)
                 </span>
               </div>
               <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${item.pillClass}`}
+                className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${item.pillClass}`}
               >
                 {item.urgency}
               </span>
@@ -1079,13 +1088,13 @@ function CollapsibleValueSection({ children }: { children: React.ReactNode }) {
     <div className="border-t border-gray-100 pt-6">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between text-left group"
+        className="flex w-full items-center justify-between text-left group min-h-[44px] py-2"
       >
         <div>
           <h3 className="text-base font-semibold text-gray-800">Vrednost in lastništvo</h3>
           <p className="text-xs text-gray-400 mt-0.5">Ocenjena vrednost, transakcije, lastništvo, parcele</p>
         </div>
-        <span className="text-gray-400 text-lg ml-4 group-hover:text-gray-600 transition-colors">
+        <span className="flex-shrink-0 flex items-center justify-center w-11 h-11 text-gray-400 text-lg ml-4 group-hover:text-gray-600 transition-colors">
           {open ? "▲" : "▼"}
         </span>
       </button>
