@@ -50,7 +50,7 @@ export function CreditCalculator() {
               Znesek kredita
             </label>
             <span className="text-sm font-medium text-gray-800 tabular-nums">
-              {fmt(amount)} \u20AC
+              {fmt(amount)} €
             </span>
           </div>
           <input
@@ -64,8 +64,8 @@ export function CreditCalculator() {
             className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-[#2d6a4f]"
           />
           <div className="flex justify-between text-xs text-gray-400 mt-1">
-            <span>10.000 \u20AC</span>
-            <span>500.000 \u20AC</span>
+            <span>10.000 €</span>
+            <span>500.000 €</span>
           </div>
         </div>
 
@@ -111,19 +111,19 @@ export function CreditCalculator() {
             <div>
               <p className="text-xs text-gray-500">Mesečni obrok</p>
               <p className="text-lg font-semibold text-gray-900 tabular-nums">
-                {fmt(result.monthly)} \u20AC
+                {fmt(result.monthly)} €
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Skupaj plačano</p>
               <p className="text-sm font-medium text-gray-700 tabular-nums">
-                {fmt(result.total)} \u20AC
+                {fmt(result.total)} €
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Skupaj obresti</p>
               <p className="text-sm font-medium text-gray-700 tabular-nums">
-                {fmt(result.interest)} \u20AC
+                {fmt(result.interest)} €
               </p>
             </div>
           </div>
