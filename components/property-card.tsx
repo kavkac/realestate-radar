@@ -293,8 +293,12 @@ export function PropertyCard({
           <EnergyCertificateSection data={energetskaIzkaznica} />
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
-          {/* L4: Vrednost in lastništvo (collapsible) */}
-          <CollapsibleValueSection>
+          {/* L4: Vrednost in lastništvo (vedno odprto) */}
+          <div className="border-t border-gray-100 pt-6 space-y-8">
+            <div>
+              <h3 className="text-base font-semibold text-gray-800">Vrednost in lastništvo</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Ocenjena vrednost, transakcije, lastništvo, parcele</p>
+            </div>
             <RenVrednostSection data={renVrednost} />
             <VrednostnaAnalizaSection data={etnAnaliza} />
             {isMultiUnit && !activePart ? (
@@ -302,6 +306,14 @@ export function PropertyCard({
             ) : (
               <LastnistvoSection data={currentPart?.lastnistvo} />
             )}
+            <ParceleSection parcele={parcele} />
+          </div>
+
+          {/* L5: Storitve */}
+          <ServicesSection />
+
+          {/* L6: Izračunaj kredit */}
+          <div>
             <button
               onClick={() => setKreditOpen(!kreditOpen)}
               className="w-full flex items-center justify-between px-6 py-3 bg-green-50 border border-green-200 hover:bg-green-100 transition-colors text-sm font-medium text-[#2d6a4f]"
@@ -314,9 +326,7 @@ export function PropertyCard({
                 <CreditCalculator />
               </div>
             )}
-            <ParceleSection parcele={parcele} />
-            <ServicesSection />
-          </CollapsibleValueSection>
+          </div>
         </div>
 
         {/* Right column: maps (40% on desktop) */}
