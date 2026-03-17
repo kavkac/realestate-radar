@@ -193,9 +193,9 @@ export function PropertyCard({
         </div>
       </div>
 
-      <div className="lg:flex">
+      <div className="lg:flex overflow-hidden">
         {/* Left column: main data (60% on desktop) */}
-        <div className="lg:w-[60%] p-6 space-y-8">
+        <div className="lg:w-[60%] min-w-0 p-6 space-y-8">
           {/* 2. Ocenjena vrednost */}
           <RenVrednostSection data={renVrednost} />
 
@@ -291,11 +291,15 @@ export function PropertyCard({
           <ServicesSection />
         </div>
 
-        {/* Right column: aerial map + credit calculator (40% on desktop) */}
-        <div className="lg:w-[40%] lg:border-l lg:border-gray-100 p-6 space-y-6">
+        {/* Right column: aerial map (40% on desktop) */}
+        <div className="lg:w-[40%] min-w-0 overflow-hidden lg:border-l lg:border-gray-100 p-6 space-y-6 lg:sticky lg:top-0 lg:self-start">
           <AerialMap lat={lat} lng={lng} naslov={naslov} />
-          <CreditCalculator />
         </div>
+      </div>
+
+      {/* Credit calculator - full width after all property data */}
+      <div className="border-t border-gray-100 p-6">
+        <CreditCalculator />
       </div>
     </div>
   );
@@ -434,7 +438,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
         />
         <Field label="Vrsta rabe" value={part.vrsta} />
         <div className="col-span-2 sm:col-span-3 -mt-2">
-          <p className="text-xs text-gray-400">Klasifikacija po uradnem registru GURS</p>
+          <p className="text-xs text-amber-600">Uradna klasifikacija po registru GURS — dejanska raba se lahko razlikuje</p>
         </div>
         <Field label="Obnova instalacij" value={part.letoObnoveInstalacij} />
         <Field label="Obnova oken" value={part.letoObnoveOken} />
