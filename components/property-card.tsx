@@ -136,6 +136,7 @@ export function PropertyCard({
   requestedDel,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
+  const [kreditOpen, setKreditOpen] = useState(false);
 
   const filteredParts =
     requestedDel != null
@@ -301,6 +302,18 @@ export function PropertyCard({
             ) : (
               <LastnistvoSection data={currentPart?.lastnistvo} />
             )}
+            <button
+              onClick={() => setKreditOpen(!kreditOpen)}
+              className="w-full flex items-center justify-between px-6 py-3 bg-green-50 border border-green-200 hover:bg-green-100 transition-colors text-sm font-medium text-[#2d6a4f]"
+            >
+              <span>Izračunaj kredit</span>
+              <span className="text-xs">{kreditOpen ? '▲' : '▼'}</span>
+            </button>
+            {kreditOpen && (
+              <div className="border-l-4 border-[#2d6a4f] bg-gray-50 px-6 py-4">
+                <CreditCalculator />
+              </div>
+            )}
             <ParceleSection parcele={parcele} />
             <ServicesSection />
           </CollapsibleValueSection>
@@ -320,11 +333,6 @@ export function PropertyCard({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Credit calculator - full width after all property data */}
-      <div className="border-t border-gray-100 p-6">
-        <CreditCalculator />
       </div>
 
       {/* CC 4.0 attribution footer */}
