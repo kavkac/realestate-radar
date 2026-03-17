@@ -81,6 +81,8 @@ interface LookupResult {
   } | null;
 }
 
+type SearchMode = "naslov" | "parcela";
+
 type PropertyTab = {
   id: string;
   naslov: string;
@@ -121,6 +123,9 @@ export function AddressSearch() {
   const [address, setAddress] = useState(initialAddress);
   const [delStavbe, setDelStavbe] = useState(initialDel);
   const [copied, setCopied] = useState(false);
+  const [searchMode, setSearchMode] = useState<SearchMode>("naslov");
+  const [parcelaNum, setParcelaNum] = useState("");
+  const [koId, setKoId] = useState("");
 
   const [tabs, setTabs] = useState<PropertyTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -297,10 +302,70 @@ export function AddressSearch() {
     }
   }
 
+  async function performParcelSearch(parcela: string, ko: string, forceNew = false) {
+    const label = `Parcela ${parcela} (KO ${ko})`;
+    const shouldCreateNew = forceNew || addingNew || tabs.length === 0;
+
+    const fetchParcel = async () => {
+      const res = await fetch(`/api/lookup?parcela=${encodeURIComponent(parcela)}&ko=${encodeURIComponent(ko)}`);
+      return res.json() as Promise<{ success: boolean; error?: string; parcela?: { eidParcele: string; koId: number; stParcele: string; povrsina: number | null; vrstaRabe: string | null }; stavbe?: unknown[] }>;
+    };
+
+    if (shouldCreateNew) {
+      const newId = String(Date.now());
+      setTabs((prev) => [...prev, { id: newId, naslov: label, data: null, loading: true, error: null }]);
+      setActiveTabId(newId);
+      setAddingNew(false);
+
+      try {
+        const data = await fetchParcel();
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === newId
+              ? { ...t, loading: false, data: data.success ? (data as unknown as LookupResult) : null, error: data.success ? null : friendlyError(data.error ?? "Napaka") }
+              : t,
+          ),
+        );
+      } catch {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === newId ? { ...t, loading: false, error: "Napaka pri povezovanju s strežnikom." } : t,
+          ),
+        );
+      }
+    } else {
+      const currentId = activeTabId!;
+      setTabs((prev) =>
+        prev.map((t) => (t.id === currentId ? { ...t, naslov: label, data: null, loading: true, error: null } : t)),
+      );
+      try {
+        const data = await fetchParcel();
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === currentId
+              ? { ...t, loading: false, data: data.success ? (data as unknown as LookupResult) : null, error: data.success ? null : friendlyError(data.error ?? "Napaka") }
+              : t,
+          ),
+        );
+      } catch {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === currentId ? { ...t, loading: false, error: "Napaka pri povezovanju s strežnikom." } : t,
+          ),
+        );
+      }
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const parsedDel = delStavbe.trim() ? parseInt(delStavbe, 10) : undefined;
-    await performSearch(address, parsedDel);
+    if (searchMode === "parcela") {
+      if (!parcelaNum.trim() || !koId.trim()) return;
+      await performParcelSearch(parcelaNum.trim(), koId.trim());
+    } else {
+      const parsedDel = delStavbe.trim() ? parseInt(delStavbe, 10) : undefined;
+      await performSearch(address, parsedDel);
+    }
   }
 
   function handleSwitchTab(tabId: string) {
@@ -361,44 +426,97 @@ export function AddressSearch() {
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-3" aria-label="Iskanje nepremičnine">
-        {/* Desktop: vse v eni vrstici | Mobile: vsako v svoji */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <label className="sr-only" htmlFor="address-input">Vnesite naslov nepremičnine</label>
-          <div className="relative flex-1">
-            <input
-              id="address-input"
-              ref={inputRef}
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="npr. Slovenčeva ulica 4, Ljubljana"
-              className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={isLoading}
-              autoComplete="off"
-              aria-autocomplete="list"
-            />
-          </div>
-          <label className="sr-only" htmlFor="del-input">Številka dela stavbe</label>
-          <input
-            id="del-input"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={delStavbe}
-            onChange={(e) => setDelStavbe(e.target.value.replace(/\D/g, ""))}
-            placeholder="Št. dela stavbe (neobvezno)"
-            className="sm:w-32 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield]"
-            disabled={isLoading}
-          />
+        {/* Search mode toggle */}
+        <div className="flex gap-1 rounded-md border border-input bg-background p-1 w-fit text-sm">
           <button
-            type="submit"
-            disabled={isLoading || address.length < 3}
-            className="rounded-md bg-[#2d6a4f] px-5 py-3 text-sm font-medium text-white hover:bg-[#245a42] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-            aria-label="Poišči nepremičnino"
+            type="button"
+            onClick={() => setSearchMode("naslov")}
+            className={`rounded px-3 py-1.5 transition-colors ${searchMode === "naslov" ? "bg-[#2d6a4f] text-white font-medium" : "text-muted-foreground hover:text-foreground"}`}
           >
-            {isLoading ? "Iščem\u2026" : "Poišči"}
+            Po naslovu
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchMode("parcela")}
+            className={`rounded px-3 py-1.5 transition-colors ${searchMode === "parcela" ? "bg-[#2d6a4f] text-white font-medium" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Po parcelni številki
           </button>
         </div>
+
+        {/* Desktop: vse v eni vrstici | Mobile: vsako v svoji */}
+        {searchMode === "naslov" ? (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <label className="sr-only" htmlFor="address-input">Vnesite naslov nepremičnine</label>
+            <div className="relative flex-1">
+              <input
+                id="address-input"
+                ref={inputRef}
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="npr. Slovenčeva ulica 4, Ljubljana"
+                className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                disabled={isLoading}
+                autoComplete="off"
+                aria-autocomplete="list"
+              />
+            </div>
+            <label className="sr-only" htmlFor="del-input">Številka dela stavbe</label>
+            <input
+              id="del-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={delStavbe}
+              onChange={(e) => setDelStavbe(e.target.value.replace(/\D/g, ""))}
+              placeholder="Št. dela stavbe (neobvezno)"
+              className="sm:w-32 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield]"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || address.length < 3}
+              className="rounded-md bg-[#2d6a4f] px-5 py-3 text-sm font-medium text-white hover:bg-[#245a42] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+              aria-label="Poišči nepremičnino"
+            >
+              {isLoading ? "Iščem\u2026" : "Poišči"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <label className="sr-only" htmlFor="ko-input">ID katastrske občine</label>
+            <input
+              id="ko-input"
+              type="text"
+              inputMode="numeric"
+              value={koId}
+              onChange={(e) => setKoId(e.target.value.replace(/\D/g, ""))}
+              placeholder="ID kat. občine (npr. 1728)"
+              className="sm:w-48 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield]"
+              disabled={isLoading}
+            />
+            <label className="sr-only" htmlFor="parcela-input">Parcelna številka</label>
+            <input
+              id="parcela-input"
+              type="text"
+              value={parcelaNum}
+              onChange={(e) => setParcelaNum(e.target.value)}
+              placeholder="Parcelna številka (npr. 1234/5)"
+              className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !parcelaNum.trim() || !koId.trim()}
+              className="rounded-md bg-[#2d6a4f] px-5 py-3 text-sm font-medium text-white hover:bg-[#245a42] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+              aria-label="Poišči parcelo"
+            >
+              {isLoading ? "Iščem\u2026" : "Poišči"}
+            </button>
+          </div>
+        )}
+
 
 
 

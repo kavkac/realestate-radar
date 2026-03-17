@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lookupByAddress, getParcele, getRenVrednost, getOwnership } from "@/lib/gurs-api";
+import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
 
@@ -23,6 +23,99 @@ function checkRateLimit(ip: string): boolean {
   }
   entry.count++;
   return entry.count <= RATE_LIMIT_MAX;
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const parcela = searchParams.get("parcela");
+  const koStr = searchParams.get("ko");
+
+  if (!parcela || !koStr) {
+    return NextResponse.json(
+      { success: false, error: "Manjkata parametra parcela in ko" },
+      { status: 400 },
+    );
+  }
+
+  const koId = parseInt(koStr, 10);
+  if (isNaN(koId)) {
+    return NextResponse.json(
+      { success: false, error: "Neveljaven ko parameter (mora biti število)" },
+      { status: 400 },
+    );
+  }
+
+  // Rate limit
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { success: false, error: "Preveč zahtevkov. Poskusite znova čez minuto." },
+      { status: 429 },
+    );
+  }
+
+  try {
+    const parcelaData = await getParcelByNumber(koId, parcela);
+    if (!parcelaData) {
+      return NextResponse.json(
+        { success: false, error: "Parcela ni bila najdena v evidenci GURS" },
+        { status: 404 },
+      );
+    }
+
+    // Get all buildings on this parcel
+    const stavbe = await getBuildingsByParcel(parcelaData.eidParcele);
+
+    // For each building get its parts
+    const stavbeWithParts = await Promise.all(
+      stavbe.map(async (stavba) => {
+        const deliStavbe = await getBuildingParts(stavba.eidStavba);
+        return { stavba, deliStavbe };
+      }),
+    );
+
+    return NextResponse.json({
+      success: true,
+      parcela: parcelaData,
+      stavbe: stavbeWithParts.map(({ stavba, deliStavbe }) => ({
+        koId: stavba.koId,
+        stStavbe: stavba.stStavbe,
+        eidStavba: stavba.eidStavba,
+        letoIzgradnje: stavba.letoIzgradnje,
+        letoObnove: {
+          fasade: stavba.letoObnoveFasade,
+          strehe: stavba.letoObnoveStrehe,
+        },
+        steviloEtaz: stavba.steviloEtaz,
+        steviloStanovanj: stavba.steviloStanovanj,
+        povrsina: stavba.brutoTlorisnaPovrsina,
+        konstrukcija: stavba.nosilnaKonstrukcija,
+        tip: stavba.tipStavbe,
+        prikljucki: {
+          elektrika: stavba.elektrika,
+          plin: stavba.plin,
+          vodovod: stavba.vodovod,
+          kanalizacija: stavba.kanalizacija,
+        },
+        deliStavbe: deliStavbe.map((d) => ({
+          stDela: d.stDelaStavbe,
+          povrsina: d.povrsina,
+          uporabnaPovrsina: d.uporabnaPovrsina,
+          vrsta: d.vrsta,
+          prostori: d.prostori,
+        })),
+      })),
+    });
+  } catch (error) {
+    console.error("Parcel lookup error:", error);
+    return NextResponse.json(
+      { success: false, error: "Napaka pri iskanju parcele" },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

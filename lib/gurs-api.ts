@@ -327,6 +327,101 @@ export async function getBuildingParts(
   return parts;
 }
 
+// --- Parcel types ---
+
+export interface ParcelaFullData {
+  eidParcele: string;
+  koId: number;
+  stParcele: string;
+  povrsina: number | null;
+  vrstaRabe: string | null;
+  geometry: Record<string, unknown> | null;
+}
+
+// --- Parcel lookups ---
+
+export async function getParcelByNumber(
+  koId: number,
+  stParcele: string,
+): Promise<ParcelaFullData | null> {
+  const url = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:PARCELE_H",
+    `KO_ID=${koId} AND ST_PARCELE='${stParcele}'`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return null;
+
+  const f = data.features[0];
+  const p = f.properties;
+  return {
+    eidParcele: String(p.EID_PARCELE),
+    koId: p.KO_ID as number,
+    stParcele: String(p.ST_PARCELE ?? stParcele),
+    povrsina: (p.POVRSINA as number) || null,
+    vrstaRabe: VRSTA_RABE[p.VRSTA_RABE_ID as number] ?? null,
+    geometry: (f.geometry as Record<string, unknown>) ?? null,
+  };
+}
+
+export async function getParcelById(
+  eidParcele: string,
+): Promise<ParcelaFullData | null> {
+  const url = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:PARCELE_H",
+    `EID_PARCELE='${eidParcele}'`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return null;
+
+  const f = data.features[0];
+  const p = f.properties;
+  return {
+    eidParcele,
+    koId: p.KO_ID as number,
+    stParcele: String(p.ST_PARCELE ?? ""),
+    povrsina: (p.POVRSINA as number) || null,
+    vrstaRabe: VRSTA_RABE[p.VRSTA_RABE_ID as number] ?? null,
+    geometry: (f.geometry as Record<string, unknown>) ?? null,
+  };
+}
+
+export async function getBuildingsByParcel(
+  eidParcele: string,
+): Promise<StavbaData[]> {
+  const url = buildWfsUrl(
+    BASE_KN,
+    "SI.GURS.KN:STAVBE_H",
+    `EID_PARCELE='${eidParcele}'`,
+  );
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return [];
+
+  return data.features.map((feat) => {
+    const p = feat.properties;
+    return {
+      koId: p.KO_ID as number,
+      stStavbe: p.ST_STAVBE as number,
+      eidStavba: String(p.EID_STAVBA),
+      letoIzgradnje: (p.LETO_IZGRADNJE as number) || null,
+      letoObnoveFasade: (p.LETO_OBNOVE_FASADE as number) || null,
+      letoObnoveStrehe: (p.LETO_OBNOVE_STREHE as number) || null,
+      steviloEtaz: (p.STEVILO_ETAZ as number) || null,
+      steviloStanovanj: (p.STEVILO_STANOVANJ as number) || null,
+      brutoTlorisnaPovrsina: (p.BRUTO_TLORISNA_POVRSINA as number) || null,
+      elektrika: wfsBool(p.ELEKTRIKA),
+      plin: wfsBool(p.PLIN),
+      vodovod: wfsBool(p.VODOVOD),
+      kanalizacija: wfsBool(p.KANALIZACIJA),
+      nosilnaKonstrukcija:
+        NOSILNA_KONSTRUKCIJA[p.NOSILNA_KONSTRUKCIJA_ID as number] ?? null,
+      tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
+      datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
+    };
+  });
+}
+
 // --- Zemljišče šifrant ---
 
 const VRSTA_RABE: Record<number, string> = {
