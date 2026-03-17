@@ -386,7 +386,7 @@ export function AddressSearch() {
             pattern="[0-9]*"
             value={delStavbe}
             onChange={(e) => setDelStavbe(e.target.value.replace(/\D/g, ""))}
-            placeholder="Enota"
+            placeholder="Št. dela stavbe (neobvezno)"
             className="sm:w-32 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield]"
             disabled={isLoading}
           />
@@ -400,25 +400,7 @@ export function AddressSearch() {
           </button>
         </div>
 
-        <div className="flex gap-2">
-          {/* spacer — share button row */}
-          <div className="flex-1" />
-          {showShareButton && (
-            <button
-              type="button"
-              onClick={handleShare}
-              title="Kopiraj delljivo povezavo"
-              className="flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-[#2d6a4f] transition-colors"
-              aria-label="Kopiraj delljivo povezavo"
-            >
-              {copied ? (
-                <><span className="hidden sm:inline">Kopirano</span><span className="sm:hidden">OK</span></>
-              ) : (
-                <><span className="hidden sm:inline">Deli povezavo</span><span className="sm:hidden">Deli</span></>
-              )}
-            </button>
-          )}
-        </div>
+
 
         {activeTab?.error && (
           <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
