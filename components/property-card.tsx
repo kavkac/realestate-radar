@@ -506,10 +506,11 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
     <section>
       <Label vir="Kataster nepremičnin · GURS">O stavbi</Label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-        <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
-        <Field label="Obnova strehe" value={stavba.letoObnove.strehe} />
+        <Field label="Tip stavbe" value={stavba.tip} />
         <Field label="Stanovanj" value={stavba.steviloStanovanj} />
         <Field label="Konstrukcija" value={stavba.konstrukcija} />
+        <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
+        <Field label="Obnova strehe" value={stavba.letoObnove.strehe} />
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
