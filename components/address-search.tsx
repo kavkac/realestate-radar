@@ -64,6 +64,16 @@ interface LookupResult {
     vrednost: number;
     datumOcene: string;
   } | null;
+  etnAnaliza?: {
+    steviloTransakcij: number;
+    povprecnaCenaM2: number;
+    minCenaM2: number;
+    maxCenaM2: number;
+    ocenjenaTrznaVrednost: number | null;
+    trend: "rast" | "padec" | "stabilno" | null;
+    zadnjeLeto: number | null;
+    predLeto: number | null;
+  } | null;
 }
 
 export function AddressSearch() {
@@ -206,6 +216,7 @@ export function AddressSearch() {
           energetskaIzkaznica={result.energetskaIzkaznica ?? null}
           parcele={result.parcele}
           renVrednost={result.renVrednost}
+          etnAnaliza={result.etnAnaliza}
           requestedDel={submittedDel}
         />
       )}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
+import { getEtnAnaliza } from "@/lib/etn-lookup";
 
 const LookupSchema = z.object({
   address: z.string().min(3, "Naslov mora vsebovati vsaj 3 znake"),
@@ -55,8 +56,12 @@ export async function POST(request: NextRequest) {
     const stDelaStavbe =
       delStavbe ?? (deliStavbe.length === 1 ? deliStavbe[0].stDelaStavbe : undefined);
 
-    // Fetch energy certificate, parcele, and REN vrednost in parallel
-    const [energyCertResult, parcele, renVrednost] = await Promise.all([
+    // Useable area for ETN analysis
+    const useableArea =
+      deliStavbe[0]?.uporabnaPovrsina ?? deliStavbe[0]?.povrsina ?? null;
+
+    // Fetch energy certificate, parcele, REN vrednost, and ETN analysis in parallel
+    const [energyCertResult, parcele, renVrednost, etnAnaliza] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -64,6 +69,7 @@ export async function POST(request: NextRequest) {
       }).catch(() => null),
       getParcele(stavba.koId, stavba.stStavbe),
       getRenVrednost(stavba.koId, stavba.stStavbe),
+      getEtnAnaliza(stavba.koId, useableArea).catch(() => null),
     ]);
 
     let energetskaIzkaznica = null;
@@ -123,6 +129,7 @@ export async function POST(request: NextRequest) {
       energetskaIzkaznica,
       parcele,
       renVrednost,
+      etnAnaliza,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
