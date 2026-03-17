@@ -207,7 +207,7 @@ export function PropertyCard({
         {/* Left column: main data (60% on desktop) */}
         <div className="lg:w-[60%] min-w-0 p-6 space-y-8">
           {/* L1: Ključni podatki */}
-          <KljucniPodatki stavba={stavba} />
+          <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} />
 
           {/* L2: Tehnični izpis */}
           <BuildingSection stavba={stavba} />
@@ -420,35 +420,30 @@ function fmtDate(raw: string): string {
 
 // --- Sections ---
 
-function KljucniPodatki({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
-  const boxes: { label: string; value: string }[] = [];
+function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["stavba"]; deliStavbe: PropertyCardProps["deliStavbe"] }) {
+  // Površina: bruto iz stavbe, fallback = vsota enot
+  const povrsina = stavba.povrsina ?? (
+    deliStavbe.length > 0
+      ? deliStavbe.reduce((sum, d) => sum + (d.povrsina ?? 0), 0) || null
+      : null
+  );
 
-  if (stavba.letoIzgradnje) {
-    boxes.push({ label: "Leto izgradnje", value: String(stavba.letoIzgradnje) });
-  }
-  if (stavba.steviloEtaz) {
-    boxes.push({ label: "Etaže", value: String(stavba.steviloEtaz) });
-  }
-  if (stavba.povrsina != null) {
-    boxes.push({ label: "Površina", value: `${fmtDec(stavba.povrsina)} m\u00B2` });
-  }
-  if (stavba.tip) {
-    boxes.push({ label: "Tip stavbe", value: stavba.tip });
-  }
+  const stats: { label: string; value: string }[] = [];
+  if (stavba.letoIzgradnje) stats.push({ label: "Leto", value: String(stavba.letoIzgradnje) });
+  if (stavba.steviloEtaz) stats.push({ label: "Etaže", value: String(stavba.steviloEtaz) });
+  if (povrsina) stats.push({ label: "Površina", value: `${fmtDec(povrsina)} m²` });
+  if (stavba.tip) stats.push({ label: "Tip", value: stavba.tip });
 
-  if (boxes.length === 0) return null;
+  if (stats.length === 0) return null;
 
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Ključni podatki</Label>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {boxes.map((b) => (
-          <div
-            key={b.label}
-            className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-center"
-          >
-            <p className={`font-bold text-gray-900 leading-tight ${b.value.length > 10 ? "text-base" : b.value.length > 6 ? "text-xl" : "text-2xl"}`}>{b.value}</p>
-            <p className="text-xs font-medium tracking-wider text-gray-500 uppercase mt-1">{b.label}</p>
+      <div className="flex divide-x divide-gray-100 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
+        {stats.map((s) => (
+          <div key={s.label} className="flex-1 min-w-0 px-4 py-4 text-center">
+            <p className="text-xs text-gray-400 mb-1 whitespace-nowrap">{s.label}</p>
+            <p className="font-semibold text-gray-900 leading-tight text-sm sm:text-base break-words">{s.value}</p>
           </div>
         ))}
       </div>
