@@ -49,7 +49,30 @@ export const VRSTA_DEJANSKE_RABE: Record<number, string> = {
   20: "Kmetijski prostor",
   21: "Gozdarski prostor",
   22: "Vodna površina",
+  23: "Skupna raba",
+  24: "Poslovni prostor v stanovanjski stavbi",
+  25: "Stanovanje v poslovni stavbi",
+  26: "Nestanovanjska raba",
+  30: "Garažno mesto",
+  31: "Parkirno mesto",
+  32: "Kolesarnica",
+  33: "Tehnični prostor",
+  34: "Stopnišče",
+  35: "Hodnik",
+  36: "Dvigalo",
+  37: "Kotlovnica",
+  38: "Smetnjak",
+  40: "Zunanja površina",
+  41: "Balkon",
+  42: "Terasa",
+  43: "Lopa",
+  44: "Vrt",
+  45: "Dvorišče",
+  46: "Neznano",
   47: "Stanovanje (starejši zapis)",
+  48: "Pisarna (starejši zapis)",
+  49: "Poslovni prostor (starejši zapis)",
+  50: "Garaža (starejši zapis)",
 };
 
 export const VRSTA_PROSTORA: Record<number, string> = {
@@ -86,6 +109,7 @@ export interface StavbaData {
   kanalizacija: boolean;
   nosilnaKonstrukcija: string | null;
   tipStavbe: string | null;
+  datumSys: string | null;
 }
 
 export interface ProstorData {
@@ -241,6 +265,7 @@ export async function getBuilding(
     nosilnaKonstrukcija:
       NOSILNA_KONSTRUKCIJA[p.NOSILNA_KONSTRUKCIJA_ID as number] ?? null,
     tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
+    datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
   };
 }
 

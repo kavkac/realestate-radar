@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
         povrsina: stavba.brutoTlorisnaPovrsina,
         konstrukcija: stavba.nosilnaKonstrukcija,
         tip: stavba.tipStavbe,
+        datumSys: stavba.datumSys,
         prikljucki: {
           elektrika: stavba.elektrika,
           plin: stavba.plin,

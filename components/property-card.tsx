@@ -81,6 +81,7 @@ interface PropertyCardProps {
     povrsina: number | null;
     konstrukcija: string | null;
     tip: string | null;
+    datumSys?: string | null;
     prikljucki: {
       elektrika: boolean;
       plin: boolean;
@@ -325,6 +326,11 @@ export function PropertyCard({
         <CreditCalculator />
       </div>
 
+      {/* CC 4.0 attribution footer */}
+      <div className="text-[10px] text-gray-400 px-6 py-3 border-t border-gray-100">
+        Podatki: Geodetska uprava Republike Slovenije (GURS) &middot; Ministrstvo za okolje in prostor (MOP) &middot; Vir: Kataster nepremičnin, Register energetskih izkaznic &middot; Licenca: CC BY 4.0
+      </div>
+
       {/* Lead capture - low-key, bottom of card */}
       <LeadCaptureSection naslov={naslov} />
     </div>
@@ -536,6 +542,9 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         <Field label="Konstrukcija" value={stavba.konstrukcija} />
         <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
         <Field label="Obnova strehe" value={stavba.letoObnove.strehe} />
+        {stavba.datumSys && (
+          <Field label="Stanje registra" value={fmtDate(stavba.datumSys)} />
+        )}
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
@@ -711,6 +720,12 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
   );
 }
 
+function fmtLastniki(n: number): string {
+  if (n === 1) return "1 lastnik";
+  if (n >= 2 && n <= 4) return `${n} lastnika`;
+  return `${n} lastnikov`;
+}
+
 function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps["deliStavbe"] }) {
   const all = deliStavbe.flatMap(d => (d.lastnistvo ?? []).map(l => ({ ...l, enota: d.stDela })));
   if (all.length === 0) return (
@@ -722,7 +737,7 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
   return (
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
-      <p className="text-xs text-gray-400 mb-3">Prikazano lastništvo za vse enote stavbe. Za podrobnosti izberite enoto.</p>
+      <p className="text-xs text-gray-500 mb-3">{fmtLastniki(all.length)}</p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[400px]">
           <thead>
@@ -754,6 +769,7 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
   return (
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
+      <p className="text-xs text-gray-500 mb-3">{fmtLastniki(data.length)}</p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[420px]">
           <thead>
