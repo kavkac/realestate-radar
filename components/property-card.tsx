@@ -198,12 +198,15 @@ export function PropertyCard({
       </div>
 
       {/* Cadastral map - full width on mobile, hidden on desktop (shown in right col) */}
-      <div className="lg:hidden border-b border-gray-100">
+      <div className="lg:hidden border-b border-gray-100 space-y-0">
         {lat && lng ? (
           <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} />
         ) : (
           <AerialMap lat={lat} lng={lng} naslov={naslov} />
         )}
+        <div className="px-4 pb-4">
+          <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
+        </div>
       </div>
 
       <div className="lg:flex overflow-hidden">
@@ -301,13 +304,14 @@ export function PropertyCard({
           </CollapsibleValueSection>
         </div>
 
-        {/* Right column: aerial map (40% on desktop) */}
-        <div className="hidden lg:block lg:w-[40%] min-w-0 overflow-hidden lg:border-l lg:border-gray-100 p-6 space-y-6 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+        {/* Right column: maps (40% on desktop) */}
+        <div className="hidden lg:block lg:w-[40%] min-w-0 overflow-hidden lg:border-l lg:border-gray-100 p-6 space-y-4 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
           {lat && lng ? (
             <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} />
           ) : (
             <AerialMap lat={lat} lng={lng} naslov={naslov} />
           )}
+          <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
         </div>
       </div>
 
@@ -1111,6 +1115,27 @@ function CollapsibleValueSection({ children }: { children: React.ReactNode }) {
         </span>
       </button>
       {open && <div className="mt-6 space-y-8">{children}</div>}
+    </div>
+  );
+}
+
+function StreetViewEmbed({ lat, lng, naslov }: { lat: number | null | undefined; lng: number | null | undefined; naslov: string }) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!lat || !lng || !apiKey) return null;
+  const url = `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${lat},${lng}&fov=80&pitch=5&source=outdoor`;
+  return (
+    <div className="print:hidden">
+      <div className="relative rounded-lg overflow-hidden">
+        <iframe
+          src={url}
+          className="w-full h-[200px] border-0"
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          title={`Street View: ${naslov}`}
+        />
+      </div>
+      <p className="text-[10px] text-gray-400 mt-1 text-right">Vir: Google Street View · Povlecite za rotacijo</p>
     </div>
   );
 }
