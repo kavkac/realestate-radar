@@ -178,13 +178,18 @@ export function PropertyCard({
             <h3 className="text-2xl font-semibold print:text-[#2d6a4f]">
               {naslov}
             </h3>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <p className="text-sm text-green-200 print:text-gray-500">
                 Pregled podatkov o nepremičnini
               </p>
               <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-medium tracking-wide uppercase text-white/80 print:border-gray-300 print:text-gray-500">
                 Uradni podatki
               </span>
+              {stavba?.tip && (
+                <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-medium text-white/80 print:border-gray-300 print:text-gray-500">
+                  {stavba.tip}
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -429,21 +434,20 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
   );
 
   const stats: { label: string; value: string }[] = [];
-  if (stavba.letoIzgradnje) stats.push({ label: "Leto", value: String(stavba.letoIzgradnje) });
+  if (stavba.letoIzgradnje) stats.push({ label: "Leto izgradnje", value: String(stavba.letoIzgradnje) });
   if (stavba.steviloEtaz) stats.push({ label: "Etaže", value: String(stavba.steviloEtaz) });
   if (povrsina) stats.push({ label: "Površina", value: `${fmtDec(povrsina)} m²` });
-  if (stavba.tip) stats.push({ label: "Tip", value: stavba.tip });
 
   if (stats.length === 0) return null;
 
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Ključni podatki</Label>
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x divide-gray-100 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
+      <div className="flex divide-x divide-gray-100 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden">
         {stats.map((s) => (
-          <div key={s.label} className="px-4 py-4 text-center">
-            <p className="text-[11px] text-gray-400 mb-1 uppercase tracking-wide">{s.label}</p>
-            <p className="font-semibold text-gray-900 leading-snug text-sm">{s.value}</p>
+          <div key={s.label} className="flex-1 px-4 py-5 text-center">
+            <p className="text-[11px] text-gray-400 mb-2 uppercase tracking-wider">{s.label}</p>
+            <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
           </div>
         ))}
       </div>
