@@ -16,7 +16,7 @@ export default function HomePage() {
       </header>
 
       <section className="flex-1 flex items-start justify-center px-4 py-8 sm:py-16">
-        <div className="w-full max-w-2xl space-y-8">
+        <div className="w-full max-w-5xl space-y-8">
           <div className="text-center space-y-3">
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
               Poišči svojo nepremičnino
@@ -34,7 +34,7 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t py-8 px-4">
-        <div className="container mx-auto max-w-2xl space-y-3 text-center text-sm text-muted-foreground">
+        <div className="container mx-auto max-w-5xl space-y-3 text-center text-sm text-muted-foreground">
           <p className="font-medium text-foreground/70">Viri podatkov</p>
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">
             <span>📍 GURS — Register prostorskih enot (RPE)</span>

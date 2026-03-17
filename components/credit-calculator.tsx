@@ -34,8 +34,8 @@ export function CreditCalculator() {
     });
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-6 text-left">
-      <h4 className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-5">
+    <div className="rounded-lg border border-gray-100 bg-white p-6 text-left">
+      <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 border-l-4 border-gray-800 pl-3 mb-5">
         Kreditni kalkulator
       </h4>
 

@@ -96,15 +96,15 @@ interface PropertyCardProps {
 }
 
 const ENERGY_COLORS: Record<string, string> = {
-  A1: "bg-green-700",
-  A2: "bg-green-600",
-  B1: "bg-emerald-500",
-  B2: "bg-lime-500",
-  C: "bg-yellow-500 text-gray-900",
-  D: "bg-orange-500",
-  E: "bg-orange-600",
-  F: "bg-red-600",
-  G: "bg-red-800",
+  A1: "bg-green-100 text-green-800",
+  A2: "bg-green-100 text-green-800",
+  B1: "bg-lime-100 text-lime-800",
+  B2: "bg-lime-100 text-lime-800",
+  C: "bg-yellow-100 text-yellow-800",
+  D: "bg-orange-100 text-orange-800",
+  E: "bg-orange-100 text-orange-800",
+  F: "bg-red-100 text-red-800",
+  G: "bg-red-100 text-red-800",
 };
 
 const HEATING_PRICE_EUR = 0.12;
@@ -175,7 +175,7 @@ export function PropertyCard({
       <div className="bg-[#2d6a4f] px-6 py-5 text-white print:bg-white print:text-gray-900 print:border-b-2 print:border-[#2d6a4f]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold print:text-[#2d6a4f]">
+            <h3 className="text-2xl font-semibold print:text-[#2d6a4f]">
               {naslov}
             </h3>
             <p className="text-sm text-green-200 print:text-gray-500 mt-0.5">
@@ -193,104 +193,109 @@ export function PropertyCard({
         </div>
       </div>
 
-      {/* 1. Aerial map */}
-      <AerialMap lat={lat} lng={lng} naslov={naslov} />
+      <div className="lg:flex">
+        {/* Left column: main data (60% on desktop) */}
+        <div className="lg:w-[60%] p-6 space-y-8">
+          {/* 2. Ocenjena vrednost */}
+          <RenVrednostSection data={renVrednost} />
 
-      <div className="p-6 space-y-8">
-        {/* 2. Ocenjena vrednost */}
-        <RenVrednostSection data={renVrednost} />
+          {/* 3. Ključni podatki */}
+          <KljucniPodatki stavba={stavba} />
 
-        {/* 3. Ključni podatki */}
-        <KljucniPodatki stavba={stavba} />
+          {/* 4. Poraba energije */}
+          <EnergyCertificateSection data={energetskaIzkaznica} />
 
-        {/* 4. Poraba energije */}
-        <EnergyCertificateSection data={energetskaIzkaznica} />
+          {/* 5. Prodajne cene v okolici */}
+          <VrednostnaAnalizaSection data={etnAnaliza} />
 
-        {/* 5. Prodajne cene v okolici */}
-        <VrednostnaAnalizaSection data={etnAnaliza} />
+          {/* 6. O stavbi */}
+          <BuildingSection stavba={stavba} />
 
-        {/* 6. O stavbi */}
-        <BuildingSection stavba={stavba} />
+          {/* 7. Stanovanja in prostori */}
+          {isMultiUnit && !activePart && (
+            <section>
+              <Label>Stanovanja in prostori ({deliStavbe.length})</Label>
+              <p className="text-sm text-gray-500 mb-3">
+                Izberite enoto za podroben pregled.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {deliStavbe.map((d) => (
+                  <button
+                    key={d.stDela}
+                    onClick={() => setSelectedDel(d.stDela)}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-gray-200 bg-white px-4 py-3 text-sm text-left hover:border-[#2d6a4f] hover:shadow-sm transition-all"
+                  >
+                    <div className="text-gray-800 min-w-0">
+                      <span className="font-medium">Enota {d.stDela}</span>
+                      {d.vrsta && (
+                        <span className="ml-1.5 text-gray-500">
+                          &mdash; {d.vrsta}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-gray-500 tabular-nums ml-auto flex items-center gap-2">
+                      {d.povrsina != null && <span>{fmtDec(d.povrsina)} m&sup2;</span>}
+                      {d.uporabnaPovrsina != null && (
+                        <span className="text-xs text-gray-400">
+                          (upor. {fmtDec(d.uporabnaPovrsina)} m&sup2;)
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
-        {/* 7. Stanovanja in prostori */}
-        {isMultiUnit && !activePart && (
-          <section>
-            <Label>Stanovanja in prostori ({deliStavbe.length})</Label>
-            <p className="text-sm text-gray-500 mb-3">
-              Izberite enoto za podroben pregled.
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {deliStavbe.map((d) => (
+          {isMultiUnit && activePart && (
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <Label>Enota {activePart.stDela}</Label>
                 <button
-                  key={d.stDela}
-                  onClick={() => setSelectedDel(d.stDela)}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-gray-200 bg-white px-4 py-3 text-sm text-left hover:border-[#2d6a4f] hover:shadow-sm transition-all"
+                  onClick={() => setSelectedDel(null)}
+                  className="text-sm text-[#2d6a4f] hover:underline"
                 >
-                  <div className="text-gray-800 min-w-0">
-                    <span className="font-medium">Enota {d.stDela}</span>
-                    {d.vrsta && (
-                      <span className="ml-1.5 text-gray-500">
-                        &mdash; {d.vrsta}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-gray-500 tabular-nums ml-auto flex items-center gap-2">
-                    {d.povrsina != null && <span>{fmtDec(d.povrsina)} m&sup2;</span>}
-                    {d.uporabnaPovrsina != null && (
-                      <span className="text-xs text-gray-400">
-                        (upor. {fmtDec(d.uporabnaPovrsina)} m&sup2;)
-                      </span>
-                    )}
-                  </div>
+                  &larr; Nazaj na seznam
                 </button>
+              </div>
+              <PartDetail part={activePart} />
+            </section>
+          )}
+
+          {!isMultiUnit && filteredParts.length > 0 && (
+            <section>
+              <Label>
+                {filteredParts.length === 1
+                  ? "Stanovanje"
+                  : `Stanovanja in prostori (${filteredParts.length})`}
+              </Label>
+              {filteredParts.map((d) => (
+                <PartDetail key={d.stDela} part={d} />
               ))}
-            </div>
-          </section>
-        )}
+            </section>
+          )}
 
-        {isMultiUnit && activePart && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <Label>Enota {activePart.stDela}</Label>
-              <button
-                onClick={() => setSelectedDel(null)}
-                className="text-sm text-[#2d6a4f] hover:underline"
-              >
-                &larr; Nazaj na seznam
-              </button>
-            </div>
-            <PartDetail part={activePart} />
-          </section>
-        )}
+          {/* 8. Lastništvo */}
+          <LastnistvoSection data={currentPart?.lastnistvo} />
 
-        {!isMultiUnit && filteredParts.length > 0 && (
-          <section>
-            <Label>
-              {filteredParts.length === 1
-                ? "Stanovanje"
-                : `Stanovanja in prostori (${filteredParts.length})`}
-            </Label>
-            {filteredParts.map((d) => (
-              <PartDetail key={d.stDela} part={d} />
-            ))}
-          </section>
-        )}
+          {/* 9. Zemljišče */}
+          <ParceleSection parcele={parcele} />
 
-        {/* 8. Lastništvo */}
-        <LastnistvoSection data={currentPart?.lastnistvo} />
+          {/* 9. Kdaj je potrebno vzdrževanje */}
+          <MaintenanceSection stavba={stavba} part={currentPart} />
 
-        {/* 9. Zemljišče */}
-        <ParceleSection parcele={parcele} />
+          {/* 10. Stroški ogrevanja */}
+          <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
-        {/* 9. Kdaj je potrebno vzdrževanje */}
-        <MaintenanceSection stavba={stavba} part={currentPart} />
+          {/* 11. Uredite z enim klikom */}
+          <ServicesSection />
+        </div>
 
-        {/* 10. Stroški ogrevanja + kredit */}
-        <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
-        <CreditCalculator />
-
-        {/* 11. Uredite z enim klikom */}
-        <ServicesSection />
+        {/* Right column: aerial map + credit calculator (40% on desktop) */}
+        <div className="lg:w-[40%] lg:border-l lg:border-gray-100 p-6 space-y-6">
+          <AerialMap lat={lat} lng={lng} naslov={naslov} />
+          <CreditCalculator />
+        </div>
       </div>
     </div>
   );
@@ -300,7 +305,7 @@ export function PropertyCard({
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">
+    <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 border-l-4 border-gray-800 pl-3 mb-3">
       {children}
     </h4>
   );
@@ -324,8 +329,8 @@ function Field({
   if (value == null) return null;
   return (
     <div>
-      <span className="text-gray-500 text-xs">{label}</span>
-      <p className="font-medium text-gray-800">{value}</p>
+      <span className="text-xs font-medium tracking-wider text-gray-500 uppercase">{label}</span>
+      <p className="text-sm text-gray-900">{value}</p>
     </div>
   );
 }
@@ -372,10 +377,10 @@ function KljucniPodatki({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         {boxes.map((b) => (
           <div
             key={b.label}
-            className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-center"
+            className="rounded-lg border border-gray-100 bg-gray-50 p-6 text-center"
           >
-            <p className="text-xs text-gray-500">{b.label}</p>
-            <p className="text-lg font-semibold text-gray-800 mt-0.5">{b.value}</p>
+            <p className="text-2xl font-bold text-gray-900">{b.value}</p>
+            <p className="text-xs font-medium tracking-wider text-gray-500 uppercase mt-1">{b.label}</p>
           </div>
         ))}
       </div>
@@ -448,7 +453,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
             </thead>
             <tbody>
               {part.prostori.map((r, i) => (
-                <tr key={i} className="border-b border-gray-50 last:border-0">
+                <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
                   <td className="py-2 pr-4 text-gray-700">{r.vrsta}</td>
                   <td className="py-2 text-right tabular-nums text-gray-700">
                     {r.povrsina != null ? `${fmtDec(r.povrsina)} m\u00B2` : "\u2014"}
@@ -471,7 +476,7 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <span
-              className={`inline-flex items-center justify-center rounded px-4 py-2 text-lg font-bold text-white ${ENERGY_COLORS[data.razred] ?? "bg-gray-400"}`}
+              className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-2xl font-bold ${ENERGY_COLORS[data.razred] ?? "bg-gray-100 text-gray-800"}`}
             >
               {data.razred}
             </span>
@@ -553,7 +558,7 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
         </thead>
         <tbody>
           {parcele.map((p, i) => (
-            <tr key={i} className="border-b border-gray-50 last:border-0">
+            <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
               <td className="py-2 pr-4">{p.parcelnaStevila}</td>
               <td className="py-2 pr-4 text-right tabular-nums">
                 {p.povrsina != null ? `${fmtDec(p.povrsina)} m\u00B2` : "\u2014"}
@@ -586,7 +591,7 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
         </thead>
         <tbody>
           {data.map((r, i) => (
-            <tr key={i} className="border-b border-gray-50 last:border-0">
+            <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
               <td className="py-2 pr-4 text-gray-700">
                 {r.tipOsebe}
                 {r.nazivPravneOsebe && (
@@ -715,7 +720,7 @@ function EnergetskiIzracunSection({
                 return (
                   <tr
                     key={imp.name}
-                    className="border-b border-gray-50 last:border-0"
+                    className="border-b border-gray-50 last:border-0 odd:bg-gray-50"
                   >
                     <td className="py-2 pr-4 text-gray-700">{imp.name}</td>
                     <td className="py-2 pr-4 text-right tabular-nums text-gray-700">
@@ -866,8 +871,8 @@ function MaintenanceSection({
         age,
         lifespan: m.lifespan,
         urgency: "Planirati",
-        borderColor: "border-l-gray-300",
-        pillClass: "bg-gray-100 text-gray-600",
+        borderColor: "border-l-green-400",
+        pillClass: "bg-green-50 text-green-700",
       });
     }
   }
@@ -925,12 +930,12 @@ function AerialMap({
 
   if (!lat || !lng || !apiKey) {
     return (
-      <div className="px-6 pt-4 print:hidden">
+      <div className="print:hidden">
         <a
           href={mapsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="block text-center text-sm text-[#2d6a4f] hover:underline py-3 border border-gray-100 rounded-md bg-gray-50"
+          className="block text-center text-sm text-[#2d6a4f] hover:underline py-3 border border-gray-100 rounded-lg bg-gray-50"
         >
           Odpri v Google Maps
         </a>
@@ -946,7 +951,7 @@ function AerialMap({
         <img
           src={staticUrl}
           alt={`Zračni posnetek: ${naslov}`}
-          className="w-full h-[200px] object-cover"
+          className="w-full h-[200px] object-cover rounded-lg"
           loading="lazy"
         />
       </a>
