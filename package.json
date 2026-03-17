@@ -13,7 +13,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "import:eiz": "npx ts-node scripts/import-eiz.ts",
-    "import:etn": "npx ts-node scripts/import-etn.ts"
+    "import:etn": "npx ts-node scripts/import-etn.ts",
+    "import:ev": "npx tsx scripts/import-ev.ts"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.0.2",

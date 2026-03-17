@@ -3,6 +3,7 @@ import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
+import { prisma } from "@/lib/prisma";
 
 const LookupSchema = z.object({
   address: z.string().min(3, "Naslov mora vsebovati vsaj 3 znake"),
@@ -153,8 +154,8 @@ export async function POST(request: NextRequest) {
     const useableArea =
       deliStavbe[0]?.uporabnaPovrsina ?? deliStavbe[0]?.povrsina ?? null;
 
-    // Fetch energy certificate, parcele, REN vrednost, ETN analysis, and ownership in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, ...ownershipResults] = await Promise.all([
+    // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, and EV in parallel
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, evResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -163,6 +164,13 @@ export async function POST(request: NextRequest) {
       getParcele(stavba.koId, stavba.stStavbe),
       getRenVrednost(stavba.koId, stavba.stStavbe),
       getEtnAnaliza(stavba.koId, useableArea).catch(() => null),
+      Promise.all(
+        deliStavbe.map((d) =>
+          prisma.evidencaVrednotenja
+            .findUnique({ where: { eidDelStavbe: String(d.eidDelStavbe) } })
+            .catch(() => null)
+        )
+      ),
       ...deliStavbe.map((d) => getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>)),
     ]);
 
@@ -223,6 +231,15 @@ export async function POST(request: NextRequest) {
         dvigalo: d.dvigalo,
         prostori: d.prostori,
         lastnistvo: ownershipResults[i] ?? [],
+        vrednotenje: evResults[i]
+          ? {
+              posplosenaVrednost: evResults[i]!.posplosenaVrednost,
+              vrednostNaM2: evResults[i]!.vrednostNaM2,
+              idModel: evResults[i]!.idModel,
+              letoIzgradnje: evResults[i]!.letoIzgradnje,
+              povrsina: evResults[i]!.povrsina,
+            }
+          : null,
       })),
       energetskaIzkaznica,
       parcele,
