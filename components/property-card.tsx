@@ -342,6 +342,13 @@ function fmt(n: number): string {
   return Math.round(n).toLocaleString("sl-SI");
 }
 
+function fmtDate(raw: string): string {
+  if (!raw) return "\u2014";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString("sl-SI", { day: "numeric", month: "numeric", year: "numeric" });
+}
+
 // --- Sections ---
 
 function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
@@ -428,7 +435,7 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
               {data.razred}
             </span>
             <div className="text-sm text-gray-500">
-              <p>Veljavna do {data.veljaDo}</p>
+              <p>Veljavna do {fmtDate(data.veljaDo)}</p>
               {data.tip && <p className="mt-0.5">Tip: {data.tip}</p>}
             </div>
           </div>
@@ -477,7 +484,7 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
                   : null
               }
             />
-            <Field label="Datum izdaje" value={data.datumIzdaje} />
+            <Field label="Datum izdaje" value={fmtDate(data.datumIzdaje)} />
           </div>
         </div>
       ) : (
@@ -512,7 +519,7 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
               </td>
               <td className="py-2 pr-4">{p.vrstaRabe ?? "\u2014"}</td>
               <td className="py-2 text-right tabular-nums">
-                {p.boniteta != null ? p.boniteta : "\u2014"}
+                {p.boniteta != null ? p.boniteta.toLocaleString("sl-SI") : "\u2014"}
               </td>
             </tr>
           ))}
@@ -532,7 +539,7 @@ function RenVrednostSection({ data }: { data?: RenVrednost | null }) {
           label="Vrednost"
           value={`${data.vrednost.toLocaleString("sl-SI")} \u20AC`}
         />
-        <Field label="Datum ocene" value={data.datumOcene} />
+        <Field label="Datum ocene" value={fmtDate(data.datumOcene)} />
       </div>
     </section>
   );
@@ -590,7 +597,7 @@ function EnergetskiIzracunSection({
 
   return (
     <section>
-      <Label>Energetska analiza</Label>
+      <Label>Stroški ogrevanja</Label>
       <div className="space-y-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
           <Field
@@ -671,7 +678,7 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
 
   return (
     <section>
-      <Label>Vrednostna analiza (ETN)</Label>
+      <Label>Vrednostna analiza</Label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
         <Field
           label="Povprečna cena/m²"
@@ -685,7 +692,7 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
           label="Max cena/m²"
           value={`${data.maxCenaM2.toLocaleString("sl-SI")} \u20AC`}
         />
-        <Field label="Št. transakcij" value={data.steviloTransakcij} />
+        <Field label="Št. transakcij" value={data.steviloTransakcij.toLocaleString("sl-SI")} />
         {data.ocenjenaTrznaVrednost != null && (
           <Field
             label="Ocenjena tržna vrednost"
