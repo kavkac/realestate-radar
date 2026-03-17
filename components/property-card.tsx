@@ -215,9 +215,9 @@ export function PropertyCard({
                 <button
                   key={d.stDela}
                   onClick={() => setSelectedDel(d.stDela)}
-                  className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3 text-sm text-left hover:border-[#2d6a4f] hover:shadow-sm transition-all"
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-gray-200 bg-white px-4 py-3 text-sm text-left hover:border-[#2d6a4f] hover:shadow-sm transition-all"
                 >
-                  <div className="text-gray-800">
+                  <div className="text-gray-800 min-w-0">
                     <span className="font-medium">Enota {d.stDela}</span>
                     {d.vrsta && (
                       <span className="ml-1.5 text-gray-500">
@@ -225,10 +225,10 @@ export function PropertyCard({
                       </span>
                     )}
                   </div>
-                  <div className="text-gray-500 text-right tabular-nums">
+                  <div className="text-gray-500 tabular-nums ml-auto flex items-center gap-2">
                     {d.povrsina != null && <span>{fmtDec(d.povrsina)} m&sup2;</span>}
                     {d.uporabnaPovrsina != null && (
-                      <span className="ml-2 text-xs text-gray-400">
+                      <span className="text-xs text-gray-400">
                         (upor. {fmtDec(d.uporabnaPovrsina)} m&sup2;)
                       </span>
                     )}
@@ -409,6 +409,9 @@ function PartDetail({ part }: { part: DelStavbe }) {
           }
         />
         <Field label="Vrsta rabe" value={part.vrsta} />
+        <div className="col-span-2 sm:col-span-3 -mt-2">
+          <p className="text-xs text-gray-400">Klasifikacija po uradnem registru GURS</p>
+        </div>
         <Field label="Obnova instalacij" value={part.letoObnoveInstalacij} />
         <Field label="Obnova oken" value={part.letoObnoveOken} />
         {part.dvigalo && <Field label="Dvigalo" value="Da" />}
@@ -419,7 +422,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
           <SubLabel>Prostori</SubLabel>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
+              <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
                 <th className="pb-2 pr-4 font-medium">Vrsta prostora</th>
                 <th className="pb-2 text-right font-medium">Površina</th>
               </tr>
