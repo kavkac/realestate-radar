@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { CreditCalculator } from "./credit-calculator";
 
 interface Prostor {
@@ -206,22 +206,13 @@ export function PropertyCard({
       <div className="lg:flex overflow-hidden">
         {/* Left column: main data (60% on desktop) */}
         <div className="lg:w-[60%] min-w-0 p-6 space-y-8">
-          {/* 2. Ocenjena vrednost */}
-          <RenVrednostSection data={renVrednost} />
-
-          {/* 3. Ključni podatki */}
+          {/* L1: Ključni podatki */}
           <KljucniPodatki stavba={stavba} />
 
-          {/* 4. Poraba energije */}
-          <EnergyCertificateSection data={energetskaIzkaznica} />
-
-          {/* 5. Prodajne cene v okolici */}
-          <VrednostnaAnalizaSection data={etnAnaliza} />
-
-          {/* 6. O stavbi */}
+          {/* L2: Tehnični izpis */}
           <BuildingSection stavba={stavba} />
 
-          {/* 7. Stanovanja in prostori */}
+          {/* L2: Stanovanja in prostori */}
           {isMultiUnit && !activePart && (
             <section>
               <Label vir="Kataster nepremičnin · GURS">Stanovanja in prostori ({deliStavbe.length})</Label>
@@ -285,19 +276,19 @@ export function PropertyCard({
             </section>
           )}
 
-          {/* 8. Lastništvo */}
-          <LastnistvoSection data={currentPart?.lastnistvo} />
-
-          {/* 9. Zemljišče */}
-          <ParceleSection parcele={parcele} />
-
-          {/* 9. Kdaj je potrebno vzdrževanje */}
+          {/* L3: Stanje */}
           <MaintenanceSection stavba={stavba} part={currentPart} />
-
-          {/* 10. Stroški ogrevanja */}
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
-          {/* 11. Uredite z enim klikom */}
+          {/* L4: Vrednost in lastništvo (collapsible) */}
+          <CollapsibleValueSection>
+            <RenVrednostSection data={renVrednost} />
+            <VrednostnaAnalizaSection data={etnAnaliza} />
+            <LastnistvoSection data={currentPart?.lastnistvo} />
+            <ParceleSection parcele={parcele} />
+          </CollapsibleValueSection>
+
+          {/* Storitve */}
           <ServicesSection />
         </div>
 
@@ -927,6 +918,27 @@ function MaintenanceSection({
         </div>
       )}
     </section>
+  );
+}
+
+function CollapsibleValueSection({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="border-t border-gray-100 pt-6">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between text-left group"
+      >
+        <div>
+          <h3 className="text-base font-semibold text-gray-800">Vrednost in lastništvo</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Ocenjena vrednost, transakcije, lastništvo, parcele</p>
+        </div>
+        <span className="text-gray-400 text-lg ml-4 group-hover:text-gray-600 transition-colors">
+          {open ? "▲" : "▼"}
+        </span>
+      </button>
+      {open && <div className="mt-6 space-y-8">{children}</div>}
+    </div>
   );
 }
 
