@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { PropertyCard } from "./property-card";
 import { PropertySkeleton } from "./property-skeleton";
+import { LoadingProgress } from "./loading-progress";
 
 interface Prostor {
   vrsta: string;
@@ -276,7 +277,7 @@ export function AddressSearch() {
         )}
       </form>
 
-      {loading && <PropertySkeleton />}
+      {loading && <LoadingProgress />}
 
       {result?.success && result.naslov && result.stavba && (
         <PropertyCard
