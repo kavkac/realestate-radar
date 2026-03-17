@@ -107,3 +107,12 @@ model Transaction {
   @@index([koId, stStavbe, stDelaStavbe])
   @@map("transactions")
 }
+
+model LeadEmail {
+  id        String   @id @default(cuid())
+  email     String
+  naslov    String
+  createdAt DateTime @default(now())
+
+  @@map("lead_emails")
+}
