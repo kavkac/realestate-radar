@@ -278,6 +278,7 @@ export function PropertyCard({
 
           {/* L3: Stanje */}
           <MaintenanceSection stavba={stavba} part={currentPart} />
+          <EnergyCertificateSection data={energetskaIzkaznica} />
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
           {/* L4: Vrednost in lastništvo (collapsible) */}
@@ -286,10 +287,8 @@ export function PropertyCard({
             <VrednostnaAnalizaSection data={etnAnaliza} />
             <LastnistvoSection data={currentPart?.lastnistvo} />
             <ParceleSection parcele={parcele} />
+            <ServicesSection />
           </CollapsibleValueSection>
-
-          {/* Storitve */}
-          <ServicesSection />
         </div>
 
         {/* Right column: aerial map (40% on desktop) */}
@@ -430,7 +429,7 @@ function KljucniPodatki({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
   if (stavba.steviloEtaz) {
     boxes.push({ label: "Etaže", value: String(stavba.steviloEtaz) });
   }
-  if (stavba.povrsina) {
+  if (stavba.povrsina != null) {
     boxes.push({ label: "Površina", value: `${fmtDec(stavba.povrsina)} m\u00B2` });
   }
   if (stavba.tip) {
@@ -462,16 +461,9 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
     <section>
       <Label vir="Kataster nepremičnin · GURS">O stavbi</Label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-        <Field label="Leto izgradnje" value={stavba.letoIzgradnje} />
         <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
         <Field label="Obnova strehe" value={stavba.letoObnove.strehe} />
-        <Field label="Etaže" value={stavba.steviloEtaz} />
         <Field label="Stanovanj" value={stavba.steviloStanovanj} />
-        <Field
-          label="Bruto površina"
-          value={stavba.povrsina != null ? `${fmtDec(stavba.povrsina)} m\u00B2` : null}
-        />
-        <Field label="Tip stavbe" value={stavba.tip} />
         <Field label="Konstrukcija" value={stavba.konstrukcija} />
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
@@ -604,7 +596,7 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
         </div>
       ) : (
         <p className="text-sm text-gray-400 italic">
-          Ni energetske izkaznice
+          Energetska izkaznica za to nepremičnino ni vpisana v register.
         </p>
       )}
     </section>
@@ -902,20 +894,26 @@ function MaintenanceSection({
     pillClass: string;
   }[] = [];
 
-  for (const m of MAINTENANCE_ITEMS) {
-    let yearInstalled: number | null = null;
-    if (m.key === "fasade") {
-      yearInstalled = stavba.letoObnove.fasade ?? baseYear;
-    } else if (m.key === "strehe") {
-      yearInstalled = stavba.letoObnove.strehe ?? baseYear;
-    } else if (m.key === "instalacije") {
-      yearInstalled = part?.letoObnoveInstalacij ?? baseYear;
-    } else if (m.key === "okna") {
-      yearInstalled = part?.letoObnoveOken ?? baseYear;
-    }
-    if (!yearInstalled) continue;
+  const noDataItems: string[] = [];
 
-    const age = currentYear - yearInstalled;
+  for (const m of MAINTENANCE_ITEMS) {
+    let letoObnove: number | null = null;
+    if (m.key === "fasade") {
+      letoObnove = stavba.letoObnove.fasade;
+    } else if (m.key === "strehe") {
+      letoObnove = stavba.letoObnove.strehe;
+    } else if (m.key === "instalacije") {
+      letoObnove = part?.letoObnoveInstalacij ?? null;
+    } else if (m.key === "okna") {
+      letoObnove = part?.letoObnoveOken ?? null;
+    }
+
+    if (!letoObnove) {
+      noDataItems.push(m.name);
+      continue;
+    }
+
+    const age = currentYear - letoObnove;
     if (age >= m.lifespan) {
       items.push({
         name: m.name,
@@ -949,7 +947,7 @@ function MaintenanceSection({
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Kdaj je potrebno vzdrževanje</Label>
-      {items.length === 0 ? (
+      {items.length === 0 && noDataItems.length === 0 ? (
         <p className="text-sm text-gray-400 italic">
           Ni nujnih vzdrževalnih posegov
         </p>
@@ -972,6 +970,15 @@ function MaintenanceSection({
               >
                 {item.urgency}
               </span>
+            </div>
+          ))}
+          {noDataItems.map((name) => (
+            <div
+              key={name}
+              className="flex items-center justify-between rounded border border-gray-100 border-l-4 border-l-gray-300 bg-white px-4 py-3 text-sm"
+            >
+              <span className="text-gray-500">{name}</span>
+              <span className="text-xs text-gray-400 italic">Ni podatka o zadnji obnovi</span>
             </div>
           ))}
         </div>
