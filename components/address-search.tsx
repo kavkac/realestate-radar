@@ -81,6 +81,17 @@ interface LookupResult {
   } | null;
 }
 
+type PropertyTab = {
+  id: string;
+  naslov: string;
+  del?: number;
+  data: LookupResult | null;
+  loading: boolean;
+  error: string | null;
+};
+
+const MAX_TABS = 5;
+
 const ERROR_MESSAGES: Record<string, string> = {
   "Address not found": "Naslova ni bilo mogoče najti v registru GURS. Preverite zapis naslova.",
   "Rate limit exceeded": "Preveč zahtev. Počakajte minuto in poskusite znova.",
@@ -95,6 +106,11 @@ function friendlyError(err: string): string {
   return err || "Prišlo je do neznane napake. Poskusite znova.";
 }
 
+function truncateAddress(naslov: string, max = 25): string {
+  if (naslov.length <= max) return naslov;
+  return naslov.slice(0, max) + "\u2026";
+}
+
 export function AddressSearch() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -104,14 +120,16 @@ export function AddressSearch() {
 
   const [address, setAddress] = useState(initialAddress);
   const [delStavbe, setDelStavbe] = useState(initialDel);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<LookupResult | null>(null);
-  const [submittedDel, setSubmittedDel] = useState<number | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+
+  const [tabs, setTabs] = useState<PropertyTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
 
   const handlePlaceSelect = useCallback(() => {
     const place = autocompleteRef.current?.getPlace();
@@ -157,45 +175,125 @@ export function AddressSearch() {
   // Auto-search if address in URL on first load
   useEffect(() => {
     if (initialAddress && initialAddress.length >= 3) {
-      performSearch(initialAddress, initialDel ? parseInt(initialDel, 10) : undefined);
+      performSearch(initialAddress, initialDel ? parseInt(initialDel, 10) : undefined, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function performSearch(addr: string, del?: number) {
-    setError(null);
-    setResult(null);
-    setLoading(true);
-    setSubmittedDel(del);
-
-    // Update URL
+  function updateUrl(addr: string, del?: number) {
     const params = new URLSearchParams();
     params.set("naslov", addr);
     if (del != null) params.set("del", String(del));
     router.replace(`?${params.toString()}`, { scroll: false });
+  }
 
-    try {
-      const body: Record<string, unknown> = { address: addr };
-      if (del != null) body.delStavbe = del;
+  async function performSearch(addr: string, del?: number, forceNew = false) {
+    const shouldCreateNew = forceNew || addingNew || tabs.length === 0;
 
-      const res = await fetch("/api/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+    if (shouldCreateNew) {
+      // Create new tab
+      const newId = String(Date.now());
+      const newTab: PropertyTab = {
+        id: newId,
+        naslov: addr,
+        del,
+        data: null,
+        loading: true,
+        error: null,
+      };
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(newId);
+      setAddingNew(false);
+      updateUrl(addr, del);
 
-      const data: LookupResult = await res.json();
+      try {
+        const body: Record<string, unknown> = { address: addr };
+        if (del != null) body.delStavbe = del;
 
-      if (!data.success) {
-        setError(friendlyError(data.error ?? "Napaka pri iskanju"));
-        return;
+        const res = await fetch("/api/lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        const data: LookupResult = await res.json();
+
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === newId
+              ? {
+                  ...t,
+                  loading: false,
+                  data: data.success ? data : null,
+                  error: data.success ? null : friendlyError(data.error ?? "Napaka pri iskanju"),
+                  naslov: data.naslov ?? addr,
+                }
+              : t
+          )
+        );
+      } catch {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === newId
+              ? {
+                  ...t,
+                  loading: false,
+                  error: "Napaka pri povezovanju s strežnikom. Preverite internetno povezavo.",
+                }
+              : t
+          )
+        );
       }
+    } else {
+      // Replace current tab's data
+      const currentId = activeTabId!;
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === currentId
+            ? { ...t, naslov: addr, del, data: null, loading: true, error: null }
+            : t
+        )
+      );
+      updateUrl(addr, del);
 
-      setResult(data);
-    } catch {
-      setError("Napaka pri povezovanju s strežnikom. Preverite internetno povezavo.");
-    } finally {
-      setLoading(false);
+      try {
+        const body: Record<string, unknown> = { address: addr };
+        if (del != null) body.delStavbe = del;
+
+        const res = await fetch("/api/lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        const data: LookupResult = await res.json();
+
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === currentId
+              ? {
+                  ...t,
+                  loading: false,
+                  data: data.success ? data : null,
+                  error: data.success ? null : friendlyError(data.error ?? "Napaka pri iskanju"),
+                  naslov: data.naslov ?? addr,
+                }
+              : t
+          )
+        );
+      } catch {
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === currentId
+              ? {
+                  ...t,
+                  loading: false,
+                  error: "Napaka pri povezovanju s strežnikom. Preverite internetno povezavo.",
+                }
+              : t
+          )
+        );
+      }
     }
   }
 
@@ -205,14 +303,60 @@ export function AddressSearch() {
     await performSearch(address, parsedDel);
   }
 
+  function handleSwitchTab(tabId: string) {
+    setActiveTabId(tabId);
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab) {
+      setAddress(tab.naslov);
+      setDelStavbe(tab.del != null ? String(tab.del) : "");
+      updateUrl(tab.naslov, tab.del);
+    }
+    setAddingNew(false);
+  }
+
+  function handleCloseTab(tabId: string) {
+    setTabs((prev) => {
+      const next = prev.filter((t) => t.id !== tabId);
+      if (tabId === activeTabId) {
+        // Switch to previous tab, or next, or clear
+        const closedIdx = prev.findIndex((t) => t.id === tabId);
+        const newActive = next[Math.min(closedIdx, next.length - 1)] ?? null;
+        setActiveTabId(newActive?.id ?? null);
+        if (newActive) {
+          setAddress(newActive.naslov);
+          setDelStavbe(newActive.del != null ? String(newActive.del) : "");
+          updateUrl(newActive.naslov, newActive.del);
+        } else {
+          setAddress("");
+          setDelStavbe("");
+          router.replace("?", { scroll: false });
+        }
+      }
+      return next;
+    });
+  }
+
+  function handleAddTab() {
+    if (tabs.length >= MAX_TABS) return;
+    setAddingNew(true);
+    setAddress("");
+    setDelStavbe("");
+    inputRef.current?.focus();
+  }
+
   async function handleShare() {
     const url = new URL(window.location.href);
-    url.searchParams.set("naslov", address);
-    if (delStavbe.trim()) url.searchParams.set("del", delStavbe.trim());
+    if (activeTab) {
+      url.searchParams.set("naslov", activeTab.naslov);
+      if (activeTab.del != null) url.searchParams.set("del", String(activeTab.del));
+    }
     await navigator.clipboard.writeText(url.toString());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  const isLoading = activeTab?.loading ?? false;
+  const showShareButton = activeTab?.data?.success ?? false;
 
   return (
     <div className="space-y-6">
@@ -227,17 +371,17 @@ export function AddressSearch() {
             onChange={(e) => setAddress(e.target.value)}
             placeholder="npr. Slovenčeva ulica 4, Ljubljana"
             className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={loading}
+            disabled={isLoading}
             autoComplete="off"
             aria-autocomplete="list"
           />
           <button
             type="submit"
-            disabled={loading || address.length < 3}
+            disabled={isLoading || address.length < 3}
             className="rounded-md bg-[#2d6a4f] px-5 py-3 text-sm font-medium text-white hover:bg-[#245a42] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
             aria-label="Poišči nepremičnino"
           >
-            {loading ? "Iščem…" : "Poišči"}
+            {isLoading ? "Iščem\u2026" : "Poišči"}
           </button>
         </div>
 
@@ -251,9 +395,9 @@ export function AddressSearch() {
             onChange={(e) => setDelStavbe(e.target.value)}
             placeholder="Številka dela stavbe / stanovanja — neobvezno"
             className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={loading}
+            disabled={isLoading}
           />
-          {result?.success && (
+          {showShareButton && (
             <button
               type="button"
               onClick={handleShare}
@@ -270,28 +414,71 @@ export function AddressSearch() {
           )}
         </div>
 
-        {error && (
+        {activeTab?.error && (
           <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+            {activeTab.error}
           </div>
         )}
       </form>
 
-      {loading && <LoadingProgress />}
+      {/* Tab bar */}
+      {tabs.length > 0 && (
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleSwitchTab(tab.id)}
+              className={`group flex items-center gap-1.5 rounded-t-md border px-3 py-2 text-sm whitespace-nowrap transition-colors ${
+                tab.id === activeTabId && !addingNew
+                  ? "border-[#2d6a4f] border-b-white bg-white text-gray-900 font-medium"
+                  : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+              }`}
+            >
+              <span>{truncateAddress(tab.naslov || "Iskanje\u2026")}</span>
+              {tab.loading && (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-[#2d6a4f]" />
+              )}
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCloseTab(tab.id);
+                }}
+                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-xs text-gray-400 hover:bg-gray-200 hover:text-gray-700 cursor-pointer"
+                role="button"
+                aria-label={`Zapri ${tab.naslov}`}
+              >
+                &times;
+              </span>
+            </button>
+          ))}
+          {tabs.length < MAX_TABS && (
+            <button
+              onClick={handleAddTab}
+              className="flex items-center justify-center rounded-t-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              title="Dodaj nepremičnino"
+              aria-label="Dodaj novo nepremičnino"
+            >
+              +
+            </button>
+          )}
+        </div>
+      )}
 
-      {result?.success && result.naslov && result.stavba && (
+      {activeTab?.loading && <LoadingProgress />}
+
+      {activeTab?.data?.success && activeTab.data.naslov && activeTab.data.stavba && (
         <PropertyCard
-          naslov={result.naslov}
-          enolicniId={result.enolicniId!}
-          stavba={result.stavba}
-          deliStavbe={result.deliStavbe ?? []}
-          energetskaIzkaznica={result.energetskaIzkaznica ?? null}
-          parcele={result.parcele}
-          renVrednost={result.renVrednost}
-          etnAnaliza={result.etnAnaliza}
-          lat={result.lat}
-          lng={result.lng}
-          requestedDel={submittedDel}
+          naslov={activeTab.data.naslov}
+          enolicniId={activeTab.data.enolicniId!}
+          stavba={activeTab.data.stavba}
+          deliStavbe={activeTab.data.deliStavbe ?? []}
+          energetskaIzkaznica={activeTab.data.energetskaIzkaznica ?? null}
+          parcele={activeTab.data.parcele}
+          renVrednost={activeTab.data.renVrednost}
+          etnAnaliza={activeTab.data.etnAnaliza}
+          lat={activeTab.data.lat}
+          lng={activeTab.data.lng}
+          requestedDel={activeTab.del}
         />
       )}
     </div>
