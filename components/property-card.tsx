@@ -178,9 +178,14 @@ export function PropertyCard({
             <h3 className="text-2xl font-semibold print:text-[#2d6a4f]">
               {naslov}
             </h3>
-            <p className="text-sm text-green-200 print:text-gray-500 mt-0.5">
-              Pregled podatkov o nepremičnini
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-sm text-green-200 print:text-gray-500">
+                Pregled podatkov o nepremičnini
+              </p>
+              <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-medium tracking-wide uppercase text-white/80 print:border-gray-300 print:text-gray-500">
+                Uradni podatki
+              </span>
+            </div>
           </div>
           <button
             onClick={() => window.print()}
@@ -214,7 +219,7 @@ export function PropertyCard({
           {/* 7. Stanovanja in prostori */}
           {isMultiUnit && !activePart && (
             <section>
-              <Label>Stanovanja in prostori ({deliStavbe.length})</Label>
+              <Label vir="Kataster nepremičnin \u00B7 GURS">Stanovanja in prostori ({deliStavbe.length})</Label>
               <p className="text-sm text-gray-500 mb-3">
                 Izberite enoto za podroben pregled.
               </p>
@@ -264,7 +269,7 @@ export function PropertyCard({
 
           {!isMultiUnit && filteredParts.length > 0 && (
             <section>
-              <Label>
+              <Label vir="Kataster nepremičnin · GURS">
                 {filteredParts.length === 1
                   ? "Stanovanje"
                   : `Stanovanja in prostori (${filteredParts.length})`}
@@ -307,11 +312,16 @@ export function PropertyCard({
 
 // --- Shared components ---
 
-function Label({ children }: { children: React.ReactNode }) {
+function Label({ children, vir }: { children: React.ReactNode; vir?: string }) {
   return (
-    <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 border-l-4 border-gray-800 pl-3 mb-3">
-      {children}
-    </h4>
+    <div className="mb-3">
+      <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 border-l-4 border-gray-800 pl-3">
+        {children}
+      </h4>
+      {vir && (
+        <p className="text-[10px] text-gray-400 font-normal pl-[19px] mt-0.5">Vir: {vir}</p>
+      )}
+    </div>
   );
 }
 
@@ -376,7 +386,7 @@ function KljucniPodatki({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
 
   return (
     <section>
-      <Label>Ključni podatki</Label>
+      <Label vir="Kataster nepremičnin \u00B7 GURS">Ključni podatki</Label>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {boxes.map((b) => (
           <div
@@ -395,7 +405,7 @@ function KljucniPodatki({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
 function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
   return (
     <section>
-      <Label>O stavbi</Label>
+      <Label vir="Kataster nepremičnin \u00B7 GURS">O stavbi</Label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
         <Field label="Leto izgradnje" value={stavba.letoIzgradnje} />
         <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
@@ -436,9 +446,9 @@ function PartDetail({ part }: { part: DelStavbe }) {
               : null
           }
         />
-        <Field label="Vrsta rabe" value={part.vrsta} />
+        <Field label="Namembnost (KN)" value={part.vrsta} />
         <div className="col-span-2 sm:col-span-3 -mt-2">
-          <p className="text-xs text-amber-600">Uradna klasifikacija po registru GURS — dejanska raba se lahko razlikuje</p>
+          <p className="text-[10px] text-gray-400">Kataster nepremičnin, GURS</p>
         </div>
         <Field label="Obnova instalacij" value={part.letoObnoveInstalacij} />
         <Field label="Obnova oken" value={part.letoObnoveOken} />
@@ -475,7 +485,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
 function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
   return (
     <section>
-      <Label>Poraba energije</Label>
+      <Label vir="Register energetskih izkaznic \u00B7 MOP">Poraba energije</Label>
       {data ? (
         <div className="space-y-4">
           <div className="flex items-center gap-4">
@@ -550,7 +560,7 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
   if (!parcele || parcele.length === 0) return null;
   return (
     <section>
-      <Label>Zemljišče</Label>
+      <Label vir="Zemljiški kataster \u00B7 GURS">Zemljišče</Label>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
@@ -583,7 +593,7 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
   if (!data || data.length === 0) return null;
   return (
     <section>
-      <Label>Lastništvo</Label>
+      <Label vir="Zemljiška knjiga \u00B7 GURS">Lastništvo</Label>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
@@ -618,7 +628,7 @@ function RenVrednostSection({ data }: { data?: RenVrednost | null }) {
   if (!data) return null;
   return (
     <section>
-      <Label>Ocenjena vrednost</Label>
+      <Label vir="Množično vrednotenje \u00B7 GURS">Ocenjena vrednost</Label>
       <div className="rounded-lg border border-green-100 bg-green-50 px-5 py-4">
         <p className="text-2xl font-bold text-gray-800">
           {data.vrednost.toLocaleString("sl-SI")} {"\u20AC"}
@@ -684,7 +694,7 @@ function EnergetskiIzracunSection({
 
   return (
     <section>
-      <Label>Stroški ogrevanja</Label>
+      <Label vir="Register energetskih izkaznic \u00B7 MOP">Stroški ogrevanja</Label>
       <div className="space-y-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
           <Field
@@ -765,7 +775,7 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
 
   return (
     <section>
-      <Label>Prodajne cene v okolici</Label>
+      <Label vir="Evidenca trga nepremičnin \u00B7 GURS">Prodajne cene v okolici</Label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
         <Field
           label="Povprečna cena/m²"
@@ -883,7 +893,7 @@ function MaintenanceSection({
 
   return (
     <section>
-      <Label>Kdaj je potrebno vzdrževanje</Label>
+      <Label vir="Kataster nepremičnin \u00B7 GURS">Kdaj je potrebno vzdrževanje</Label>
       {items.length === 0 ? (
         <p className="text-sm text-gray-400 italic">
           Ni nujnih vzdrževalnih posegov
@@ -959,6 +969,7 @@ function AerialMap({
           loading="lazy"
         />
       </a>
+      <p className="text-[10px] text-gray-400 mt-1.5">Vir: Google Maps &middot; GURS koordinate</p>
     </div>
   );
 }
