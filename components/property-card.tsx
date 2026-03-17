@@ -975,8 +975,7 @@ function AerialMap({
   }
 
   const staticUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=17&size=600x200&scale=2&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${apiKey}`;
-  const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=600x200&location=${lat},${lng}&fov=90&pitch=0&key=${apiKey}`;
-  const streetViewPageUrl = `https://www.google.com/maps?q=${lat},${lng}&layer=c`;
+  const streetViewEmbedUrl = `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${lat},${lng}&fov=80&pitch=5&source=outdoor`;
 
   return (
     <div className="print:hidden space-y-2">
@@ -984,19 +983,21 @@ function AerialMap({
         <img
           src={staticUrl}
           alt={`Zračni posnetek: ${naslov}`}
-          className="w-full h-[180px] object-cover rounded-lg"
+          className="w-full h-[160px] object-cover rounded-lg"
           loading="lazy"
         />
       </a>
-      <a href={streetViewPageUrl} target="_blank" rel="noopener noreferrer" className="block">
-        <img
-          src={streetViewUrl}
-          alt={`Street View: ${naslov}`}
-          className="w-full h-[150px] object-cover rounded-lg"
+      <div className="relative rounded-lg overflow-hidden">
+        <iframe
+          src={streetViewEmbedUrl}
+          className="w-full h-[220px] border-0"
+          allowFullScreen
           loading="lazy"
-          onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+          referrerPolicy="no-referrer-when-downgrade"
+          title={`Street View: ${naslov}`}
         />
-      </a>
+        <p className="text-[10px] text-gray-400 text-right pr-1 pt-1">Povlecite za rotacijo</p>
+      </div>
       <p className="text-[10px] text-gray-400">Vir: Google Maps &middot; GURS koordinate</p>
     </div>
   );
