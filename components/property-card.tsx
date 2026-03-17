@@ -188,11 +188,11 @@ export function PropertyCard({
           </div>
           <button
             onClick={() => window.print()}
-            title="Natisni poročilo"
-            className="print:hidden flex-shrink-0 rounded border border-white/20 bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors"
-            aria-label="Natisni poročilo o nepremičnini"
+            title="Izvozi poročilo o nepremičnini"
+            className="print:hidden flex-shrink-0 rounded border border-white/20 bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors whitespace-nowrap"
+            aria-label="Izvozi poročilo o nepremičnini"
           >
-            Natisni
+            Izvozi poročilo
           </button>
         </div>
       </div>
