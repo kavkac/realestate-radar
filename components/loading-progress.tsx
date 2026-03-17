@@ -21,7 +21,7 @@ export function LoadingProgress() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-md rounded-lg border border-gray-200 bg-white p-6">
+    <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-md">
       <ul className="space-y-3" role="status" aria-label="Pridobivam podatke">
         {STEPS.map((step, i) => {
           const done = i < activeIndex;

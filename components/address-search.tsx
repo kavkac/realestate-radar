@@ -461,7 +461,11 @@ export function AddressSearch() {
             )}
           </div>
 
-          {activeTab?.loading && <LoadingProgress />}
+          {activeTab?.loading && (
+            <div className="mt-10 mb-8 px-4">
+              <LoadingProgress />
+            </div>
+          )}
 
           {activeTab?.data?.success && activeTab.data.naslov && activeTab.data.stavba && (
             <PropertyCard
