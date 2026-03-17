@@ -6,20 +6,13 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { pipeline } from "stream/promises";
 
-// TODO: Replace with the actual GURS EV download URL once confirmed.
-// The EV (Evidenca vrednotenja) CSV is distributed by GURS via the JGP portal:
-//   https://jgp.eprostor.gov.si/jgp/ → Nepremičnine → Evidenca vrednotenja
-// Expected format: ZIP archive containing CSV file(s) with pipe (|) or semicolon delimiter.
-// Fields of interest: EID_DEL_STAVBE, POSPLOSENA_VREDNOST, VREDNOST_NA_M2, ID_MODEL,
-//                     LETO_IZGRADNJE, POVRSINA
-//
-// Alternative manual download path:
-//   https://egp.gu.gov.si/egp/ → Evidenca vrednotenja nepremičnin
-//
+// GURS JGP public download — verified 2026-03-18
+// Source: https://ipi.eprostor.gov.si/jgp/static/EV_SLO.zip
+// Also available: KN_SLO_STAVBE_SLO.zip, ETN_SLO.zip
 // Set env variable EV_CSV_URL to override.
 const EV_CSV_URL =
   process.env.EV_CSV_URL ||
-  "https://egp.gu.gov.si/egp/products/EvidencaVrednotenjaCSV/EV_DEL_STAVBE.zip";
+  "https://ipi.eprostor.gov.si/jgp/static/EV_SLO.zip";
 
 const prisma = new PrismaClient();
 
