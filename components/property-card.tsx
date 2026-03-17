@@ -211,7 +211,7 @@ export function PropertyCard({
         {/* Multi-unit selector */}
         {isMultiUnit && !activePart && (
           <section>
-            <Label>Deli stavbe ({deliStavbe.length})</Label>
+            <Label>Stanovanja in prostori ({deliStavbe.length})</Label>
             <p className="text-sm text-gray-500 mb-3">
               Izberite enoto za podroben pregled.
             </p>
@@ -231,10 +231,10 @@ export function PropertyCard({
                     )}
                   </div>
                   <div className="text-gray-500 text-right tabular-nums">
-                    {d.povrsina != null && <span>{d.povrsina} m&sup2;</span>}
+                    {d.povrsina != null && <span>{d.povrsina.toLocaleString("sl-SI")} m&sup2;</span>}
                     {d.uporabnaPovrsina != null && (
                       <span className="ml-2 text-xs text-gray-400">
-                        (upor. {d.uporabnaPovrsina} m&sup2;)
+                        (upor. {d.uporabnaPovrsina.toLocaleString("sl-SI")} m&sup2;)
                       </span>
                     )}
                   </div>
@@ -276,7 +276,7 @@ export function PropertyCard({
             <Label>
               {filteredParts.length === 1
                 ? `Del stavbe ${filteredParts[0].stDela}`
-                : `Deli stavbe (${filteredParts.length})`}
+                : `Stanovanja in prostori (${filteredParts.length})`}
             </Label>
             {filteredParts.map((d) => (
               <PartDetail key={d.stDela} part={d} />
@@ -347,7 +347,7 @@ function fmt(n: number): string {
 function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
   return (
     <section>
-      <Label>Podatki o stavbi</Label>
+      <Label>O stavbi</Label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
         <Field label="Leto izgradnje" value={stavba.letoIzgradnje} />
         <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
@@ -356,7 +356,7 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         <Field label="Stanovanj" value={stavba.steviloStanovanj} />
         <Field
           label="Bruto površina"
-          value={stavba.povrsina != null ? `${stavba.povrsina} m²` : null}
+          value={stavba.povrsina != null ? `${stavba.povrsina.toLocaleString("sl-SI")} m²` : null}
         />
         <Field label="Tip stavbe" value={stavba.tip} />
         <Field label="Konstrukcija" value={stavba.konstrukcija} />
@@ -372,13 +372,13 @@ function PartDetail({ part }: { part: DelStavbe }) {
         <Field label="Številka dela" value={part.stDela} />
         <Field
           label="Površina"
-          value={part.povrsina != null ? `${part.povrsina} m²` : null}
+          value={part.povrsina != null ? `${part.povrsina.toLocaleString("sl-SI")} m²` : null}
         />
         <Field
           label="Uporabna površina"
           value={
             part.uporabnaPovrsina != null
-              ? `${part.uporabnaPovrsina} m²`
+              ? `${part.uporabnaPovrsina.toLocaleString("sl-SI")} m²`
               : null
           }
         />
@@ -403,7 +403,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
                 <tr key={i} className="border-b border-gray-50 last:border-0">
                   <td className="py-2 pr-4 text-gray-700">{r.vrsta}</td>
                   <td className="py-2 text-right tabular-nums text-gray-700">
-                    {r.povrsina != null ? `${r.povrsina} m²` : "\u2014"}
+                    {r.povrsina != null ? `${r.povrsina.toLocaleString("sl-SI")} m²` : "\u2014"}
                   </td>
                 </tr>
               ))}
@@ -418,7 +418,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
 function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
   return (
     <section>
-      <Label>Energetska izkaznica</Label>
+      <Label>Poraba energije</Label>
       {data ? (
         <div className="space-y-4">
           <div className="flex items-center gap-4">
@@ -437,7 +437,7 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
               label="Potrebna toplota"
               value={
                 data.potrebnaTopota != null
-                  ? `${data.potrebnaTopota} kWh/m²a`
+                  ? `${data.potrebnaTopota.toLocaleString("sl-SI")} kWh/m²a`
                   : null
               }
             />
@@ -445,7 +445,7 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
               label="Dovedena energija"
               value={
                 data.dovedenaEnergija != null
-                  ? `${data.dovedenaEnergija} kWh/m²a`
+                  ? `${data.dovedenaEnergija.toLocaleString("sl-SI")} kWh/m²a`
                   : null
               }
             />
@@ -453,7 +453,7 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
               label="Električna energija"
               value={
                 data.elektricnaEnergija != null
-                  ? `${data.elektricnaEnergija} kWh/m²a`
+                  ? `${data.elektricnaEnergija.toLocaleString("sl-SI")} kWh/m²a`
                   : null
               }
             />
@@ -461,19 +461,19 @@ function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
               label="Primarna energija"
               value={
                 data.primaryEnergy != null
-                  ? `${data.primaryEnergy} kWh/m²a`
+                  ? `${data.primaryEnergy.toLocaleString("sl-SI")} kWh/m²a`
                   : null
               }
             />
             <Field
               label={"CO\u2082 emisije"}
-              value={data.co2 != null ? `${data.co2} kg/m²a` : null}
+              value={data.co2 != null ? `${data.co2.toLocaleString("sl-SI")} kg/m²a` : null}
             />
             <Field
               label="Kondicionirana površina"
               value={
                 data.kondicionirana != null
-                  ? `${data.kondicionirana} m²`
+                  ? `${data.kondicionirana.toLocaleString("sl-SI")} m²`
                   : null
               }
             />
@@ -508,7 +508,7 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
             <tr key={i} className="border-b border-gray-50 last:border-0">
               <td className="py-2 pr-4">{p.parcelnaStevila}</td>
               <td className="py-2 pr-4 text-right tabular-nums">
-                {p.povrsina != null ? `${p.povrsina} m²` : "\u2014"}
+                {p.povrsina != null ? `${p.povrsina.toLocaleString("sl-SI")} m²` : "\u2014"}
               </td>
               <td className="py-2 pr-4">{p.vrstaRabe ?? "\u2014"}</td>
               <td className="py-2 text-right tabular-nums">
@@ -789,7 +789,7 @@ function MaintenanceSection({
 
   return (
     <section>
-      <Label>Vzdrževalni posegi</Label>
+      <Label>Kdaj je potrebno vzdrževanje</Label>
       {items.length === 0 ? (
         <p className="text-sm text-gray-400 italic">
           Ni nujnih vzdrževalnih posegov
@@ -887,7 +887,7 @@ function ServicesSection() {
 
   return (
     <section>
-      <Label>Storitve</Label>
+      <Label>Uredite z enim klikom</Label>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {cards.map((c) => (
           <div
