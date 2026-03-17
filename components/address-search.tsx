@@ -361,19 +361,33 @@ export function AddressSearch() {
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-3" aria-label="Iskanje nepremičnine">
-        <div className="flex gap-2">
+        {/* Desktop: vse v eni vrstici | Mobile: vsako v svoji */}
+        <div className="flex flex-col sm:flex-row gap-2">
           <label className="sr-only" htmlFor="address-input">Vnesite naslov nepremičnine</label>
+          <div className="relative flex-1">
+            <input
+              id="address-input"
+              ref={inputRef}
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="npr. Slovenčeva ulica 4, Ljubljana"
+              className="w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={isLoading}
+              autoComplete="off"
+              aria-autocomplete="list"
+            />
+          </div>
+          <label className="sr-only" htmlFor="del-input">Številka dela stavbe</label>
           <input
-            id="address-input"
-            ref={inputRef}
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="npr. Slovenčeva ulica 4, Ljubljana"
-            className="flex-1 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            id="del-input"
+            type="number"
+            min="1"
+            value={delStavbe}
+            onChange={(e) => setDelStavbe(e.target.value)}
+            placeholder="Enota — neobvezno"
+            className="sm:w-40 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             disabled={isLoading}
-            autoComplete="off"
-            aria-autocomplete="list"
           />
           <button
             type="submit"
@@ -386,17 +400,8 @@ export function AddressSearch() {
         </div>
 
         <div className="flex gap-2">
-          <label className="sr-only" htmlFor="del-input">Številka dela stavbe</label>
-          <input
-            id="del-input"
-            type="number"
-            min="1"
-            value={delStavbe}
-            onChange={(e) => setDelStavbe(e.target.value)}
-            placeholder="Številka dela stavbe / stanovanja — neobvezno"
-            className="flex-1 rounded-md border border-input bg-background px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={isLoading}
-          />
+          {/* spacer — share button row */}
+          <div className="flex-1" />
           {showShareButton && (
             <button
               type="button"
