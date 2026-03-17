@@ -259,18 +259,17 @@ export function AddressSearch() {
               aria-label="Kopiraj delljivo povezavo"
             >
               {copied ? (
-                <>✓ <span className="hidden sm:inline">Kopirano!</span></>
+                <><span className="hidden sm:inline">Kopirano</span><span className="sm:hidden">OK</span></>
               ) : (
-                <>🔗 <span className="hidden sm:inline">Deli</span></>
+                <><span className="hidden sm:inline">Deli povezavo</span><span className="sm:hidden">Deli</span></>
               )}
             </button>
           )}
         </div>
 
         {error && (
-          <div role="alert" className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-            <span aria-hidden="true">⚠️</span>
-            <span>{error}</span>
+          <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
           </div>
         )}
       </form>
