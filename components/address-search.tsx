@@ -27,12 +27,14 @@ interface LookupResult {
     povrsina: number | null;
     konstrukcija: string | null;
     tip: string | null;
+    datumSys: string | null;
     prikljucki: {
       elektrika: boolean;
       plin: boolean;
       vodovod: boolean;
       kanalizacija: boolean;
     };
+    gasInfrastructure?: boolean | null;
   };
   deliStavbe?: {
     stDela: number;
@@ -43,6 +45,13 @@ interface LookupResult {
     letoObnoveOken: number | null;
     dvigalo: boolean;
     prostori: Prostor[];
+    lastnistvo?: {
+      tipLastnistva: string;
+      tipOsebe: "Pravna oseba" | "Fizična oseba";
+      delez: string;
+      datumVpisa: string;
+      nazivPravneOsebe: string | null;
+    }[];
   }[];
   energetskaIzkaznica?: {
     razred: string;
