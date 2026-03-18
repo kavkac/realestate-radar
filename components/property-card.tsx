@@ -1041,7 +1041,8 @@ function predlagajUkrepe(
     return i ? s / i : 1;
   })() : null;
 
-  const povrsina = part?.uporabnaPovrsina ?? part?.povrsina ?? null;
+  // Za enoto: uporabna površina enote; za celoten objekt: bruto površina stavbe
+  const povrsina = part?.uporabnaPovrsina ?? part?.povrsina ?? stavba?.povrsina ?? null;
 
   // 1. OKNA
   const letaOken = part?.letoObnoveOken;
