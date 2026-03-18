@@ -343,7 +343,13 @@ export function PropertyCard({
           {/* L3: Stanje */}
           <MaintenanceSection stavba={stavba} part={currentPart} />
           <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
-          <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
+          <EnergetskiIzracunSection
+            energetskaIzkaznica={energetskaIzkaznica}
+            unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
+            isMultiUnit={isMultiUnit}
+            hasSelectedUnit={!!activePart || requestedDel != null}
+            unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
+          />
 
           {stavba && (() => {
             const unitArea = currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null;
@@ -1504,8 +1510,16 @@ function RenVrednostSection({ data }: { data?: RenVrednost | null }) {
 
 function EnergetskiIzracunSection({
   energetskaIzkaznica,
+  unitArea,
+  isMultiUnit,
+  hasSelectedUnit,
+  unitLabel,
 }: {
   energetskaIzkaznica: EnergyData | null;
+  unitArea?: number | null;
+  isMultiUnit?: boolean;
+  hasSelectedUnit?: boolean;
+  unitLabel?: string | null;
 }) {
   if (
     !energetskaIzkaznica ||
@@ -1515,7 +1529,17 @@ function EnergetskiIzracunSection({
     return null;
 
   const heatingNeed = energetskaIzkaznica.potrebnaTopota;
-  const area = energetskaIzkaznica.kondicionirana;
+  const totalArea = energetskaIzkaznica.kondicionirana;
+
+  // Če je izbrana enota v večstanovanjskem objektu → skaliraj na površino enote
+  const useUnitArea = isMultiUnit && hasSelectedUnit && unitArea && unitArea > 0;
+  const area = useUnitArea ? unitArea! : totalArea;
+  const contextLabel = isMultiUnit
+    ? hasSelectedUnit && unitLabel
+      ? `za ${unitLabel}`
+      : "za celoten objekt"
+    : null;
+
   const annualCost = heatingNeed * area * HEATING_PRICE_EUR;
 
   // Cilji po razredih (kWh/m²a) — PURES 2010
@@ -1528,7 +1552,9 @@ function EnergetskiIzracunSection({
   const boljsiRazredi = RAZREDI.filter(r => r.target < heatingNeed).slice(0, 2);
   return (
     <section>
-      <Label vir="Register energetskih izkaznic · MOP">Stroški ogrevanja</Label>
+      <Label vir="Register energetskih izkaznic · MOP">
+        Stroški ogrevanja{contextLabel ? <span className="font-normal text-gray-400 ml-1 text-sm">({contextLabel})</span> : null}
+      </Label>
       <div className="space-y-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
           <Field
