@@ -26,9 +26,9 @@ function InfoTooltip({ text }: { text: string }) {
         i
       </button>
       {visible && (
-        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-gray-800 text-white text-[11px] rounded px-3 py-2 shadow-lg pointer-events-none leading-relaxed">
+        <span className="absolute z-50 top-1/2 -translate-y-1/2 left-full ml-2 w-56 bg-gray-800 text-white text-[11px] rounded px-3 py-2 shadow-lg pointer-events-none leading-relaxed whitespace-normal">
           {text}
-          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+          <span className="absolute top-1/2 -translate-y-1/2 right-full border-4 border-transparent border-r-gray-800" />
         </span>
       )}
     </span>
