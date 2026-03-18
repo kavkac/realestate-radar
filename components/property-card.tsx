@@ -842,9 +842,9 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         {(() => {
           const g = stavba.gasInfrastructure;
           if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">KN · GURS</span></span>;
-          if (g?.confidence === "high") return <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">ZK GJI ~{g.distanceM}m</span></span>;
-          if (g?.confidence === "medium") return <span className="text-gray-500">~ Plin v bližini <span className="text-xs text-gray-400">ZK GJI ~{g.distanceM}m</span></span>;
-          if (g?.confidence === "low") return <span className="text-gray-400">~ Plin v okolici <span className="text-xs">ZK GJI ~{g.distanceM}m</span></span>;
+          if (g?.confidence === "high") return <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">verjetno priključen · plinovod ~{g.distanceM}m</span></span>;
+          if (g?.confidence === "medium") return <span className="text-gray-500">~ Plin <span className="text-xs text-gray-400">plinovod v bližini ~{g.distanceM}m, priključek ni potrjen</span></span>;
+          if (g?.confidence === "low") return <span className="text-gray-400">~ Plin <span className="text-xs">plinovod v okolici ~{g.distanceM}m</span></span>;
           return <span><Check on={false} /> Plin</span>;
         })()}
         <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>

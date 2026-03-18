@@ -910,8 +910,8 @@ export async function checkGasInfrastructure(
 
     const distanceM = Math.round(minDistM);
     let confidence: GasConfidence;
-    if (distanceM < 20) confidence = "high";
-    else if (distanceM < 80) confidence = "medium";
+    if (distanceM < 25) confidence = "high";
+    else if (distanceM < 100) confidence = "medium";
     else confidence = "low";
 
     return { found: true, distanceM, confidence };
