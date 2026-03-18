@@ -363,10 +363,12 @@ export function PropertyCard({
             } else if (stStan && stStan > 1) {
               delezSkupnih = `1/${stStan}`;
             }
+            const varstvo = jeVVarstveniConi(lat, lng);
             return (
               <EnergetskiUkrepiSection
-                ukrepi={predlagajUkrepe(stavba, currentPart, delezSkupnih, null)}
+                ukrepi={predlagajUkrepe(stavba, currentPart, delezSkupnih, null, varstvo)}
                 delez={delezSkupnih}
+                varstvo={varstvo}
                 lat={lat}
                 lng={lng}
                 isMultiUnit={isMultiUnit}
@@ -974,6 +976,7 @@ interface Ukrep {
   prioriteta: "visoka" | "srednja" | "nizka";
   dobaPovrnitveMin: number;
   dobaPovrnitveMax: number;
+  varstvoCene?: boolean; // true = cene prilagojene za kulturno dediščino
 }
 
 function izracunajROI(ukrep: string, strosekSrednji: number, povrsina: number | null): { min: number; max: number } {
@@ -1058,6 +1061,7 @@ function predlagajUkrepe(
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
+      varstvoCene: varstvo.varuje,
     });
   }
 
@@ -1112,6 +1116,7 @@ function predlagajUkrepe(
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
+      varstvoCene: varstvo.varuje,
     });
   }
 
@@ -1139,8 +1144,8 @@ function predlagajUkrepe(
   return ukrepi;
 }
 
-function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSelectedUnit, unitLabel }: { ukrepi: Ukrep[]; delez: string | null; lat?: number | null; lng?: number | null; isMultiUnit?: boolean; hasSelectedUnit?: boolean; unitLabel?: string | null }) {
-  const varstvo = jeVVarstveniConi(lat, lng);
+function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSelectedUnit, unitLabel, varstvo }: { ukrepi: Ukrep[]; delez: string | null; lat?: number | null; lng?: number | null; isMultiUnit?: boolean; hasSelectedUnit?: boolean; unitLabel?: string | null; varstvo?: { varuje: boolean; naziv: string | null } }) {
+  const varstvoInfo = varstvo ?? jeVVarstveniConi(lat, lng);
   if (ukrepi.length === 0) return null;
 
   const prioritetaColor: Record<Ukrep["prioriteta"], string> = {
@@ -1159,12 +1164,12 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
           </span>
         )}
       </div>
-      {varstvo.varuje && (
+      {varstvoInfo.varuje && (
         <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded px-3 py-2 mb-3">
           <span className="text-purple-600 text-xs mt-0.5">🏛</span>
           <div>
             <p className="text-xs font-medium text-purple-800">Varstvo kulturne dediščine</p>
-            <p className="text-xs text-purple-700">{varstvo.naziv} — Za vsak poseg v zunanjost stavbe je potrebno predhodno soglasje Zavoda za varstvo kulturne dediščine Slovenije (ZVKDS).</p>
+            <p className="text-xs text-purple-700">{varstvoInfo.naziv} — Za vsak poseg v zunanjost stavbe je potrebno predhodno soglasje Zavoda za varstvo kulturne dediščine Slovenije (ZVKDS).</p>
       <p className="text-xs text-purple-700 mt-1">
         📞 <a href="tel:+38614244200" className="underline">01 424 42 00</a>
         {" · "}✉️ <a href="mailto:gp.zvkds@gov.si" className="underline">gp.zvkds@gov.si</a>
@@ -1177,8 +1182,13 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
         {ukrepi.map((u, i) => (
           <div key={i} className="border border-gray-100 rounded p-3">
             <div className="flex items-start justify-between gap-2 mb-1">
-              <p className="text-sm font-medium text-gray-800">{u.naziv}</p>
-              <span className={`text-xs flex-shrink-0 ${prioritetaColor[u.prioriteta]}`}>
+              <div>
+                <p className="text-sm font-medium text-gray-800">{u.naziv}</p>
+                {u.varstvoCene && (
+                  <p className="text-xs text-purple-600 mt-0.5">🏛 Cene prilagojene za varstvo kulturne dediščine</p>
+                )}
+              </div>
+              <span className={`text-xs flex-shrink-0 mt-0.5 ${prioritetaColor[u.prioriteta]}`}>
                 {u.prioriteta === "visoka" ? "↑ prednostno" : u.prioriteta === "srednja" ? "priporočeno" : "opcijsko"}
               </span>
             </div>
