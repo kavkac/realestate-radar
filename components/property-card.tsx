@@ -1085,7 +1085,7 @@ function predlagajUkrepe(
     const roi = izracunajROI("ogrevanje", stSrednji, povrsina);
     ukrepi.push({
       naziv: "Posodobitev ogrevalnega sistema",
-      nivo: "stanovanje",
+      nivo: "skupno",
       opis: letaInst
         ? `Instalacije so bile nazadnje obnovljene ${letaInst}. Sodobna toplotna črpalka ali kondenzacijski kotel zmanjša porabo energije za ogrevanje za 30-50%.`
         : `Ogrevalni sistem ni bil obnovljen. Posodobitev bistveno zmanjša stroške ogrevanja.`,
