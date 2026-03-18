@@ -524,9 +524,18 @@ export function PropertyCard({
                 parcelGeoms={parcele ?? null}
               />
               <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex gap-4 text-[10px] text-gray-400">
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#2d6a4f]" /> Stavba (GURS)</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-[#1a56a0]" /> Parcela (GURS)</span>
-                <span className="ml-auto">Vir: Kataster nepremičnin · GURS</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#2d6a4f]" /> Stavba</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-[#1a56a0]" /> Parcela</span>
+                <span className="ml-auto">Vir: KN · GURS</span>
+              </div>
+            </div>
+          )}
+
+          {/* Street View */}
+          {lat && lng && (
+            <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+              <div className="px-4 py-3">
+                <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
               </div>
             </div>
           )}

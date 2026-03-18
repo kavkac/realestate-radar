@@ -555,22 +555,14 @@ export async function getParcele(
     const parcelaRef = p.PARCELA ?? p.ST_PARCELE;
 
     if (parcelaRef != null) {
-      const parceleUrl = buildWfsUrl(
-        BASE_KN,
-        "SI.GURS.KN:PARCELE_H",
-        `KO_ID=${koId} AND ST_PARCELE='${parcelaRef}'`,
-      );
+      const parceleUrl = buildWfsUrl(BASE_KN, "SI.GURS.KN:PARCELE_H", `KO_ID=${koId} AND ST_PARCELE='${parcelaRef}'`) + "&SRSNAME=EPSG:4326";
       parceleData = await fetchWfs(parceleUrl);
     }
   }
 
   // Fallback: try linking by ST_STAVBE
   if (!parceleData || parceleData.features.length === 0) {
-    const fallbackUrl = buildWfsUrl(
-      BASE_KN,
-      "SI.GURS.KN:PARCELE_H",
-      `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`,
-    );
+    const fallbackUrl = buildWfsUrl(BASE_KN, "SI.GURS.KN:PARCELE_H", `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`) + "&SRSNAME=EPSG:4326";
     parceleData = await fetchWfs(fallbackUrl);
   }
 
