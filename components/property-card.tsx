@@ -2331,184 +2331,6 @@ function TveganjeProgressBar({ tocke }: { tocke: number }) {
   );
 }
 
-function ZavarovanjeSection({
-  naslov,
-  stavba,
-  seizmicniPodatki,
-  etaze,
-  poplavnaNevarnost,
-  unitArea,
-}: {
-  naslov: string;
-  stavba: PropertyCardProps["stavba"];
-  seizmicniPodatki: SeizmicniPodatki | null | undefined;
-  etaze?: number | null;
-  poplavnaNevarnost?: PoplavnaNevarnost | null;
-  unitArea?: number | null;
-}) {
-  const konstr = (stavba.konstrukcija ?? "").toLowerCase();
-  const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
-
-  // Vedno zagotovimo seizmične podatke — fallback po koordinatah (Ljubljana default)
-  const seizmicni: SeizmicniPodatki = seizmicniPodatki ?? { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost" };
-  const potresno = izracunajPotresnoTveganje(stavba, seizmicni, unitArea);
-  const priporocenaVsota = potresno.priporocenaVsota;
-
-  const pozarnaStopnja = jeMasivna ? 0.0005 : 0.0008;
-  const pozarnaMin = Math.round(priporocenaVsota * pozarnaStopnja * 0.8);
-  const pozarnaMax = Math.round(priporocenaVsota * pozarnaStopnja * 1.3);
-
-  const tveganjeLabel: Record<string, string> = {
-    "nizko": "Nizko",
-    "zmerno": "Zmerno",
-    "srednje": "Srednje",
-    "visoko": "Visoko",
-    "zelo visoko": "Zelo visoko",
-  };
-
-  return (
-    <section className="border-t border-gray-100 pt-6 space-y-6">
-      <div>
-        <h3 className="text-base font-semibold text-gray-800">Zavarovanje nepremičnine</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Indikativni izračun potresnega tveganja in priporočila za zavarovanje</p>
-      </div>
-
-      {/* Potresna varnost — vedno prikazano */}
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">Potresna varnost</h4>
-          <span className="text-[10px] text-gray-400">Vir: ARSO · Eurocode 8 (EN 1998)</span>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          {/* Cona + Ranljivost */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Seizmična cona</p>
-              <p className="text-xl font-bold text-gray-800">Cona {seizmicni.cona}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{seizmicni.opisCone}</p>
-              <p className="text-xs text-gray-400">PGA: {seizmicni.pga}g (Eurocode 8)</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ranljivost objekta</p>
-              <p className="text-xl font-bold text-gray-800">Razred {potresno.razredRanljivosti}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{potresno.opisRanljivosti}</p>
-            </div>
-          </div>
-
-          {/* Ocena tveganja */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Ocena tveganja</p>
-              <span className={`text-xs font-semibold ${
-                potresno.tveganjeTocke <= 3 ? "text-green-700"
-                : potresno.tveganjeTocke <= 6 ? "text-orange-600"
-                : potresno.tveganjeTocke <= 8 ? "text-red-600"
-                : "text-red-800"
-              }`}>
-                {tveganjeLabel[potresno.tveganje]} ({potresno.tveganjeTocke}/10)
-              </span>
-            </div>
-            <TveganjeProgressBar tocke={potresno.tveganjeTocke} />
-            <p className="text-xs text-gray-400 mt-2">
-              Skupno tveganje = seizmična cona {seizmicni.cona} + ranljivost {potresno.razredRanljivosti} (starejša gradnja) + etažnost.
-              {potresno.tveganjeTocke >= 7 && (seizmicni.cona === "II" || seizmicni.cona === "III") && (
-                <> Visoko tveganje kljub zmerni/srednji coni — posledica ranljivosti starejše gradnje.</>
-              )}
-            </p>
-          </div>
-
-          {/* Vrednosti */}
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Priporočena zavarovalna vsota</p>
-              <p className="text-base font-semibold text-gray-800">{potresno.priporocenaVsota.toLocaleString("sl-SI")} €</p>
-              <p className="text-xs text-gray-400">1.800 €/m² × {unitArea ?? stavba.povrsina ?? 80} m² gradbene vrednosti</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Indikativna letna premija</p>
-              <p className="text-base font-semibold text-gray-800">
-                {potresno.letnaPremijaOcena.min.toLocaleString("sl-SI")} € – {potresno.letnaPremijaOcena.max.toLocaleString("sl-SI")} €
-              </p>
-              <p className="text-xs text-gray-400">Stopnja: ~0,15% (cona {seizmicni.cona}, razred {potresno.razredRanljivosti})</p>
-            </div>
-          </div>
-
-          {/* Opomba */}
-          <p className="text-[11px] text-gray-400 leading-relaxed pt-1 border-t border-gray-50">
-            Indikativna ocena<InfoTooltip text="Dejanska premija je odvisna od pogojev zavarovalnice in podrobnega pregleda nepremičnine." />
-          </p>
-        </div>
-      </div>
-
-      {/* Premoženjsko zavarovanje */}
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">Premoženjsko zavarovanje</h4>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-gray-400 text-[11px] uppercase tracking-wide">
-                <th className="px-5 py-2.5 font-medium">Vrsta zavarovanja</th>
-                <th className="px-5 py-2.5 font-medium text-right">Priporočena vsota</th>
-                <th className="px-5 py-2.5 font-medium text-right">Indikativna premija/leto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {/* Požarno — vedno prikazano */}
-              <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3">
-                  <p className="text-gray-700 font-medium">Požarno in splošno</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Osnova: gradbena vrednost × stopnja 0,04% (masivna konstrukcija)</p>
-                </td>
-                <td className="px-5 py-3 text-right tabular-nums text-gray-700">{priporocenaVsota.toLocaleString("sl-SI")} €</td>
-                <td className="px-5 py-3 text-right tabular-nums text-gray-700">{pozarnaMin.toLocaleString("sl-SI")} € – {pozarnaMax.toLocaleString("sl-SI")} €</td>
-              </tr>
-              {/* Poplavno — samo če je relevantno */}
-              {poplavnaNevarnost && poplavnaNevarnost.stopnja !== "ni" && (
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3">
-                    <p className="font-medium text-sm">Poplavno zavarovanje</p>
-                    <p className="text-xs text-gray-400">{poplavnaNevarnost.opis} Stopnja: 0,08–0,20% (glede na cono).</p>
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">{priporocenaVsota.toLocaleString('sl-SI')} €</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">
-                    {Math.round(priporocenaVsota * 0.0008).toLocaleString('sl-SI')} € – {Math.round(priporocenaVsota * 0.002).toLocaleString('sl-SI')} €
-                  </td>
-                </tr>
-              )}
-              {/* Odgovornost lastnika — samo za večstanovanjske */}
-              {stavba.steviloStanovanj != null && stavba.steviloStanovanj > 1 && (
-                <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3">
-                    <p className="text-gray-700 font-medium">Odgovornost</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Standardna vsota za stavbe s skupnimi deli. Stopnja: 0,006–0,012 %/leto.</p>
-                  </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">500.000 €</td>
-                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">30 € – 60 €</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Zavarovalniški marketplace — prihaja */}
-
-      {/* Disclaimer */}
-      <div className="text-[11px] text-gray-400 leading-relaxed space-y-0.5">
-        <span className="inline-flex items-center gap-1">Indikativni izračun<InfoTooltip text="Izračuni temeljijo na javno dostopnih podatkih (ARSO, KN GURS). Niso nadomestilo za uradno ponudbo certificiranega zavarovalnega zastopnika." /></span>
-        <p>Vir: ARSO potresna nevarnost · Eurocode 8 (EN 1998) · EMS-98 lestvica ranljivosti</p>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────
-   ZavarovanjeSection — ločeni tipi zavarovanja + koračni modal
-   ──────────────────────────────────────────────────────────────── */
-
 interface ZavarovalniskiTip {
   id: "potresno" | "pozarno" | "poplavno" | "odgovornost";
   naziv: string;
@@ -2526,38 +2348,445 @@ const PONUDNIKI = [
   { naziv: "Allianz SI",         logo: "AL", mod: 1.00 },
 ] as const;
 
-function ServicesSection() {
-  const cards = [
+function ZavarovanjeSection({
+  naslov,
+  stavba,
+  seizmicniPodatki,
+  poplavnaNevarnost,
+  unitArea,
+}: {
+  naslov: string;
+  stavba: PropertyCardProps["stavba"];
+  seizmicniPodatki: SeizmicniPodatki | null | undefined;
+  etaze?: number | null;
+  poplavnaNevarnost?: PoplavnaNevarnost | null;
+  unitArea?: number | null;
+}) {
+  const seizmicni: SeizmicniPodatki = seizmicniPodatki ?? { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost" };
+  const potresno = izracunajPotresnoTveganje(stavba, seizmicni, unitArea);
+  const priporocenaVsota = potresno.priporocenaVsota;
+
+  const konstr = (stavba.konstrukcija ?? "").toLowerCase();
+  const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
+  const pozarnaStopnja = jeMasivna ? 0.0005 : 0.0008;
+  const imaPoplavo = poplavnaNevarnost && poplavnaNevarnost.stopnja !== "ni";
+  const jeVecStanovanjska = (stavba.steviloStanovanj ?? 1) > 1;
+  const povrsina = unitArea ?? stavba.povrsina ?? 80;
+
+  // Ogrevanje iz GURS plin podatka — readonly, brez dropdowna
+  const ogrevanje = stavba.prikljucki?.plin ? "Centralno (plin)" : "Električno / drugo";
+
+  const vsiTipi: ZavarovalniskiTip[] = [
     {
-      title: "Kredit za prenovo",
-      desc: "Primerjajte ponudbe bank za stanovanjski kredit",
+      id: "potresno",
+      naziv: "Potresno zavarovanje",
+      opis: "Krije škodo na nepremičnini zaradi potresa.",
+      vsota: priporocenaVsota,
+      premijaMin: potresno.letnaPremijaOcena.min,
+      premijaMax: potresno.letnaPremijaOcena.max,
+      osnova: `Cona ${seizmicni.cona}, ranljivost ${potresno.razredRanljivosti}, ${povrsina} m²`,
     },
     {
-      title: "Zavarovanje nepremičnine",
-      desc: "Zavarovajte svojo naložbo po ugodni ceni",
+      id: "pozarno",
+      naziv: "Požarno in splošno zavarovanje",
+      opis: "Krije požar, strelo, eksplozijo, vlom.",
+      vsota: priporocenaVsota,
+      premijaMin: Math.round(priporocenaVsota * pozarnaStopnja * 0.8),
+      premijaMax: Math.round(priporocenaVsota * pozarnaStopnja * 1.3),
+      osnova: `Gradbena vrednost 1.800 €/m² × ${povrsina} m²`,
     },
-    {
-      title: "Energetska sanacija",
-      desc: "Preverite subvencije Eko sklada za energetsko prenovo",
-    },
+    ...(imaPoplavo ? [{
+      id: "poplavno" as const,
+      naziv: "Poplavno zavarovanje",
+      opis: "Krije škodo zaradi poplav in zemeljskih plazov.",
+      vsota: priporocenaVsota,
+      premijaMin: Math.round(priporocenaVsota * 0.0008),
+      premijaMax: Math.round(priporocenaVsota * 0.002),
+      osnova: poplavnaNevarnost?.opis ?? "Poplavna nevarnost po ARSO",
+    }] : []),
+    ...(jeVecStanovanjska ? [{
+      id: "odgovornost" as const,
+      naziv: "Zavarovanje odgovornosti",
+      opis: "Za škodo tretjim osebam (skupni deli stavbe).",
+      vsota: 500000,
+      premijaMin: 30,
+      premijaMax: 60,
+      osnova: "Standardna vsota za stavbe s skupnimi deli",
+    }] : []),
   ];
 
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(["potresno", "pozarno"]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  // Step 2
+  const [tipStrehe, setTipStrehe] = useState("dvokapnica");
+  const [alarm, setAlarm] = useState("brez");
+  const [skode, setSkode] = useState("0");
+  const [placilo, setPlacilo] = useState("letno");
+
+  // Step 3
+  const [selectedPonudnik, setSelectedPonudnik] = useState<string | null>(null);
+  const [ime, setIme] = useState("");
+  const [email, setEmail] = useState("");
+  const [tel, setTel] = useState("");
+  const [sendStatus, setSendStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  const toggleType = (id: string) => {
+    setSelectedTypes(prev =>
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
+  };
+
+  const selectedTipi = vsiTipi.filter(t => selectedTypes.includes(t.id));
+
+  const tipaStreheMod = tipStrehe === "ravna" ? 1.15 : 1.0;
+  const alarmMod = alarm === "alarm+resetke" ? 0.90 : alarm === "alarm" ? 0.95 : 1.0;
+  const skodeMod = skode === "2+" ? 1.35 : skode === "1" ? 1.15 : 1.0;
+  const mesecnoMod = placilo === "mesecno" ? 1.03 : 1.0;
+  const skupniMod = tipaStreheMod * alarmMod * skodeMod * mesecnoMod;
+
+  const handleSend = async () => {
+    setSendStatus("sending");
+    try {
+      await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, phone: tel, naslov, ponudnik: selectedPonudnik, tipi: selectedTypes }),
+      });
+      setSendStatus("sent");
+      setTimeout(() => {
+        setModalOpen(false); setSendStatus("idle"); setSelectedPonudnik(null);
+        setIme(""); setEmail(""); setTel(""); setCurrentStep(1);
+      }, 2000);
+    } catch {
+      setSendStatus("error");
+    }
+  };
+
+  const selectClass = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300 bg-white";
+  const showTipStrehe = selectedTypes.includes("potresno") || selectedTypes.includes("pozarno");
+  const showAlarm = selectedTypes.includes("pozarno");
+
+  return (
+    <section className="space-y-4">
+      <p className="text-xs text-gray-400">Izberite tip zavarovanja in pridobite indikativno ponudbo.</p>
+
+      {/* Kartice tipov */}
+      <div className="space-y-2">
+        {vsiTipi.map((tip) => {
+          const checked = selectedTypes.includes(tip.id);
+          return (
+            <button
+              key={tip.id}
+              onClick={() => toggleType(tip.id)}
+              className={`w-full text-left rounded-lg border px-4 py-3 transition-all ${
+                checked ? "border-[#2d6a4f] bg-green-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                  checked ? "bg-[#2d6a4f] border-[#2d6a4f]" : "border-gray-300 bg-white"
+                }`}>
+                  {checked && <span className="text-white text-[10px] font-bold leading-none">&#10003;</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-700">{tip.naziv}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{tip.opis}</p>
+                  <div className="flex flex-wrap gap-x-4 mt-1.5 text-xs text-gray-500">
+                    <span>Vsota: <strong className="text-gray-700">{tip.vsota.toLocaleString("sl-SI")} &euro;</strong></span>
+                    <span>Premija: ~<strong className="text-gray-700">{tip.premijaMin.toLocaleString("sl-SI")} &ndash; {tip.premijaMax.toLocaleString("sl-SI")} &euro;/leto</strong></span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Osnova: {tip.osnova}</p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        disabled={selectedTypes.length === 0}
+        onClick={() => { setCurrentStep(1); setModalOpen(true); }}
+        className="w-full rounded-lg bg-[#2d6a4f] px-4 py-3 text-sm font-semibold text-white hover:bg-[#245a42] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        Pridobi ponudbo za izbrano ({selectedTypes.length}) &rarr;
+      </button>
+
+      <p className="text-[11px] text-gray-400">Izra&#269;uni so indikativni &middot; Vir: ARSO &middot; Eurocode 8 &middot; EMS-98</p>
+
+      {/* MODAL */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg relative my-8">
+
+            {/* Header + stepper */}
+            <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex-1">
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Zavarovanje nepremi&#269;nine</p>
+                <div className="flex gap-3">
+                  {([1, 2, 3] as const).map(s => (
+                    <div key={s} className="flex items-center gap-1.5">
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
+                        currentStep === s ? "bg-[#2d6a4f] text-white" :
+                        currentStep > s ? "bg-green-200 text-green-800" : "bg-gray-100 text-gray-400"
+                      }`}>{s}</div>
+                      <span className={`text-xs ${currentStep === s ? "text-gray-700 font-medium" : "text-gray-400"}`}>
+                        {s === 1 ? "Pregled" : s === 2 ? "Podatki" : "Ponudniki"}
+                      </span>
+                      {s < 3 && <span className="text-gray-200">&rsaquo;</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button onClick={() => { setModalOpen(false); setCurrentStep(1); }}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none p-1 ml-4" aria-label="Zapri">
+                &#x2715;
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+
+              {/* KORAK 1 */}
+              {currentStep === 1 && (
+                <>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Zavarujete</p>
+                    <div className="flex flex-wrap gap-2">
+                      {vsiTipi.map(tip => {
+                        const sel = selectedTypes.includes(tip.id);
+                        return (
+                          <button key={tip.id} onClick={() => toggleType(tip.id)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+                              sel ? "bg-[#2d6a4f] border-[#2d6a4f] text-white" : "border-gray-200 text-gray-400 line-through bg-gray-50"
+                            }`}>
+                            {sel && <span>&#10003;</span>}
+                            {tip.naziv.split(" ")[0]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedTypes.length === 0 && <p className="text-xs text-red-500 mt-1">Izberite vsaj en tip zavarovanja.</p>}
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Podatki o nepremi&#269;nini (iz registrov GURS)</p>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-100 text-sm">
+                      {([
+                        ["Naslov", naslov || "\u2014"],
+                        ["Povr&#353;ina", povrsina + " m\u00B2"],
+                        ["Leto izgradnje", String(stavba.letoIzgradnje ?? "\u2014")],
+                        ["Konstrukcija", stavba.konstrukcija ?? "\u2014"],
+                        ["Seizmi&#269;na cona", seizmicni.cona + " (PGA " + seizmicni.pga + "g)"],
+                        ["Ogrevanje", ogrevanje],
+                      ] as [string, string][]).map(([label, val]) => (
+                        <div key={label} className="flex justify-between px-4 py-2">
+                          <span className="text-gray-500 shrink-0 mr-3" dangerouslySetInnerHTML={{ __html: label }} />
+                          <span className="text-gray-800 font-medium text-right" dangerouslySetInnerHTML={{ __html: val }} />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5">Vir: Kataster nepremi&#269;nin &middot; ARSO &middot; GURS</p>
+                  </div>
+
+                  {selectedTipi.length > 0 && (
+                    <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
+                      <p className="text-xs text-green-700 font-semibold mb-1">Skupna indikativna premija za izbrane tipe</p>
+                      <p className="text-lg font-bold text-green-800">
+                        {selectedTipi.reduce((s, t) => s + t.premijaMin, 0).toLocaleString("sl-SI")} &euro; &ndash;{" "}
+                        {selectedTipi.reduce((s, t) => s + t.premijaMax, 0).toLocaleString("sl-SI")} &euro;/leto
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button disabled={selectedTypes.length === 0} onClick={() => setCurrentStep(2)}
+                      className="rounded-lg bg-[#2d6a4f] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#245a42] disabled:opacity-40 transition-colors">
+                      Naprej &rarr;
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* KORAK 2 */}
+              {currentStep === 2 && (
+                <>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Dodatni podatki za natan&#269;en izra&#269;un</p>
+                  <div className="space-y-3">
+                    {showTipStrehe && (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Tip strehe</label>
+                        <select value={tipStrehe} onChange={e => setTipStrehe(e.target.value)} className={selectClass}>
+                          <option value="dvokapnica">Dvokapnica</option>
+                          <option value="ravna">Ravna streha (+15%)</option>
+                          <option value="mansarda">Mansarda</option>
+                          <option value="enokapnica">Enokapnica</option>
+                        </select>
+                      </div>
+                    )}
+                    {showAlarm && (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Protivlomna za&#353;&#269;ita</label>
+                        <select value={alarm} onChange={e => setAlarm(e.target.value)} className={selectClass}>
+                          <option value="brez">Brez</option>
+                          <option value="alarm">Alarmni sistem (&minus;5%)</option>
+                          <option value="resetke">Re&#353;etke na oknih</option>
+                          <option value="alarm+resetke">Alarm + re&#353;etke (&minus;10%)</option>
+                        </select>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">&#352;kode zadnjih 5 let</label>
+                      <select value={skode} onChange={e => setSkode(e.target.value)} className={selectClass}>
+                        <option value="0">Ni prijavljenih &#353;kod</option>
+                        <option value="1">1 &#353;koda (+15%)</option>
+                        <option value="2+">2 ali ve&#269; &#353;kod (+35%)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Pla&#269;ilo premije</label>
+                      <select value={placilo} onChange={e => setPlacilo(e.target.value)} className={selectClass}>
+                        <option value="letno">Letno</option>
+                        <option value="mesecno">Mese&#269;no (+3%)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                    <p className="text-[11px] text-blue-500 uppercase tracking-wide mb-0.5">Prilagojena skupna premija</p>
+                    <p className="text-lg font-bold text-blue-800">
+                      {Math.round(selectedTipi.reduce((s, t) => s + t.premijaMin, 0) * skupniMod).toLocaleString("sl-SI")} &euro; &ndash;{" "}
+                      {Math.round(selectedTipi.reduce((s, t) => s + t.premijaMax, 0) * skupniMod).toLocaleString("sl-SI")} &euro;/leto
+                    </p>
+                    <p className="text-[11px] text-blue-400 mt-0.5">Posodobljeno glede na va&#353;e podatke</p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <button onClick={() => setCurrentStep(1)} className="text-sm text-gray-500 hover:text-gray-700">&larr; Nazaj</button>
+                    <button onClick={() => setCurrentStep(3)}
+                      className="rounded-lg bg-[#2d6a4f] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#245a42] transition-colors">
+                      Primerjaj ponudnike &rarr;
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* KORAK 3 */}
+              {currentStep === 3 && (
+                <>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Primerjava ponudnikov</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Prikazano za: {selectedTipi.map(t => t.naziv.split(" ")[0]).join(", ")}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {PONUDNIKI.map(p => {
+                      const perType = selectedTipi.map(tip => ({
+                        naziv: tip.naziv,
+                        min: Math.round(tip.premijaMin * p.mod * skupniMod),
+                        max: Math.round(tip.premijaMax * p.mod * skupniMod),
+                      }));
+                      const skupajMin = perType.reduce((s, t) => s + t.min, 0);
+                      const skupajMax = perType.reduce((s, t) => s + t.max, 0);
+                      const isSelected = selectedPonudnik === p.naziv;
+
+                      return (
+                        <div key={p.naziv} className={`rounded-lg border px-4 py-3 transition-all ${
+                          isSelected ? "border-[#2d6a4f] bg-green-50" : "border-gray-200 bg-white"
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">{p.logo}</div>
+                              <span className="text-sm font-semibold text-gray-800">{p.naziv}</span>
+                            </div>
+                            <button onClick={() => setSelectedPonudnik(isSelected ? null : p.naziv)}
+                              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                                isSelected ? "bg-[#2d6a4f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              }`}>
+                              {isSelected ? "\u2713 Izbran" : "Izberi"}
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {perType.map(t => (
+                              <div key={t.naziv} className="flex justify-between text-xs text-gray-500">
+                                <span>{t.naziv.split(" ")[0]}:</span>
+                                <span className="tabular-nums">{t.min.toLocaleString("sl-SI")} &euro; &ndash; {t.max.toLocaleString("sl-SI")} &euro;</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between text-sm font-semibold text-gray-800 border-t border-gray-100 pt-1 mt-1">
+                              <span>Skupaj:</span>
+                              <span className="tabular-nums">{skupajMin.toLocaleString("sl-SI")} &euro; &ndash; {skupajMax.toLocaleString("sl-SI")} &euro;/leto</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {selectedPonudnik && (
+                    <div className="space-y-3 border-t border-gray-100 pt-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+                        Kontaktni podatki za ponudbo od {selectedPonudnik}
+                      </p>
+                      <input type="text" placeholder="Ime in priimek" value={ime} onChange={e => setIme(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                      <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                      <input type="tel" placeholder="Telefonska &#353;tevilka" value={tel} onChange={e => setTel(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300" />
+                      <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                        Demo: podatki shranjeni za testiranje. Dejanska sklenitev prihaja.
+                      </div>
+                      {sendStatus === "sent" && (
+                        <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-800 font-medium">
+                          Zahtevek poslan. Kontaktirali vas bomo.
+                        </div>
+                      )}
+                      {sendStatus === "error" && (
+                        <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800">
+                          Pri&#353;lo je do napake. Poskusite znova.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <button onClick={() => setCurrentStep(2)} className="text-sm text-gray-500 hover:text-gray-700">&larr; Nazaj</button>
+                    {selectedPonudnik && (
+                      <button onClick={handleSend} disabled={sendStatus === "sending" || sendStatus === "sent"}
+                        className="rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60 transition-colors">
+                        {sendStatus === "sending" ? "Po&#353;iljam..." : "Skleni \u2192"}
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ServicesSection() {
+  const cards = [
+    { title: "Kredit za prenovo", desc: "Primerjajte ponudbe bank za stanovanjski kredit" },
+    { title: "Zavarovanje nepremičnine", desc: "Zavarovajte svojo naložbo po ugodni ceni" },
+    { title: "Energetska sanacija", desc: "Preverite subvencije Eko sklada za energetsko prenovo" },
+  ];
   return (
     <section>
       <Label>Uredite z enim klikom</Label>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {cards.map((c) => (
-          <div
-            key={c.title}
-            className="rounded-md border border-gray-100 bg-white p-5 shadow-sm"
-          >
+          <div key={c.title} className="rounded-md border border-gray-100 bg-white p-5 shadow-sm">
             <h5 className="font-medium text-sm text-gray-800">{c.title}</h5>
-            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
-              {c.desc}
-            </p>
-            <span className="inline-block mt-3 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-400">
-              Kmalu
-            </span>
+            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{c.desc}</p>
+            <span className="inline-block mt-3 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-400">Kmalu</span>
           </div>
         ))}
       </div>
