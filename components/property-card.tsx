@@ -424,6 +424,7 @@ export function PropertyCard({
             seizmicniPodatki={seizmicniPodatki ?? null}
             etaze={stavba.steviloEtaz}
             poplavnaNevarnost={poplavnaNevarnost ?? null}
+            unitArea={activePart?.uporabnaPovrsina ?? activePart?.povrsina ?? null}
           />
 
           {/* L6: Storitve */}
@@ -2117,6 +2118,7 @@ interface PotresnoTveganje {
 function izracunajPotresnoTveganje(
   stavba: PropertyCardProps["stavba"],
   seizmicni: SeizmicniPodatki,
+  unitArea?: number | null,
 ): PotresnoTveganje {
   const leto = stavba.letoIzgradnje ?? 1980;
   const konstr = (stavba.konstrukcija ?? "").toLowerCase();
@@ -2179,8 +2181,8 @@ function izracunajPotresnoTveganje(
     : tveganjeTocke <= 8 ? "visoko"
     : "zelo visoko";
 
-  // Priporočena zavarovalna vsota
-  const povrsina = stavba.povrsina ?? 80;
+  // Priporočena zavarovalna vsota — unitArea ima prednost pred stavba.povrsina
+  const povrsina = unitArea ?? stavba.povrsina ?? 80;
   const ocenjenVrednost = povrsina * 1800;
   const priporocenaVsota = Math.round(ocenjenVrednost * 1.1);
 
@@ -2213,18 +2215,20 @@ function ZavarovanjeSection({
   seizmicniPodatki,
   etaze,
   poplavnaNevarnost,
+  unitArea,
 }: {
   stavba: PropertyCardProps["stavba"];
   seizmicniPodatki: SeizmicniPodatki | null | undefined;
   etaze?: number | null;
   poplavnaNevarnost?: PoplavnaNevarnost | null;
+  unitArea?: number | null;
 }) {
   const konstr = (stavba.konstrukcija ?? "").toLowerCase();
   const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
 
   // Vedno zagotovimo seizmične podatke — fallback po koordinatah (Ljubljana default)
   const seizmicni: SeizmicniPodatki = seizmicniPodatki ?? { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost" };
-  const potresno = izracunajPotresnoTveganje(stavba, seizmicni);
+  const potresno = izracunajPotresnoTveganje(stavba, seizmicni, unitArea);
   const priporocenaVsota = potresno.priporocenaVsota;
 
   const pozarnaStopnja = jeMasivna ? 0.0005 : 0.0008;
@@ -2296,7 +2300,7 @@ function ZavarovanjeSection({
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Priporočena zavarovalna vsota</p>
               <p className="text-base font-semibold text-gray-800">{potresno.priporocenaVsota.toLocaleString("sl-SI")} €</p>
-              <p className="text-xs text-gray-400">1.800 €/m² × {stavba.povrsina ?? 80} m² gradbene vrednosti</p>
+              <p className="text-xs text-gray-400">1.800 €/m² × {unitArea ?? stavba.povrsina ?? 80} m² gradbene vrednosti</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Indikativna letna premija</p>
