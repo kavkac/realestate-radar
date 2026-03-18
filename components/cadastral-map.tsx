@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -56,15 +56,11 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
         zIndex={0}
       />
 
-      {/* GURS DOF satelitska podlaga — tloris se ujema z uradnimi koordinatami */}
-      <WMSTileLayer
-        url="https://storitve.eprostor.gov.si/ows-pub-wms/wms"
-        layers="SI.GURS.DOF"
-        format="image/png"
-        transparent={false}
-        attribution="&copy; GURS · Geodetska uprava RS"
-        // @ts-expect-error react-leaflet v4 WMS typing
-        srs="EPSG:3857"
+      {/* Esri World Imagery satelitska podlaga — zanesljivi XYZ tiles, EPSG:3857, ujema se z GURS koordinatami */}
+      <TileLayer
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        attribution="&copy; Esri, Maxar, Earthstar Geographics"
+        maxZoom={19}
         zIndex={1}
       />
 
