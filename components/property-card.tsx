@@ -142,9 +142,10 @@ export function PropertyCard({
   const [showAllUnits, setShowAllUnits] = useState(false);
   const VISIBLE_DEFAULT = 6; // 2 vrstici × 3 stolpci (sm:grid-cols-3)
 
+  const sortedParts = [...deliStavbe].sort((a, b) => a.stDela - b.stDela);
   const filteredParts =
     requestedDel != null
-      ? deliStavbe.filter((d) => d.stDela === requestedDel)
+      ? sortedParts.filter((d) => d.stDela === requestedDel)
       : deliStavbe;
 
   const isMultiUnit = !requestedDel && deliStavbe.length > 1;
@@ -248,7 +249,7 @@ export function PropertyCard({
                 <span>↓</span> Izberite enoto za podroben pregled
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {(showAllUnits ? deliStavbe : deliStavbe.slice(0, VISIBLE_DEFAULT)).map((d) => (
+                {(showAllUnits ? sortedParts : sortedParts.slice(0, VISIBLE_DEFAULT)).map((d) => (
                   <button
                     key={d.stDela}
                     onClick={() => setSelectedDel(d.stDela)}
