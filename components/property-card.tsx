@@ -2154,7 +2154,7 @@ function MaintenanceSection({
                 <span className="ml-2 text-xs text-gray-400">
                   ({item.age}/{item.lifespan} let
                   {item.jeOcena && (
-                    <> · <span title="Leto zadnje obnove ni vpisano v register. Starost je ocenjena iz leta izgradnje stavbe.">ni podatka o obnovi ⓘ</span></>
+                    <> · ni podatka o obnovi<InfoTooltip text="Leto zadnje obnove ni vpisano v register nepremičnin. Starost elementa je ocenjena iz leta izgradnje stavbe in je lahko precej netočna." /></>
                   )})
                 </span>
               </div>
