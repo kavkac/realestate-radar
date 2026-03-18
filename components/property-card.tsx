@@ -2467,9 +2467,39 @@ function ZavarovanjeSection({
   const showTipStrehe = selectedTypes.includes("potresno") || selectedTypes.includes("pozarno");
   const showAlarm = selectedTypes.includes("pozarno");
 
+    // Tveganje za prikaz
+  const potresnoTveganje = potresno.tveganjeTocke >= 7 ? "visoko" : potresno.tveganjeTocke >= 4 ? "srednje" : "nizko";
+  const tveganjeBarva = potresnoTveganje === "visoko" ? "bg-red-100 border-red-200 text-red-800" : potresnoTveganje === "srednje" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-700";
+  const tveganjeIkona = potresnoTveganje === "visoko" ? "⚠" : potresnoTveganje === "srednje" ? "◈" : "✓";
+
   return (
     <section className="space-y-4">
-      <p className="text-xs text-gray-400">Izberite tip zavarovanja in pridobite indikativno ponudbo.</p>
+
+      {/* Tveganje za to nepremičnino */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Tveganje za to nepremičnino</p>
+        <div className="grid grid-cols-1 gap-2">
+          {/* Potresno tveganje */}
+          <div className={`rounded-lg border px-4 py-3 flex items-start justify-between gap-3 ${tveganjeBarva}`}>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide">Potresno tveganje</p>
+              <p className="text-sm mt-0.5">Seizmična cona {seizmicni.cona} · PGA {seizmicni.pga}g · Ranljivost {potresno.razredRanljivosti}</p>
+              <p className="text-xs mt-1 opacity-75">{seizmicni.opisCone}</p>
+            </div>
+            <span className="text-lg flex-shrink-0 mt-0.5">{tveganjeIkona}</span>
+          </div>
+          {/* Poplavno tveganje */}
+          {imaPoplavo && poplavnaNevarnost && (
+            <div className="rounded-lg border px-4 py-3 flex items-start justify-between gap-3 bg-blue-50 border-blue-200 text-blue-800">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide">Poplavno tveganje</p>
+                <p className="text-sm mt-0.5">{poplavnaNevarnost.opis ?? `Stopnja: ${poplavnaNevarnost.stopnja}`}</p>
+              </div>
+              <span className="text-lg flex-shrink-0 mt-0.5">⚠</span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Kartice tipov */}
       <div className="space-y-2">
