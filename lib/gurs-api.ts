@@ -637,36 +637,31 @@ export async function getParcele(
       const totalPts = buildingRing?.length ?? 0;
       const scored = bboxData.features.map((f) => {
         const geom = f.geometry as { type: string; coordinates: number[][][] } | null;
-        if (!geom || geom.type !== "Polygon") return { f, score: 0, hasCenter: false };
+        if (!geom || geom.type !== "Polygon") return { f, score: 0, hasCenter: false, area: Infinity };
         const parcelRing = geom.coordinates[0];
         const hasCenter = pointInPolygon([lng, lat], parcelRing);
+        const area = (f.properties?.POVRSINA as number) ?? Infinity;
         if (buildingRing && totalPts > 0) {
           const hits = buildingRing.filter(pt => pointInPolygon(pt as [number, number], parcelRing)).length;
-          return { f, score: hits, hasCenter };
+          return { f, score: hits, hasCenter, area };
         }
-        return { f, score: hasCenter ? 1 : 0, hasCenter };
+        return { f, score: hasCenter ? 1 : 0, hasCenter, area };
       });
-      // Parcele z centrom stavbe znotraj (glavna parcela) ali ≥25% točk tlorisa
+
+      // Strategija: vertex score ima prednost (reka/cesta dobi 0 scored ker stavbni tloris ni nad njo)
+      // Fallback: center containment za stavbe brez tlorisa
       const threshold = Math.max(1, Math.round(totalPts * 0.25));
-      const relevant = scored
-        .filter(x => x.hasCenter || x.score >= threshold)
-        // Med enako kvalificiranimi: preferiramo manjše parcele (ceste/koridorji so veliki)
-        .sort((a, b) => {
-          const aArea = (a.f.properties?.POVRSINA as number) ?? Infinity;
-          const bArea = (b.f.properties?.POVRSINA as number) ?? Infinity;
-          // Najprej po score (več = boljše), nato po površini (manj = boljše)
-          if (b.score !== a.score) return b.score - a.score;
-          return aArea - bArea;
-        })
-        .slice(0, 2)
-        .map(x => x.f);
-      if (relevant.length === 0) {
-        // Fallback: najmanjša parcela ki vsebuje center
-        const centerParcels = scored.filter(x => x.hasCenter)
-          .sort((a, b) => ((a.f.properties?.POVRSINA as number) ?? Infinity) - ((b.f.properties?.POVRSINA as number) ?? Infinity));
-        parceleData = { ...bboxData, features: centerParcels.length > 0 ? [centerParcels[0].f] : bboxData.features.slice(0, 1) };
+      const byScore = scored.filter(x => x.score >= threshold)
+        .sort((a, b) => b.score !== a.score ? b.score - a.score : a.area - b.area)
+        .slice(0, 2).map(x => x.f);
+
+      if (byScore.length > 0) {
+        parceleData = { ...bboxData, features: byScore };
       } else {
-        parceleData = { ...bboxData, features: relevant };
+        // Ni tlorisa ali vertex match — vzemi najmanjšo parcelo ki vsebuje center
+        const centerParcels = scored.filter(x => x.hasCenter)
+          .sort((a, b) => a.area - b.area);
+        parceleData = { ...bboxData, features: centerParcels.length > 0 ? [centerParcels[0].f] : bboxData.features.slice(0, 1) };
       }
     }
   }
