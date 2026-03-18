@@ -553,13 +553,24 @@ export function PropertyCard({
           </div>
 
           {/* 3. Lastništvo */}
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            {isMultiUnit && !activePart ? (
-              <LastnistvoMultiSection deliStavbe={deliStavbe} />
-            ) : (
-              <LastnistvoSection data={currentPart?.lastnistvo} />
-            )}
-          </div>
+          {(() => {
+            const lastnistvoData = isMultiUnit && !activePart
+              ? null
+              : (currentPart?.lastnistvo ?? (deliStavbe.length === 1 ? deliStavbe[0].lastnistvo : null));
+            if (isMultiUnit && !activePart) {
+              return (
+                <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                  <LastnistvoMultiSection deliStavbe={deliStavbe} />
+                </div>
+              );
+            }
+            if (!lastnistvoData || lastnistvoData.length === 0) return null;
+            return (
+              <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                <LastnistvoSection data={lastnistvoData} />
+              </div>
+            );
+          })()}
 
           {/* 3. Parcele */}
           {parcele && parcele.length > 0 && (
