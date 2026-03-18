@@ -1046,7 +1046,7 @@ function predlagajUkrepe(
       osnova: varstvo.varuje
         ? `Lesena okna po meri (ZVKDS smernice) × ${okenCenaMin}–${okenCenaMax} €/m²`
         : `Ocena: ~15% stanovanjske površine (${povrsina ? Math.round(povrsina * 0.15) + ' m²' : 'neznano'}) × 450–650 €/m²`,
-      prioriteta: starOken > 40 ? "visoka" : "srednja",
+      prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
     });
@@ -1069,7 +1069,7 @@ function predlagajUkrepe(
       strosekMin: stMin,
       strosekMax: stMax,
       osnova: "Toplotna črpalka zrak-voda: 8.000–12.000 €; kondenzacijski kotel: 3.500–6.000 €",
-      prioriteta: starInst > 40 ? "visoka" : "srednja",
+      prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
     });
@@ -1100,7 +1100,7 @@ function predlagajUkrepe(
       strosekMin: skupniMin,
       strosekMax: skupniMax,
       osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × ${fasadaCenaMin}–${fasadaCenaMax} €/m²${varstvo.varuje ? " (apnena malta, ZVKDS materiali)" : ""}${delezMin != null ? `\nVaš delež (${delez}): ${delezMin.toLocaleString('sl-SI')}–${delezMax!.toLocaleString('sl-SI')} €` : ""}`,
-      prioriteta: starFasade > 40 ? "visoka" : "srednja",
+      prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
     });
@@ -1121,7 +1121,7 @@ function predlagajUkrepe(
       strosekMin: stMin,
       strosekMax: stMax,
       osnova: `Glede na velikost stavbe: 15.000–40.000 €${delezNum != null ? `\nVaš delež (${delez}): ${Math.round(15000 * delezNum).toLocaleString('sl-SI')}–${Math.round(40000 * delezNum).toLocaleString('sl-SI')} €` : ""}`,
-      prioriteta: starStrehe > 40 ? "visoka" : "nizka",
+      prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
     });
