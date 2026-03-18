@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
         steviloStanovanj: stavba.steviloStanovanj,
         povrsina: stavba.brutoTlorisnaPovrsina,
         konstrukcija: stavba.nosilnaKonstrukcija,
-        tip: deliStavbe.length >= 3 ? "Večstanovanjska" : deliStavbe.length === 2 ? "Dvostanovanjska" : stavba.tipStavbe,
+        tip: stavba.steviloStanovanj != null && stavba.steviloStanovanj >= 3 ? "Večstanovanjska" : stavba.steviloStanovanj === 2 ? "Dvostanovanjska" : stavba.steviloStanovanj === 1 ? "Enostanovanjska" : stavba.tipStavbe,
         prikljucki: {
           elektrika: stavba.elektrika,
           plin: stavba.plin,
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
         steviloStanovanj: stavba.steviloStanovanj,
         povrsina: stavba.brutoTlorisnaPovrsina,
         konstrukcija: stavba.nosilnaKonstrukcija,
-        tip: deliStavbe.length >= 3 ? "Večstanovanjska" : deliStavbe.length === 2 ? "Dvostanovanjska" : stavba.tipStavbe,
+        tip: stavba.steviloStanovanj != null && stavba.steviloStanovanj >= 3 ? "Večstanovanjska" : stavba.steviloStanovanj === 2 ? "Dvostanovanjska" : stavba.steviloStanovanj === 1 ? "Enostanovanjska" : stavba.tipStavbe,
         datumSys: stavba.datumSys,
         prikljucki: {
           elektrika: stavba.elektrika,
