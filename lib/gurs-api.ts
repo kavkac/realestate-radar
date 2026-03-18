@@ -670,7 +670,7 @@ export async function getParcele(
       const byScore = scored
         .filter(x => x.score >= threshold && x.area <= maxParcelaArea)
         .sort((a, b) => b.score !== a.score ? b.score - a.score : a.area - b.area)
-        .slice(0, 2).map(x => x.f);
+        .slice(0, 1).map(x => x.f);
 
       if (byScore.length > 0) {
         parceleData = { ...bboxData, features: byScore };
