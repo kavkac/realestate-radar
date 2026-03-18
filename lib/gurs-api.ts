@@ -635,6 +635,22 @@ export async function getParcele(
     if (bboxData && bboxData.features.length > 0) {
       const buildingRing = obrisGeom?.coordinates?.[0];
       const totalPts = buildingRing?.length ?? 0;
+
+      // Oceni površino tlorisa stavbe (Shoelace formula, m²) za določitev max velikosti parcele
+      let buildingAreaM2 = 0;
+      if (buildingRing && buildingRing.length > 2) {
+        let area = 0;
+        for (let i = 0, j = buildingRing.length - 1; i < buildingRing.length; j = i++) {
+          area += (buildingRing[j][0] + buildingRing[i][0]) * (buildingRing[j][1] - buildingRing[i][1]);
+        }
+        // Convert degrees² → m² (approx: 1° lat ≈ 111320m, 1° lng ≈ 71000m at 46°N)
+        buildingAreaM2 = Math.abs(area) / 2 * 111320 * 71000;
+      }
+      // Max parcela: 15x površina stavbe ali vsaj 3000m² (za majhne stavbe), max 8000m²
+      const maxParcelaArea = buildingAreaM2 > 0
+        ? Math.min(Math.max(buildingAreaM2 * 15, 3000), 8000)
+        : 4000;
+
       const scored = bboxData.features.map((f) => {
         const geom = f.geometry as { type: string; coordinates: number[][][] } | null;
         if (!geom || geom.type !== "Polygon") return { f, score: 0, hasCenter: false, area: Infinity };
@@ -651,17 +667,24 @@ export async function getParcele(
       // Strategija: vertex score ima prednost (reka/cesta dobi 0 scored ker stavbni tloris ni nad njo)
       // Fallback: center containment za stavbe brez tlorisa
       const threshold = Math.max(1, Math.round(totalPts * 0.25));
-      const byScore = scored.filter(x => x.score >= threshold)
+      const byScore = scored
+        .filter(x => x.score >= threshold && x.area <= maxParcelaArea)
         .sort((a, b) => b.score !== a.score ? b.score - a.score : a.area - b.area)
         .slice(0, 2).map(x => x.f);
 
       if (byScore.length > 0) {
         parceleData = { ...bboxData, features: byScore };
       } else {
-        // Ni tlorisa ali vertex match — vzemi najmanjšo parcelo ki vsebuje center
-        const centerParcels = scored.filter(x => x.hasCenter)
+        // Ni tlorisa ali vertex match — vzemi najmanjšo parcelo znotraj maxParcelaArea ki vsebuje center
+        const centerParcels = scored
+          .filter(x => x.hasCenter && x.area <= maxParcelaArea)
           .sort((a, b) => a.area - b.area);
-        parceleData = { ...bboxData, features: centerParcels.length > 0 ? [centerParcels[0].f] : bboxData.features.slice(0, 1) };
+        if (centerParcels.length > 0) {
+          parceleData = { ...bboxData, features: [centerParcels[0].f] };
+        } else {
+          // Nič razumnega — ne prikaži napačne parcele
+          parceleData = { ...bboxData, features: [] };
+        }
       }
     }
   }
