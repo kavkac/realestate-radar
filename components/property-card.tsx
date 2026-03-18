@@ -1677,34 +1677,24 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
 
 function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
   if (!parcele || parcele.length === 0) return null;
+  // Dedupliciraj po parcelni številki
+  const unique = parcele.filter((p, i, arr) =>
+    arr.findIndex(x => x.parcelnaStevila === p.parcelnaStevila) === i
+  );
   return (
     <section>
       <Label vir="Zemljiški kataster · GURS">Zemljišče</Label>
-      <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-sm min-w-[400px]">
-          <thead>
-            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
-              <th className="pb-2 pr-4 font-medium">Parcela</th>
-              <th className="pb-2 pr-4 text-right font-medium">Površina</th>
-              <th className="pb-2 pr-4 font-medium">Vrsta rabe</th>
-              <th className="pb-2 text-right font-medium">Boniteta</th>
-            </tr>
-          </thead>
-          <tbody>
-            {parcele.map((p, i) => (
-              <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
-                <td className="py-2 pr-4">{p.parcelnaStevila}</td>
-                <td className="py-2 pr-4 text-right tabular-nums">
-                  {p.povrsina != null ? `${fmtDec(p.povrsina)} m\u00B2` : "\u2014"}
-                </td>
-                <td className="py-2 pr-4">{p.vrstaRabe ?? "\u2014"}</td>
-                <td className="py-2 text-right tabular-nums">
-                  {p.boniteta != null ? fmtDec(p.boniteta) : "\u2014"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-1.5">
+        {unique.map((p, i) => (
+          <div key={i} className="flex items-baseline justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
+            <span className="font-medium text-gray-700">{p.parcelnaStevila}</span>
+            <div className="text-right text-gray-600 text-xs space-y-0.5">
+              {p.povrsina != null && <div>{fmtDec(p.povrsina)} m²</div>}
+              {p.vrstaRabe && <div className="text-gray-400">{p.vrstaRabe}</div>}
+              {p.boniteta != null && <div className="text-gray-400">Bon. {fmtDec(p.boniteta)}</div>}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );
