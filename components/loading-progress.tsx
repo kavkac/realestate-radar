@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from "react";
 
+function AnimatedDots() {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setFrame(f => (f + 1) % 4), 400);
+    return () => clearInterval(t);
+  }, []);
+  return <span className="inline-block w-4 text-left">{".".repeat(frame)}</span>;
+}
+
 const STEPS = [
   { label: "Iščem naslov v registru naslovov (GURS RPE)…", delay: 0 },
   { label: "Pridobivam podatke iz katastra nepremičnin…", delay: 800 },
@@ -51,7 +60,12 @@ export function LoadingProgress() {
                       : "text-gray-300"
                 }
               >
-                {step.label}
+                {active ? (
+                  <span className="inline-flex items-baseline gap-0">
+                    {step.label.replace(/…$/, "")}
+                    <AnimatedDots />
+                  </span>
+                ) : step.label}
               </span>
             </li>
           );

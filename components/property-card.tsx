@@ -194,17 +194,17 @@ export function PropertyCard({
       <div className="bg-[#2d6a4f] px-6 py-5 text-white print:bg-white print:text-gray-900 print:border-b-2 print:border-[#2d6a4f]">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="text-xl sm:text-2xl font-semibold print:text-[#2d6a4f] break-words">
+            <h1 className="text-2xl sm:text-3xl font-bold print:text-[#2d6a4f] break-words leading-tight">
               {naslov}
-            </h3>
-            <p className="text-sm text-green-200 print:text-gray-500 mt-0.5">
+            </h1>
+            <p className="text-sm text-green-200 print:text-gray-500 mt-1">
               Pregled podatkov o nepremičnini
             </p>
           </div>
           <button
             onClick={() => window.print()}
             title="Izvozi poročilo o nepremičnini"
-            className="print:hidden flex-shrink-0 rounded border border-white/20 bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors whitespace-nowrap"
+            className="print:hidden flex-shrink-0 rounded border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors whitespace-nowrap shadow-sm"
             aria-label="Izvozi poročilo o nepremičnini"
           >
             Izvozi poročilo
