@@ -908,19 +908,19 @@ function PartDetail({ part }: { part: DelStavbe }) {
 
 function EnergyMeter({ razred }: { razred: string }) {
   const classes = [
-    { label: "A1", color: "#1a9f3f", lightBg: "#e6f5ec", width: "45%" },
-    { label: "A2", color: "#4caf50", lightBg: "#edf7ee", width: "52%" },
-    { label: "B1", color: "#8bc34a", lightBg: "#f3f9e8", width: "59%" },
-    { label: "B2", color: "#cddc39", lightBg: "#f9fce5", width: "66%" },
-    { label: "C",  color: "#f0b429", lightBg: "#fdf7e3", width: "73%" },
-    { label: "D",  color: "#ffc107", lightBg: "#fff8e1", width: "80%" },
-    { label: "E",  color: "#ff9800", lightBg: "#fff3e0", width: "87%" },
-    { label: "F",  color: "#f44336", lightBg: "#fdecea", width: "94%" },
+    { label: "A1", color: "#1a9f3f", lightBg: "#e6f5ec", width: "30%" },
+    { label: "A2", color: "#4caf50", lightBg: "#edf7ee", width: "40%" },
+    { label: "B1", color: "#8bc34a", lightBg: "#f3f9e8", width: "50%" },
+    { label: "B2", color: "#cddc39", lightBg: "#f9fce5", width: "60%" },
+    { label: "C",  color: "#f0b429", lightBg: "#fdf7e3", width: "68%" },
+    { label: "D",  color: "#ffc107", lightBg: "#fff8e1", width: "76%" },
+    { label: "E",  color: "#ff9800", lightBg: "#fff3e0", width: "84%" },
+    { label: "F",  color: "#f44336", lightBg: "#fdecea", width: "92%" },
     { label: "G",  color: "#b71c1c", lightBg: "#f9e0df", width: "100%" },
   ];
 
   return (
-    <div className="flex flex-col gap-[3px] my-3 max-w-[280px]">
+    <div className="flex flex-col gap-[3px] my-3 max-w-[320px]">
       {classes.map((c) => {
         const isActive = c.label === razred;
         return (
