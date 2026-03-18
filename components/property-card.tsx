@@ -250,24 +250,42 @@ export function PropertyCard({
                   <button
                     key={d.stDela}
                     onClick={() => setSelectedDel(d.stDela)}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-gray-200 bg-white px-4 py-3 text-sm text-left hover:border-[#2d6a4f] hover:shadow-sm transition-all"
+                    className={`rounded-md border bg-white px-4 py-3 text-left hover:border-[#2d6a4f] hover:shadow-sm transition-all ${
+                      selectedDel === d.stDela
+                        ? "border-[#2d6a4f] ring-1 ring-[#2d6a4f]"
+                        : "border-gray-200"
+                    }`}
                   >
-                    <div className="text-gray-800 min-w-0">
-                      <span className="font-medium">Enota {d.stDela}</span>
+                    {/* Header row: unit number left, type label right */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-sm text-gray-800">Enota {d.stDela}</span>
                       {d.vrsta && (
-                        <span className="ml-1.5 text-gray-500">
-                          &mdash; {d.vrsta}
+                        <span className="text-xs text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 shrink-0">
+                          {d.vrsta}
                         </span>
                       )}
                     </div>
-                    <div className="text-gray-500 tabular-nums ml-auto flex items-center gap-2">
-                      {d.povrsina != null && <span>{fmtDec(d.povrsina)} m&sup2;</span>}
-                      {d.uporabnaPovrsina != null && (
-                        <span className="text-xs text-gray-400">
-                          (upor. {fmtDec(d.uporabnaPovrsina)} m&sup2;)
-                        </span>
-                      )}
-                    </div>
+                    {/* Area row: skupna left, uporabna right */}
+                    {(d.povrsina != null || d.uporabnaPovrsina != null) && (
+                      <div className="flex gap-6 mt-2">
+                        {d.povrsina != null && (
+                          <div>
+                            <div className="text-base font-semibold text-gray-900 tabular-nums">{fmtDec(d.povrsina)} m²</div>
+                            <div className="text-xs text-gray-400">skupna površina</div>
+                          </div>
+                        )}
+                        {d.uporabnaPovrsina != null && (
+                          <div>
+                            <div className="text-base font-semibold text-gray-700 tabular-nums">{fmtDec(d.uporabnaPovrsina)} m²</div>
+                            <div className="text-xs text-gray-400">uporabna površina</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Rooms row */}
+                    {d.prostori.length > 0 && (
+                      <div className="mt-2 text-xs text-gray-500">Prostori: {d.prostori.length}</div>
+                    )}
                   </button>
                 ))}
               </div>
