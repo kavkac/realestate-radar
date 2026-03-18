@@ -587,79 +587,40 @@ function fmtDate(raw: string): string {
 
 // --- Sections ---
 
-function PropertySummary({ stavba, deliStavbe, energetskaIzkaznica }: {
+function PropertySummary({ stavba, deliStavbe: _deliStavbe, energetskaIzkaznica }: {
   stavba: PropertyCardProps["stavba"];
   deliStavbe: PropertyCardProps["deliStavbe"];
   energetskaIzkaznica: PropertyCardProps["energetskaIzkaznica"];
 }) {
   if (!stavba || !stavba.letoIzgradnje) return null;
 
-  const leto = stavba.letoIzgradnje;
-  const letnica = new Date().getFullYear();
-
-  // --- Stavek 1: Ocena vzdrževalne urgentnosti ---
-  const LIFECYCLE: Record<string, number> = { fasada: 30, streha: 40, instalacije: 30 };
-  const komponente: { ime: string; starost: number; zivljenjska: number }[] = [];
-  const letoFasade = stavba.letoObnove?.fasade || leto;
-  const letoStrehe = stavba.letoObnove?.strehe || leto;
-  komponente.push({ ime: "fasada", starost: letnica - letoFasade, zivljenjska: LIFECYCLE.fasada });
-  komponente.push({ ime: "streha", starost: letnica - letoStrehe, zivljenjska: LIFECYCLE.streha });
-  komponente.push({ ime: "instalacije", starost: letnica - leto, zivljenjska: LIFECYCLE.instalacije });
-
-  const prekoracene = komponente.filter(k => k.starost > k.zivljenjska);
-  let stavek1 = "";
-  if (prekoracene.length >= 3) {
-    stavek1 = `Stavba je stara ${letnica - leto} let. Fasada, streha in instalacije so presegle priporočeno življenjsko dobo - investicija v prenovo je visoko verjetna.`;
-  } else if (prekoracene.length === 2) {
-    const imena = prekoracene.map(k => k.ime).join(" in ");
-    stavek1 = `Stavba je stara ${letnica - leto} let. ${imena.charAt(0).toUpperCase() + imena.slice(1)} presegata priporočeno življenjsko dobo - pričakujte stroške prenove.`;
-  } else if (prekoracene.length === 1) {
-    stavek1 = `Stavba je stara ${letnica - leto} let. ${prekoracene[0].ime.charAt(0).toUpperCase() + prekoracene[0].ime.slice(1)} presega priporočeno življenjsko dobo ${prekoracene[0].zivljenjska} let.`;
-  } else {
-    stavek1 = `Stavba je stara ${letnica - leto} let. Glede na zabeležene obnove so ključne komponente v pričakovani življenjski dobi.`;
-  }
-
-  // --- Condition score insight ---
   const conditionOcena = izracunajOcenaStanja({
     letoIzgradnje: stavba.letoIzgradnje,
     letoObnove: stavba.letoObnove,
     konstrukcija: stavba.konstrukcija,
   });
-  const stavekCondition = conditionOcena
-    ? `Ocena stanja stavbe: ${conditionOcena.ocena}/100 (${conditionOcena.razred}). ${conditionOcena.opis}`
-    : "";
 
-  // --- Stavek 2: Energetska ocena z kontekstom ---
-  let stavek2 = "";
-  if (!energetskaIzkaznica) {
-    let ocenjenRazred = "";
-    let kontekst = "";
-    if (leto < 1945) { ocenjenRazred = "E ali F"; kontekst = "Pod povprečjem za sodobne standarde"; }
-    else if (leto < 1980) { ocenjenRazred = "D ali E"; kontekst = "Pod povprečjem — pred energetsko sanacijo"; }
-    else if (leto < 2002) { ocenjenRazred = "C ali D"; kontekst = "Blizu povprečja za letnik"; }
-    else if (leto < 2010) { ocenjenRazred = "B ali C"; kontekst = "Nad povprečjem za letnik"; }
-    else { ocenjenRazred = "B"; kontekst = "Nad povprečjem — novejša gradnja"; }
-    stavek2 = `Energetska izkaznica ni v registru. Ocenjeni razred: ${ocenjenRazred} (${kontekst}).`;
-  } else {
-    // EIZ obstaja — dodaj kontekst glede letnika
-    const razred = energetskaIzkaznica.razred;
-    const povprecjeZaLetnik = leto < 1980 ? ["E","F","G"] : leto < 2002 ? ["C","D","E"] : ["B","C"];
-    const jeBoljsi = povprecjeZaLetnik.includes(razred)
-      ? false
-      : razred < povprecjeZaLetnik[0]; // nižja črka = boljši razred
-    if (jeBoljsi) {
-      stavek2 = `Energetski razred ${razred}: nad povprečjem za stavbe tega letnika.`;
-    } else {
-      stavek2 = `Energetski razred ${razred}: pod povprečjem za stavbe tega letnika — investicija v sanacijo se splača.`;
-    }
+  // Kratka energetska oznaka
+  let energetskiRazredStr = "";
+  if (energetskaIzkaznica?.razred) {
+    energetskiRazredStr = `Energetski razred: ${energetskaIzkaznica.razred}.`;
+  } else if (stavba.letoIzgradnje) {
+    // Algoritmična ocena — samo razred
+    const algoOcena = oceniEnergetskiRazred(stavba);
+    if (algoOcena) energetskiRazredStr = `Algoritmični energetski razred: ${algoOcena.razred}.`;
   }
 
+  const conditionStr = conditionOcena
+    ? `Ocena stanja: ${conditionOcena.ocena}/100 (${conditionOcena.razred}).`
+    : null;
+
+  const povzetekStr = [conditionStr, energetskiRazredStr].filter(Boolean).join(" ");
+  if (!povzetekStr) return null;
+
   return (
-    <div className="text-sm text-gray-600 leading-relaxed border-l-4 border-gray-200 pl-4 py-1 space-y-1.5">
-      {stavekCondition && <p>{stavekCondition}</p>}
-      <p>{stavek1}</p>
-      {stavek2 && <p>{stavek2}</p>}
-      <p className="text-[10px] text-gray-400">Ocena na podlagi podatkov Katastra nepremičnin · GURS</p>
+    <div className="text-sm text-gray-600 leading-relaxed border-l-4 border-gray-200 pl-4 py-1">
+      <p>{povzetekStr}</p>
+      <p className="text-[10px] text-gray-400 mt-1">Ocena na podlagi podatkov Katastra nepremičnin · GURS</p>
     </div>
   );
 }
@@ -690,6 +651,7 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
           </div>
         ))}
       </div>
+      <ConditionScoreBar stavba={stavba} />
     </section>
   );
 }
@@ -754,7 +716,6 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
         <span><Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija</span>
       </div>
-      <ConditionScoreBar stavba={stavba} />
     </section>
   );
 }
@@ -1148,7 +1109,7 @@ function predlagajUkrepe(
         : `Okna niso bila obnovljena. Energijsko varčna okna zmanjšajo toplotne izgube za 15-25%.`;
     ukrepi.push({
       naziv: "Zamenjava oken in balkonskih vrat",
-      nivo: "enota",
+      nivo: "skupno" as const,  // okna so relevantna za ves objekt
       opis: opisOkna,
       strosekMin: stMin,
       strosekMax: stMax,
@@ -1522,6 +1483,10 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
     const zc = zaupanjeColor[ocena.zaupanje];
     return (
       <section>
+        <div className="mb-4 pb-4 border-b border-gray-100">
+          <p className="text-sm font-medium text-gray-700">Uradna energetska izkaznica ni na voljo</p>
+          <p className="text-xs text-gray-400 mt-0.5">Objekt ni vpisan v register energetskih izkaznic (MOPE).</p>
+        </div>
         <div className="border-b border-gray-100 pb-1 mb-3">
           <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
             Energetsko stanje

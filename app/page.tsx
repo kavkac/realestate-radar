@@ -31,11 +31,7 @@ export default function HomePage() {
             <AddressSearch />
           </Suspense>
 
-          <div className="flex flex-wrap justify-center gap-3 mt-2">
-            <div className="bg-gray-50 border rounded-lg px-4 py-2 text-center text-sm">150.000+ nepremičnin</div>
-            <div className="bg-gray-50 border rounded-lg px-4 py-2 text-center text-sm">Uradni registri GURS</div>
-            <div className="bg-gray-50 border rounded-lg px-4 py-2 text-center text-sm">Brezplačen dostop</div>
-          </div>
+
         </div>
       </section>
 
