@@ -632,26 +632,32 @@ export async function getParcele(
     const bboxData = await fetchWfs(bboxUrl).catch(() => null);
     if (bboxData && bboxData.features.length > 0) {
       const buildingRing = obrisGeom?.coordinates?.[0];
-      // Oceni vsako parcelo: koliko točk tlorisa stavbe leži v njej
+      const totalPts = buildingRing?.length ?? 0;
       const scored = bboxData.features.map((f) => {
         const geom = f.geometry as { type: string; coordinates: number[][][] } | null;
-        if (!geom || geom.type !== "Polygon") return { f, score: 0 };
+        if (!geom || geom.type !== "Polygon") return { f, score: 0, hasCenter: false };
         const parcelRing = geom.coordinates[0];
-        if (buildingRing && buildingRing.length > 0) {
-          // Število točk tlorisa ki so v parceli (min 1 za upoštevanje)
+        const hasCenter = pointInPolygon([lng, lat], parcelRing);
+        if (buildingRing && totalPts > 0) {
           const hits = buildingRing.filter(pt => pointInPolygon(pt as [number, number], parcelRing)).length;
-          return { f, score: hits };
+          return { f, score: hits, hasCenter };
         }
-        // Fallback brez tlorisa
-        return { f, score: pointInPolygon([lng, lat], parcelRing) ? buildingRing?.length ?? 1 : 0 };
+        return { f, score: hasCenter ? 1 : 0, hasCenter };
       });
-      // Samo parcele z vsaj 1 točko tlorisa; sortirano po score descending; max 3
+      // Parcele z centrom stavbe znotraj (glavna parcela) ali ≥25% točk tlorisa
+      const threshold = Math.max(1, Math.round(totalPts * 0.25));
       const relevant = scored
-        .filter(x => x.score > 0)
-        .sort((a, b) => b.score - a.score)
+        .filter(x => x.hasCenter || x.score >= threshold)
+        .sort((a, b) => (b.hasCenter ? 1 : 0) - (a.hasCenter ? 1 : 0) || b.score - a.score)
         .slice(0, 3)
         .map(x => x.f);
-      parceleData = { ...bboxData, features: relevant.length > 0 ? relevant : bboxData.features.slice(0, 1) };
+      // Če nič ne ustreza, vrni parcelo ki vsebuje center (fallback)
+      if (relevant.length === 0) {
+        const centerParcel = scored.filter(x => x.hasCenter).map(x => x.f);
+        parceleData = { ...bboxData, features: centerParcel.length > 0 ? centerParcel : bboxData.features.slice(0, 1) };
+      } else {
+        parceleData = { ...bboxData, features: relevant };
+      }
     }
   }
 
