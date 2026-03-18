@@ -931,7 +931,7 @@ function EnergyMeter({ razred }: { razred: string }) {
             <div
               style={{
                 width: `${c.w}%`,
-                backgroundColor: isActive ? c.color : `${c.color}22`,
+                backgroundColor: isActive ? c.color : `${c.color}55`,
                 height: isActive ? "24px" : "18px",
                 clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%)",
                 display: "flex",
@@ -944,7 +944,7 @@ function EnergyMeter({ razred }: { razred: string }) {
               <span style={{
                 fontSize: isActive ? "12px" : "10px",
                 fontWeight: "700",
-                color: isActive ? "#fff" : `${c.color}bb`,
+                color: isActive ? "#fff" : `${c.color}`,
                 lineHeight: 1,
               }}>
                 {c.label}
