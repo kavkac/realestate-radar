@@ -487,15 +487,7 @@ export function PropertyCard({
             </CollapsibleSection>
           )}
 
-          {/* Ocenjena vrednost — zložljivo, privzeto ZAPRTO */}
-          <CollapsibleSection title="Ocenjena vrednost" vir="Množično vrednotenje · GURS" defaultOpen={false}>
-            <OcenaVrednostiSection
-              renVrednost={renVrednost}
-              currentPartVrednotenje={currentPart?.vrednotenje}
-              deliStavbe={deliStavbe}
-              hasSelectedUnit={!!(activePart || requestedDel != null)}
-            />
-          </CollapsibleSection>
+          {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
           {/* 9. Storitve — vedno odprto */}
           <div className="px-5 py-5 border-b border-gray-100">
@@ -537,7 +529,18 @@ export function PropertyCard({
             </div>
           </div>
 
-          {/* 2. Lastništvo */}
+          {/* 2. Ocenjena vrednost */}
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">Ocenjena vrednost</p>
+            <OcenaVrednostiSection
+              renVrednost={renVrednost}
+              currentPartVrednotenje={currentPart?.vrednotenje}
+              deliStavbe={deliStavbe}
+              hasSelectedUnit={!!(activePart || requestedDel != null)}
+            />
+          </div>
+
+          {/* 3. Lastništvo */}
           <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
             {isMultiUnit && !activePart ? (
               <LastnistvoMultiSection deliStavbe={deliStavbe} />
@@ -1748,32 +1751,21 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
       <p className="text-xs text-gray-500 mb-3">{fmtLastniki(data.length)}</p>
-      <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-sm min-w-[420px]">
-          <thead>
-            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
-              <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
-              <th className="pb-2 pr-4 font-medium">Delež</th>
-              <th className="pb-2 pr-4 font-medium">Vrsta pravice</th>
-              <th className="pb-2 font-medium">Datum vpisa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {vidniLastniki.map((r, i) => (
-              <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
-                <td className="py-2 pr-4 text-gray-700">
-                  {r.tipOsebe}
-                  {r.nazivPravneOsebe && (
-                    <span className="block text-xs text-gray-400">{r.nazivPravneOsebe}</span>
-                  )}
-                </td>
-                <td className="py-2 pr-4 tabular-nums text-gray-700">{r.delez}</td>
-                <td className="py-2 pr-4 text-gray-700">{r.tipLastnistva}</td>
-                <td className="py-2 text-gray-700">{r.datumVpisa ? fmtDate(r.datumVpisa) : "\u2014"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-1">
+        {vidniLastniki.map((r, i) => (
+          <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
+            <div className="flex-1 min-w-0">
+              <span className="text-gray-700">{r.tipOsebe}</span>
+              {r.nazivPravneOsebe && (
+                <span className="block text-xs text-gray-400 truncate">{r.nazivPravneOsebe}</span>
+              )}
+              {r.datumVpisa && (
+                <span className="block text-xs text-gray-400">{fmtDate(r.datumVpisa)}</span>
+              )}
+            </div>
+            <span className="tabular-nums text-gray-600 font-medium ml-3 flex-shrink-0">{r.delez}</span>
+          </div>
+        ))}
       </div>
       {jePokritih && (
         <div className="relative">
