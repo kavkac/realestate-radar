@@ -1497,18 +1497,16 @@ function EnergetskiIzracunSection({
             label="Letni strošek ogrevanja"
             value={`${fmt(annualCost)} \u20AC`}
           />
-          <Field
-            label="Prihranek do B2"
-            value={
-              savingsB2 > 0 ? `${fmt(savingsB2)} \u20AC/leto` : "Ni prihranka"
-            }
-          />
-          <Field
-            label="Prihranek do A2"
-            value={
-              savingsA2 > 0 ? `${fmt(savingsA2)} \u20AC/leto` : "Ni prihranka"
-            }
-          />
+          {savingsB2 > 0 ? (
+            <Field label="Prihranek do B2" value={`${fmt(savingsB2)} €/leto`} />
+          ) : (
+            <Field label="Razred B2" value="✓ Že doseženo" />
+          )}
+          {savingsA2 > 0 ? (
+            <Field label="Prihranek do A2" value={`${fmt(savingsA2)} €/leto`} />
+          ) : (
+            <Field label="Razred A2" value="✓ Že doseženo" />
+          )}
         </div>
 
       </div>
