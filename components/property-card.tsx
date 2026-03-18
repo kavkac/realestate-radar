@@ -259,11 +259,7 @@ export function PropertyCard({
                     {/* Header row: unit number left, type label right */}
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-sm text-gray-800">Enota {d.stDela}</span>
-                      {d.vrsta && (
-                        <span className="text-xs text-gray-400 shrink-0">
-                          {d.vrsta}
-                        </span>
-                      )}
+                      {/* d.vrsta hidden — WFS vrača napačne vrednosti; prikazati ko bo KN bulk import */}
                     </div>
                     {/* Area row: skupna left, uporabna right */}
                     {(d.povrsina != null || d.uporabnaPovrsina != null) && (
@@ -626,7 +622,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
               : null
           }
         />
-        <Field label="Namembnost (KN)" value={part.vrsta} />
+        {/* Namembnost (KN) hidden — WFS vrača napačne vrednosti; prikazati ko bo KN bulk import */}
         <div className="col-span-2 sm:col-span-3 -mt-2">
           <p className="text-[10px] text-gray-400">Kataster nepremičnin, GURS</p>
         </div>
