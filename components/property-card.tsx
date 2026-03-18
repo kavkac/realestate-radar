@@ -908,40 +908,51 @@ function PartDetail({ part }: { part: DelStavbe }) {
 
 function EnergyMeter({ razred }: { razred: string }) {
   const classes = [
-    { label: "A1", color: "#1a9f3f", lightBg: "#e6f5ec", width: "30%" },
-    { label: "A2", color: "#4caf50", lightBg: "#edf7ee", width: "40%" },
-    { label: "B1", color: "#8bc34a", lightBg: "#f3f9e8", width: "50%" },
-    { label: "B2", color: "#cddc39", lightBg: "#f9fce5", width: "60%" },
-    { label: "C",  color: "#f0b429", lightBg: "#fdf7e3", width: "68%" },
-    { label: "D",  color: "#ffc107", lightBg: "#fff8e1", width: "76%" },
-    { label: "E",  color: "#ff9800", lightBg: "#fff3e0", width: "84%" },
-    { label: "F",  color: "#f44336", lightBg: "#fdecea", width: "92%" },
-    { label: "G",  color: "#b71c1c", lightBg: "#f9e0df", width: "100%" },
+    { label: "A1", color: "#1a9f3f", bg: "#c8ecd4", w: 30 },
+    { label: "A2", color: "#2e9e4f", bg: "#b6e4c2", w: 38 },
+    { label: "B1", color: "#7cb83e", bg: "#d4edaa", w: 50 },
+    { label: "B2", color: "#aac520", bg: "#e4f0a0", w: 58 },
+    { label: "C",  color: "#d4a017", bg: "#f5dfa0", w: 66 },
+    { label: "D",  color: "#e8a000", bg: "#f8d880", w: 74 },
+    { label: "E",  color: "#e07000", bg: "#f5b870", w: 82 },
+    { label: "F",  color: "#d93030", bg: "#f0a0a0", w: 91 },
+    { label: "G",  color: "#a01010", bg: "#e07070", w: 100 },
   ];
 
   return (
-    <div className="flex flex-col gap-[3px] my-3 max-w-[320px]">
+    <div className="flex flex-col gap-[2px] my-3 w-full max-w-[300px]">
       {classes.map((c) => {
         const isActive = c.label === razred;
         return (
-          <div key={c.label} className="flex items-center gap-2">
-            {isActive && (
-              <span className="text-xs font-bold text-gray-600 w-3 flex-shrink-0">→</span>
-            )}
+          <div key={c.label} className="flex items-center gap-1.5">
+            {/* Marker za aktiven razred */}
+            <span className="w-3 flex-shrink-0 text-xs font-bold text-gray-700">
+              {isActive ? "▶" : ""}
+            </span>
+            {/* Bar */}
             <div
-              className="flex items-center justify-end pr-2 text-xs font-bold"
               style={{
-                width: c.width,
-                marginLeft: isActive ? 0 : "20px",
-                backgroundColor: isActive ? c.color : c.lightBg,
-                color: isActive ? "#ffffff" : c.color,
-                height: isActive ? "26px" : "20px",
-                clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)",
-                boxShadow: isActive ? `0 1px 6px ${c.color}55` : "none",
-                transition: "all 0.15s",
+                width: `${c.w}%`,
+                backgroundColor: isActive ? c.color : c.bg,
+                height: isActive ? "24px" : "18px",
+                clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                paddingRight: "14px",
+                boxShadow: isActive ? `0 2px 8px ${c.color}66` : "none",
+                outline: isActive ? `2px solid ${c.color}` : "none",
+                outlineOffset: "1px",
               }}
             >
-              {c.label}
+              <span style={{
+                fontSize: isActive ? "13px" : "11px",
+                fontWeight: "700",
+                color: isActive ? "#fff" : c.color,
+                lineHeight: 1,
+              }}>
+                {c.label}
+              </span>
             </div>
           </div>
         );
