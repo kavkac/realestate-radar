@@ -795,31 +795,18 @@ function KljucniPodatki({ stavba, deliStavbe, energetskaIzkaznica }: {
       value: <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${color}`}>{razred}</span>,
     });
   }
-  if (stavba.tip) stats.push({ label: "Tip stavbe", value: stavba.tip });
-  if (stavba.konstrukcija) stats.push({ label: "Konstrukcija", value: stavba.konstrukcija });
-  if (stavba.steviloStanovanj && stavba.steviloStanovanj > 1) stats.push({ label: "Stanovanj", value: String(stavba.steviloStanovanj) });
-
   if (stats.length === 0) return null;
-
-  const hasPrikljucki = stavba.prikljucki.elektrika || stavba.prikljucki.vodovod || imaPlin;
 
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Ključni podatki</Label>
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-4 gap-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
         {stats.map((s) => (
           <div key={s.label} className="min-w-0">
             <p className="text-[10px] text-gray-400 uppercase tracking-wide leading-tight mb-0.5">{s.label}</p>
             <p className="text-sm font-semibold text-gray-800 tabular-nums leading-snug">{s.value}</p>
           </div>
         ))}
-        {hasPrikljucki && (
-          <div className="col-span-3 sm:col-span-4 flex flex-wrap gap-x-4 gap-y-0.5 pt-1 border-t border-gray-50 mt-1 text-xs text-gray-500">
-            <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
-            <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
-            <span><Check on={imaPlin} /> Plin</span>
-          </div>
-        )}
       </div>
     </section>
   );
