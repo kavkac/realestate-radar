@@ -421,6 +421,7 @@ export function PropertyCard({
 
           {/* L5: Zavarovanje nepremičnine */}
           <ZavarovanjeSection
+            naslov={naslov}
             stavba={stavba}
             seizmicniPodatki={seizmicniPodatki ?? null}
             etaze={stavba.steviloEtaz}
@@ -2233,12 +2234,14 @@ function TveganjeProgressBar({ tocke }: { tocke: number }) {
 }
 
 function ZavarovanjeSection({
+  naslov,
   stavba,
   seizmicniPodatki,
   etaze,
   poplavnaNevarnost,
   unitArea,
 }: {
+  naslov: string;
   stavba: PropertyCardProps["stavba"];
   seizmicniPodatki: SeizmicniPodatki | null | undefined;
   etaze?: number | null;
@@ -2391,18 +2394,15 @@ function ZavarovanjeSection({
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-gray-50 flex justify-end">
-          <a
-            href="https://www.vzajemna.si/zavarovanje-nepremicnin"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded bg-[#2d6a4f] px-4 py-2 text-xs font-medium text-white hover:bg-[#245a42] transition-colors"
-          >
-            Pridobite ponudbo
-            <span aria-hidden>→</span>
-          </a>
-        </div>
       </div>
+
+      {/* Zavarovalniški marketplace */}
+      <ZavarovalniskiMarketplace
+        naslov={naslov ?? ""}
+        stavba={stavba}
+        potresno={potresno}
+        poplavnaNevarnost={poplavnaNevarnost ?? null}
+      />
 
       {/* Disclaimer */}
       <div className="text-[11px] text-gray-400 leading-relaxed space-y-0.5">
@@ -2410,6 +2410,348 @@ function ZavarovanjeSection({
         <p>Vir: ARSO potresna nevarnost · Eurocode 8 (EN 1998) · EMS-98 lestvica ranljivosti</p>
       </div>
     </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────
+   ZavarovalniskiMarketplace — demo primerjalna tabela ponudnikov
+   ──────────────────────────────────────────────────────────────── */
+
+interface ZavarovalniskiProdukt {
+  ponudnik: string;
+  logo: string;
+  produkt: string;
+  letnaPremijaMin: number;
+  letnaPremijaMax: number;
+  kritjeVsota: number;
+  vkljuceno: string[];
+  izpostavljeno: string;
+  status: "demo";
+}
+
+function ZavarovalniskiMarketplace({
+  naslov,
+  stavba,
+  potresno,
+  poplavnaNevarnost,
+}: {
+  naslov: string;
+  stavba: PropertyCardProps["stavba"];
+  potresno: ReturnType<typeof izracunajPotresnoTveganje>;
+  poplavnaNevarnost?: PoplavnaNevarnost | null;
+}) {
+  const [selectedPonudnik, setSelectedPonudnik] = useState<ZavarovalniskiProdukt | null>(null);
+  const [formData, setFormData] = useState({ ime: "", email: "", tel: "" });
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  const { priporocenaVsota, letnaPremijaOcena } = potresno;
+  const imaPoplavo = poplavnaNevarnost && poplavnaNevarnost.stopnja !== "ni";
+
+  const vkljucenoBase = ["Potresna škoda", "Požar", "Vlom"];
+  if (imaPoplavo) vkljucenoBase.splice(1, 0, "Poplava");
+
+  const produkti: ZavarovalniskiProdukt[] = [
+    {
+      ponudnik: "Triglav",
+      logo: "TR",
+      produkt: "Hiša in Dom Premium",
+      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 0.95),
+      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 0.9),
+      kritjeVsota: priporocenaVsota,
+      vkljuceno: imaPoplavo
+        ? ["Potresna škoda", "Poplava", "Požar", "Vlom"]
+        : ["Potresna škoda", "Požar", "Vlom"],
+      izpostavljeno: "Najnižja premija",
+      status: "demo",
+    },
+    {
+      ponudnik: "Zavarovalnica Sava",
+      logo: "SA",
+      produkt: "Dom Zavarovanje",
+      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 1.05),
+      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 1.0),
+      kritjeVsota: Math.round(priporocenaVsota * 1.05),
+      vkljuceno: ["Potresna škoda", "Poplava", "Požar", "Vlom"],
+      izpostavljeno: "Najboljša ocena",
+      status: "demo",
+    },
+    {
+      ponudnik: "Generali",
+      logo: "GE",
+      produkt: "Moj Dom",
+      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 1.1),
+      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 1.15),
+      kritjeVsota: Math.round(priporocenaVsota * 1.1),
+      vkljuceno: ["Potresna škoda", "Poplava", "Požar", "Vlom", "Odgovornost"],
+      izpostavljeno: "Najširše kritje",
+      status: "demo",
+    },
+    {
+      ponudnik: "Allianz SI",
+      logo: "AL",
+      produkt: "Home Protect",
+      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 1.0),
+      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 1.05),
+      kritjeVsota: priporocenaVsota,
+      vkljuceno: ["Potresna škoda", "Požar"],
+      izpostavljeno: "",
+      status: "demo",
+    },
+  ];
+
+  const badgeClass = (izpostavljeno: string) => {
+    if (izpostavljeno === "Najnižja premija") return "bg-green-100 text-green-800";
+    if (izpostavljeno === "Najširše kritje") return "bg-blue-100 text-blue-800";
+    if (izpostavljeno === "Najboljša ocena") return "bg-amber-100 text-amber-800";
+    return "";
+  };
+
+  // naslov passed as prop
+
+  const handleSend = async () => {
+    setStatus("sending");
+    try {
+      await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          phone: formData.tel,
+          naslov,
+          ponudnik: selectedPonudnik?.ponudnik,
+          produkt: selectedPonudnik?.produkt,
+          vsota: selectedPonudnik?.kritjeVsota,
+          premija_min: selectedPonudnik?.letnaPremijaMin,
+          premija_max: selectedPonudnik?.letnaPremijaMax,
+        }),
+      });
+      setStatus("sent");
+      setTimeout(() => {
+        setSelectedPonudnik(null);
+        setStatus("idle");
+        setFormData({ ime: "", email: "", tel: "" });
+      }, 2000);
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <>
+      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <div>
+            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">
+              Ponudniki zavarovanj
+            </h4>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Primerjava na podlagi podatkov o nepremičnini. Dejanske premije se določijo ob sklenitvi.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-500">
+            Demo prikaz — integracija v pripravi
+          </span>
+        </div>
+
+        {/* Table header */}
+        <div className="hidden sm:grid grid-cols-[2fr_2fr_2fr_2fr_3fr_auto] gap-x-4 px-5 py-2 border-b border-gray-100 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
+          <span>Ponudnik</span>
+          <span>Produkt</span>
+          <span>Letna premija</span>
+          <span>Kritje</span>
+          <span>Vključeno</span>
+          <span></span>
+        </div>
+
+        {/* Rows */}
+        <div className="divide-y divide-gray-50">
+          {produkti.map((p) => (
+            <div
+              key={p.ponudnik}
+              className="grid grid-cols-1 sm:grid-cols-[2fr_2fr_2fr_2fr_3fr_auto] gap-x-4 gap-y-1 px-5 py-3.5 items-center hover:bg-gray-50 transition-colors"
+            >
+              {/* Ponudnik */}
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">
+                  {p.logo}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{p.ponudnik}</p>
+                  {p.izpostavljeno && (
+                    <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded ${badgeClass(p.izpostavljeno)}`}>
+                      {p.izpostavljeno}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Produkt */}
+              <p className="text-xs text-gray-600">{p.produkt}</p>
+
+              {/* Premija */}
+              <p className="text-sm font-semibold text-gray-800 tabular-nums">
+                {p.letnaPremijaMin.toLocaleString("sl-SI")} € – {p.letnaPremijaMax.toLocaleString("sl-SI")} €
+              </p>
+
+              {/* Kritje */}
+              <p className="text-sm text-gray-700 tabular-nums">
+                {p.kritjeVsota.toLocaleString("sl-SI")} €
+              </p>
+
+              {/* Vključeno */}
+              <div className="flex flex-wrap gap-1">
+                {p.vkljuceno.map((v) => (
+                  <span key={v} className="inline-flex items-center gap-1 text-[10px] text-gray-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                    {v}
+                  </span>
+                ))}
+              </div>
+
+              {/* Gumb */}
+              <button
+                onClick={() => { setSelectedPonudnik(p); setStatus("idle"); }}
+                className="inline-flex items-center gap-1 rounded bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 transition-colors whitespace-nowrap"
+              >
+                Skleni <span aria-hidden>→</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal */}
+      {selectedPonudnik && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg relative">
+            {/* Modal header */}
+            <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest mb-0.5">Zahtevek za zavarovanje</p>
+                <h3 className="text-base font-semibold text-gray-800">
+                  {selectedPonudnik.ponudnik} — {selectedPonudnik.produkt}
+                </h3>
+              </div>
+              <button
+                onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none p-1"
+                aria-label="Zapri"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              {/* Podatki o nepremičnini */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                  Podatki o nepremičnini (iz registrov GURS)
+                </p>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-100 text-sm">
+                  {[
+                    ["Naslov", naslov || "—"],
+                    ["Leto izgradnje", stavba.letoIzgradnje ?? "—"],
+                    ["Konstrukcija", stavba.konstrukcija ?? "—"],
+                    ["Površina", stavba.povrsina ? `${stavba.povrsina} m²` : "—"],
+                  ].map(([label, val]) => (
+                    <div key={String(label)} className="flex justify-between px-4 py-2">
+                      <span className="text-gray-500">{label}</span>
+                      <span className="text-gray-800 font-medium">{String(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Predlagano kritje */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                  Predlagano kritje
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                    <p className="text-[11px] text-gray-400 mb-0.5">Zavarovalna vsota</p>
+                    <p className="text-sm font-semibold text-gray-800">{selectedPonudnik.kritjeVsota.toLocaleString("sl-SI")} €</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                    <p className="text-[11px] text-gray-400 mb-0.5">Indikativna premija</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {selectedPonudnik.letnaPremijaMin.toLocaleString("sl-SI")} € – {selectedPonudnik.letnaPremijaMax.toLocaleString("sl-SI")} € / leto
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kontaktni podatki */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                  Vaši kontaktni podatki
+                </p>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ime in priimek"
+                      value={formData.ime}
+                      onChange={(e) => setFormData((f) => ({ ...f, ime: e.target.value }))}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
+                    <input
+                      type="email"
+                      placeholder="E-mail"
+                      value={formData.email}
+                      onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="Telefonska številka"
+                    value={formData.tel}
+                    onChange={(e) => setFormData((f) => ({ ...f, tel: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  />
+                </div>
+              </div>
+
+              {/* Demo opomba */}
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+                Demo: Ob pritisku &ldquo;Pošlji zahtevek&rdquo; bodo podatki shranjeni za testiranje. Dejanska sklenitev prihaja.
+              </div>
+
+              {/* Status message */}
+              {status === "sent" && (
+                <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-xs text-green-800 font-medium">
+                  Zahtevek poslan. Kontaktirali vas bomo.
+                </div>
+              )}
+              {status === "error" && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-800">
+                  Prišlo je do napake. Poskusite znova.
+                </div>
+              )}
+
+              {/* Gumba */}
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={handleSend}
+                  disabled={status === "sending" || status === "sent"}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60 transition-colors"
+                >
+                  {status === "sending" ? "Pošiljam..." : "Pošlji zahtevek →"}
+                </button>
+                <button
+                  onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Prekliči
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
