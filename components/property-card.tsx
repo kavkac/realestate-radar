@@ -141,6 +141,42 @@ function Check({ on }: { on: boolean }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// COLLAPSIBLE SECTION WRAPPER
+// ─────────────────────────────────────────────────────────────
+
+function CollapsibleSection({
+  title,
+  vir,
+  children,
+  defaultOpen = false,
+  badge,
+}: {
+  title: string;
+  vir?: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  badge?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b border-gray-100">
+      <button
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">{title}</span>
+          {badge && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">{badge}</span>}
+          {vir && <span className="text-[10px] text-gray-400 font-normal normal-case">{vir}</span>}
+        </div>
+        <span className="text-gray-400 text-sm">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div className="px-5 pb-5">{children}</div>}
+    </div>
+  );
+}
+
 export function PropertyCard({
   naslov,
   enolicniId,
@@ -238,142 +274,132 @@ export function PropertyCard({
         </div>
       )}
 
-      {/* Cadastral map - full width on mobile, hidden on desktop (shown in right col) */}
-      <div className="lg:hidden border-b border-gray-100 space-y-4 p-4">
-        <AerialMap lat={lat} lng={lng} naslov={naslov} showStreetView={false} />
-        <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
-        {lat && lng && (
-          <div>
-            <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-1.5">Geodetski načrt · GURS</p>
-            <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} obrisGeom={stavba?.obrisGeom ?? null} />
+      {/* 2-stolpčni layout: levi stolpec + desni sidebar */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+
+        {/* ── LEVI STOLPEC — primarna vsebina ── */}
+        <div className="w-full lg:flex-1 min-w-0 space-y-0">
+
+          {/* 1. Ključni podatki — vedno odprto */}
+          <div className="px-5 py-5 border-b border-gray-100">
+            <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} />
           </div>
-        )}
-      </div>
 
-      <div className="lg:flex overflow-hidden">
-        {/* Left column: main data (60% on desktop) */}
-        <div className="lg:w-[60%] min-w-0 p-6 space-y-8">
-          {/* L1: Kratek opis */}
-          {/* PropertySummary skrita — algoritmične ocene ne prikazujemo na vrhu */}
+          {/* 2. O stavbi — zložljivo, privzeto ZAPRTO */}
+          <CollapsibleSection title="O stavbi" vir="Kataster nepremičnin · GURS" defaultOpen={false}>
+            <BuildingSection stavba={stavba} />
+          </CollapsibleSection>
 
-          {/* L1: Ključni podatki */}
-          <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} />
-
-          {/* L2: Tehnični izpis */}
-          <BuildingSection stavba={stavba} />
-
-          {/* L2: Stanovanja in prostori */}
+          {/* Stanovanja in prostori (multi-unit selector) */}
           {isMultiUnit && !activePart && (
-            <section>
-              <Label vir="Kataster nepremičnin · GURS">Stanovanja in prostori ({deliStavbe.length})</Label>
-              <p className="text-sm text-gray-400 mb-3 flex items-center gap-1">
-                <span>↓</span> Izberite enoto za podroben pregled
-              </p>
-              <div className="relative">
-              <div className="grid gap-2 sm:grid-cols-2">
-                {(showAllUnits ? sortedParts : sortedParts.slice(0, VISIBLE_DEFAULT + FADE_ROW)).map((d) => (
-                  <button
-                    key={d.stDela}
-                    onClick={() => setSelectedDel(d.stDela)}
-                    className={`rounded-md text-left cursor-pointer transition-all ${
-                      selectedDel === d.stDela
-                        ? "bg-green-50 border border-gray-200 border-l-4 border-l-[#2d6a4f] pl-3 py-3 pr-4"
-                        : "bg-white border border-gray-100 px-4 py-3 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm"
-                    }`}
-                  >
-                    {/* Header row: unit number left, type label right */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm text-gray-800">Enota {d.stDela}</span>
-                      {/* d.vrsta hidden - WFS vrača napačne vrednosti; prikazati ko bo KN bulk import */}
-                    </div>
-                    {/* Area row: skupna left, uporabna right */}
-                    {(d.povrsina != null || d.uporabnaPovrsina != null) && (
-                      <div className="flex gap-6 mt-2">
-                        {d.povrsina != null && (
-                          <div>
-                            <div className="text-base font-medium text-gray-800 tabular-nums">{fmtDec(d.povrsina)} m²</div>
-                            <div className="text-xs text-gray-400">skupna površina</div>
-                          </div>
-                        )}
-                        {d.uporabnaPovrsina != null && (
-                          <div>
-                            <div className="text-base font-medium text-gray-800 tabular-nums">{fmtDec(d.uporabnaPovrsina)} m²</div>
-                            <div className="text-xs text-gray-400">uporabna površina</div>
-                          </div>
-                        )}
+            <div className="px-5 py-5 border-b border-gray-100">
+              <section>
+                <Label vir="Kataster nepremičnin · GURS">Stanovanja in prostori ({deliStavbe.length})</Label>
+                <p className="text-sm text-gray-400 mb-3 flex items-center gap-1">
+                  <span>↓</span> Izberite enoto za podroben pregled
+                </p>
+                <div className="relative">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(showAllUnits ? sortedParts : sortedParts.slice(0, VISIBLE_DEFAULT + FADE_ROW)).map((d) => (
+                    <button
+                      key={d.stDela}
+                      onClick={() => setSelectedDel(d.stDela)}
+                      className={`rounded-md text-left cursor-pointer transition-all ${
+                        selectedDel === d.stDela
+                          ? "bg-green-50 border border-gray-200 border-l-4 border-l-[#2d6a4f] pl-3 py-3 pr-4"
+                          : "bg-white border border-gray-100 px-4 py-3 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-sm text-gray-800">Enota {d.stDela}</span>
                       </div>
-                    )}
-                    {/* Rooms row */}
-                    {d.prostori.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-500">Prostori: {d.prostori.length}</div>
-                    )}
+                      {(d.povrsina != null || d.uporabnaPovrsina != null) && (
+                        <div className="flex gap-6 mt-2">
+                          {d.povrsina != null && (
+                            <div>
+                              <div className="text-base font-medium text-gray-800 tabular-nums">{fmtDec(d.povrsina)} m²</div>
+                              <div className="text-xs text-gray-400">skupna površina</div>
+                            </div>
+                          )}
+                          {d.uporabnaPovrsina != null && (
+                            <div>
+                              <div className="text-base font-medium text-gray-800 tabular-nums">{fmtDec(d.uporabnaPovrsina)} m²</div>
+                              <div className="text-xs text-gray-400">uporabna površina</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {d.prostori.length > 0 && (
+                        <div className="mt-2 text-xs text-gray-500">Prostori: {d.prostori.length}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {!showAllUnits && sortedParts.length > VISIBLE_DEFAULT && (
+                  <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+                )}
+                </div>
+                {deliStavbe.length > VISIBLE_DEFAULT && (
+                  <button
+                    onClick={() => setShowAllUnits(!showAllUnits)}
+                    className="w-full mt-2 py-2 text-sm text-[#2d6a4f] hover:underline"
+                  >
+                    {showAllUnits
+                      ? "Skrij ↑"
+                      : `Prikaži vse enote (${deliStavbe.length}) ↓`}
                   </button>
-                ))}
-              </div>
-              {!showAllUnits && sortedParts.length > VISIBLE_DEFAULT && (
-                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-              )}
-              </div>
-              {deliStavbe.length > VISIBLE_DEFAULT && (
-                <button
-                  onClick={() => setShowAllUnits(!showAllUnits)}
-                  className="w-full mt-2 py-2 text-sm text-[#2d6a4f] hover:underline"
-                >
-                  {showAllUnits
-                    ? "Skrij ↑"
-                    : `Prikaži vse enote (${deliStavbe.length}) ↓`}
-                </button>
-              )}
-            </section>
+                )}
+              </section>
+            </div>
           )}
 
           {isMultiUnit && activePart && (
-            <section>
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 pb-3 border-b border-gray-100">
-                <button onClick={() => setSelectedDel(null)} className="hover:text-[#2d6a4f] transition-colors">
-                  Vse enote ({deliStavbe.length})
-                </button>
-                <span className="text-gray-300">/</span>
-                <span className="text-gray-800 font-medium">Enota {activePart.stDela}</span>
-              </div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">Enota {activePart.stDela}</h4>
-              <PartDetail part={activePart} />
-            </section>
+            <div className="px-5 py-5 border-b border-gray-100">
+              <section>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 pb-3 border-b border-gray-100">
+                  <button onClick={() => setSelectedDel(null)} className="hover:text-[#2d6a4f] transition-colors">
+                    Vse enote ({deliStavbe.length})
+                  </button>
+                  <span className="text-gray-300">/</span>
+                  <span className="text-gray-800 font-medium">Enota {activePart.stDela}</span>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Enota {activePart.stDela}</h4>
+                <PartDetail part={activePart} />
+              </section>
+            </div>
           )}
 
           {!isMultiUnit && filteredParts.length > 0 && (
-            <section>
-              <Label vir="Kataster nepremičnin · GURS">
-                {filteredParts.length === 1
-                  ? "Stanovanje"
-                  : `Stanovanja in prostori (${filteredParts.length})`}
-              </Label>
-              {filteredParts.map((d) => (
-                <PartDetail key={d.stDela} part={d} />
-              ))}
-            </section>
+            <div className="px-5 py-5 border-b border-gray-100">
+              <section>
+                <Label vir="Kataster nepremičnin · GURS">
+                  {filteredParts.length === 1
+                    ? "Stanovanje"
+                    : `Stanovanja in prostori (${filteredParts.length})`}
+                </Label>
+                {filteredParts.map((d) => (
+                  <PartDetail key={d.stDela} part={d} />
+                ))}
+              </section>
+            </div>
           )}
 
-          {/* L3: Stanje */}
-          <MaintenanceSection stavba={stavba} part={currentPart} />
-          <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
-          {/* Bug 1: skrij EIZ sekcijo za večstanovanjski objekt ko ni enota izbrana */}
-          {!(isMultiUnit && !(!!activePart || requestedDel != null)) && (
-            <EnergetskiIzracunSection
-              energetskaIzkaznica={energetskaIzkaznica}
-              unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
-              isMultiUnit={isMultiUnit}
-              hasSelectedUnit={!!activePart || requestedDel != null}
-              unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
-            />
-          )}
+          {/* 3. Stanje — vedno odprto */}
+          <div className="px-5 py-5 border-b border-gray-100">
+            <MaintenanceSection stavba={stavba} part={currentPart} />
+          </div>
 
+          {/* 4. Energetsko stanje — vedno odprto */}
+          <div className="px-5 py-5 border-b border-gray-100">
+            <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
+          </div>
+
+          {/* 5. Predlagani ukrepi — zložljivo, privzeto ODPRTO */}
           {stavba && (() => {
             const hasUnit = !!(activePart || requestedDel != null);
             const unitArea = currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null;
             const totalArea = stavba.povrsina ?? null;
             const stStan = stavba.steviloStanovanj;
-            // Delež skupnih stroškov samo ko je enota izbrana
             let delezSkupnih: string | null = null;
             if (hasUnit) {
               if (unitArea && totalArea && totalArea > 0) {
@@ -384,55 +410,72 @@ export function PropertyCard({
               }
             }
             const varstvo = jeVVarstveniConi(lat, lng);
+            const ukrepi = predlagajUkrepe(stavba, currentPart, delezSkupnih, null, varstvo);
+            if (ukrepi.length === 0) return null;
             return (
-              <EnergetskiUkrepiSection
-                ukrepi={predlagajUkrepe(stavba, currentPart, delezSkupnih, null, varstvo)}
-                delez={delezSkupnih}
-                varstvo={varstvo}
-                lat={lat}
-                lng={lng}
-                isMultiUnit={isMultiUnit}
-                hasSelectedUnit={hasUnit}
-                unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
-              />
+              <CollapsibleSection title="Predlagani ukrepi" vir="ZRMK/IZS referenčne cene 2024" defaultOpen={true}>
+                <EnergetskiUkrepiSection
+                  ukrepi={ukrepi}
+                  delez={delezSkupnih}
+                  varstvo={varstvo}
+                  lat={lat}
+                  lng={lng}
+                  isMultiUnit={isMultiUnit}
+                  hasSelectedUnit={hasUnit}
+                  unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
+                />
+              </CollapsibleSection>
             );
           })()}
 
-          {/* L4: Vrednost in lastništvo (vedno odprto) */}
-          <div className="border-t border-gray-100 pt-6 space-y-8">
-            <div>
-              <h3 className="text-base font-semibold text-gray-800">Vrednost in lastništvo</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Ocenjena vrednost, transakcije, lastništvo, parcele</p>
+          {/* 6. Stroški ogrevanja — vedno odprto (ko relevantno) */}
+          {!(isMultiUnit && !(!!activePart || requestedDel != null)) && (
+            <div className="px-5 py-5 border-b border-gray-100">
+              <EnergetskiIzracunSection
+                energetskaIzkaznica={energetskaIzkaznica}
+                unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
+                isMultiUnit={isMultiUnit}
+                hasSelectedUnit={!!activePart || requestedDel != null}
+                unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
+              />
             </div>
+          )}
+
+          {/* 7. Zavarovanje nepremičnine — zložljivo, privzeto ZAPRTO */}
+          <CollapsibleSection title="Zavarovanje nepremičnine" defaultOpen={false}>
+            <ZavarovanjeSection
+              naslov={naslov}
+              stavba={stavba}
+              seizmicniPodatki={seizmicniPodatki ?? null}
+              etaze={stavba.steviloEtaz}
+              poplavnaNevarnost={poplavnaNevarnost ?? null}
+              unitArea={activePart?.uporabnaPovrsina ?? activePart?.povrsina ?? null}
+            />
+          </CollapsibleSection>
+
+          {/* 8. Tržne transakcije (ETN) — zložljivo, privzeto ZAPRTO */}
+          {etnAnaliza && (
+            <CollapsibleSection title="Tržne transakcije" vir="ETN · GURS" defaultOpen={false}>
+              <VrednostnaAnalizaSection data={etnAnaliza} />
+            </CollapsibleSection>
+          )}
+
+          {/* Ocenjena vrednost — zložljivo, privzeto ZAPRTO */}
+          <CollapsibleSection title="Ocenjena vrednost" vir="Množično vrednotenje · GURS" defaultOpen={false}>
             <OcenaVrednostiSection
               renVrednost={renVrednost}
               currentPartVrednotenje={currentPart?.vrednotenje}
               deliStavbe={deliStavbe}
               hasSelectedUnit={!!(activePart || requestedDel != null)}
             />
-            <VrednostnaAnalizaSection data={etnAnaliza} />
-            {isMultiUnit && !activePart ? (
-              <LastnistvoMultiSection deliStavbe={deliStavbe} />
-            ) : (
-              <LastnistvoSection data={currentPart?.lastnistvo} />
-            )}
-            <ParceleSection parcele={parcele} />
+          </CollapsibleSection>
+
+          {/* 9. Storitve — vedno odprto */}
+          <div className="px-5 py-5 border-b border-gray-100">
+            <ServicesSection />
           </div>
 
-          {/* L5: Zavarovanje nepremičnine */}
-          <ZavarovanjeSection
-            naslov={naslov}
-            stavba={stavba}
-            seizmicniPodatki={seizmicniPodatki ?? null}
-            etaze={stavba.steviloEtaz}
-            poplavnaNevarnost={poplavnaNevarnost ?? null}
-            unitArea={activePart?.uporabnaPovrsina ?? activePart?.povrsina ?? null}
-          />
-
-          {/* L6: Storitve */}
-          <ServicesSection />
-
-          {/* L6: Izračunaj kredit */}
+          {/* Izračunaj kredit */}
           <div>
             <button
               onClick={() => setKreditOpen(!kreditOpen)}
@@ -449,19 +492,54 @@ export function PropertyCard({
           </div>
         </div>
 
-        {/* Right column: maps (40% on desktop) */}
-        <div className="hidden lg:block lg:w-[40%] min-w-0 overflow-hidden lg:border-l lg:border-gray-100 p-6 space-y-4 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
-          {/* 1. Google Maps aerial */}
-          <AerialMap lat={lat} lng={lng} naslov={naslov} showStreetView={false} />
-          {/* 2. Street View */}
-          <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
-          {/* 3. Cadastral map - parcel boundaries */}
+        {/* ── DESNI SIDEBAR — referenčni podatki ── */}
+        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-3 lg:sticky lg:top-4 p-4 lg:pl-0 lg:pr-4 lg:pt-4">
+
+          {/* 1. Katastrski načrt — fiksna višina 240px */}
           {lat && lng && (
-            <div>
-              <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-1.5">Geodetski načrt · GURS</p>
+            <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ height: "240px" }}>
               <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} obrisGeom={stavba?.obrisGeom ?? null} />
             </div>
           )}
+
+          {/* Aerialmap + StreetView */}
+          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <div className="px-4 py-3 space-y-3">
+              <AerialMap lat={lat} lng={lng} naslov={naslov} showStreetView={false} />
+              <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
+            </div>
+          </div>
+
+          {/* 2. Lastništvo */}
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+            {isMultiUnit && !activePart ? (
+              <LastnistvoMultiSection deliStavbe={deliStavbe} />
+            ) : (
+              <LastnistvoSection data={currentPart?.lastnistvo} />
+            )}
+          </div>
+
+          {/* 3. Parcele */}
+          {parcele && parcele.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <ParceleSection parcele={parcele} />
+            </div>
+          )}
+
+          {/* 4. O naslovu — referenčni podatki */}
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">O naslovu</p>
+            <div className="space-y-1 text-xs text-gray-600">
+              {lat != null && lng != null && (
+                <p>Koordinate: {lat.toFixed(6)}, {lng.toFixed(6)}</p>
+              )}
+              <p>KO ID: {enolicniId.koId}</p>
+              <p>Št. stavbe: {enolicniId.stStavbe}</p>
+              {enolicniId.stDelaStavbe != null && (
+                <p>Št. dela stavbe: {enolicniId.stDelaStavbe}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
