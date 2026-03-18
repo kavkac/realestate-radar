@@ -1218,7 +1218,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
         {ocena.dejavnikiPrilagoditve.length > 0 && (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
-              Prilagoditve · lastni algoritem ({ocena.prilagoditev > 0 ? "+" : ""}{ocena.prilagoditev} točk · razred {ocena.prilagoditev < 0 ? "boljši" : ocena.prilagoditev > 0 ? "slabši" : "nespremenjen"})
+              Upoštevani dejavniki
             </p>
             <ul className="space-y-0.5">
               {ocena.dejavnikiPrilagoditve.map((d, i) => (
