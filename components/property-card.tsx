@@ -841,10 +841,10 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
         {(() => {
           const g = stavba.gasInfrastructure;
-          if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">KN · GURS</span></span>;
-          if (g?.confidence === "high") return <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">verjetno priključen · plinovod ~{g.distanceM}m</span></span>;
-          if (g?.confidence === "medium") return <span className="text-gray-500">~ Plin <span className="text-xs text-gray-400">plinovod v bližini ~{g.distanceM}m, priključek ni potrjen</span></span>;
-          if (g?.confidence === "low") return <span className="text-gray-400">~ Plin <span className="text-xs">plinovod v okolici ~{g.distanceM}m</span></span>;
+          if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin</span>;
+          if (g?.confidence === "high") return <span><Check on={true} /> Plin <InfoTooltip text={`Ocena na podlagi ZK GJI podatkov. Plinovod oddaljen ~${g.distanceM}m — verjetno priključen. Uradnega podatka v katastru ni.`} /></span>;
+          if (g?.confidence === "medium") return <span className="text-gray-500">~ Plin <InfoTooltip text={`Plinovod v bližini (~${g.distanceM}m). Priključek ni potrjen v registru.`} /></span>;
+          if (g?.confidence === "low") return <span className="text-gray-400">~ Plin <InfoTooltip text={`Plinovod v okolici (~${g.distanceM}m). Priključek ni verjeten.`} /></span>;
           return <span><Check on={false} /> Plin</span>;
         })()}
         <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
