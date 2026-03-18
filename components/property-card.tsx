@@ -920,31 +920,29 @@ function EnergyMeter({ razred }: { razred: string }) {
   ];
 
   return (
-    <div className="flex flex-col gap-[2px] my-3 w-full max-w-[280px]">
+    <div className="my-3 w-full max-w-[320px] flex flex-col gap-[2px]">
       {classes.map((c) => {
         const isActive = c.label === razred;
         return (
-          <div key={c.label} className="flex items-center gap-1.5">
-            <span className="w-3 flex-shrink-0 text-[10px] font-bold text-gray-600">
-              {isActive ? "▶" : ""}
-            </span>
+          <div key={c.label} style={{ width: `${c.w}%` }}>
             <div
               style={{
-                width: `${c.w}%`,
                 backgroundColor: isActive ? c.color : `${c.color}55`,
-                height: isActive ? "24px" : "18px",
-                clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%)",
+                height: isActive ? "26px" : "19px",
+                clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "flex-end",
-                paddingRight: "13px",
+                paddingLeft: isActive ? "8px" : "4px",
+                paddingRight: "16px",
+                justifyContent: "space-between",
                 boxShadow: isActive ? `0 1px 6px ${c.color}55` : "none",
               }}
             >
+              <span style={{ fontSize: "10px", color: isActive ? "#fff" : "transparent", fontWeight: 700 }}>▶</span>
               <span style={{
                 fontSize: isActive ? "12px" : "10px",
                 fontWeight: "700",
-                color: isActive ? "#fff" : `${c.color}`,
+                color: isActive ? "#fff" : c.color,
                 lineHeight: 1,
               }}>
                 {c.label}
