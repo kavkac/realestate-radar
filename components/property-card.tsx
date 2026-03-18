@@ -993,9 +993,11 @@ function izracunajROI(ukrep: string, strosekSrednji: number, povrsina: number | 
     case "okna":
       return { min: Math.round(strosekSrednji / (p * 12)), max: Math.round(strosekSrednji / (p * 8)) };
     case "fasada":
-      return { min: Math.round(strosekSrednji / (p * 25)), max: Math.round(strosekSrednji / (p * 15)) };
+      // ~120 kWh/m²/yr × 25% redukcija × 0.10 €/kWh = 3 €/m²/yr prihranek
+      return { min: Math.round(strosekSrednji / (p * 3.5)), max: Math.round(strosekSrednji / (p * 2)) };
     case "streha":
-      return { min: Math.round(strosekSrednji / (p * 20)), max: Math.round(strosekSrednji / (p * 12)) };
+      // ~120 kWh/m²/yr × 15% redukcija × 0.10 €/kWh = 1.8 €/m²/yr prihranek
+      return { min: Math.round(strosekSrednji / (p * 2.5)), max: Math.round(strosekSrednji / (p * 1.5)) };
     case "ogrevanje":
       return { min: Math.round(strosekSrednji / 400), max: Math.round(strosekSrednji / 200) };
     default:
