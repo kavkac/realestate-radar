@@ -1203,7 +1203,7 @@ function predlagajUkrepe(
       skupniStrosekMin: stMin,
       skupniStrosekMax: stMax,
       osnova: `Glede na velikost stavbe: 15.000-40.000 €`,
-      prioriteta: strehaNujno ? "visoka" : (roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka"),
+      prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       vrednostDvig: 5,
