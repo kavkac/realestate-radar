@@ -2137,6 +2137,7 @@ function MaintenanceSection({
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Kdaj je potrebno vzdrževanje</Label>
+      <p className="text-xs text-gray-400 mb-3">Starost elementov je izračunana iz uradnih podatkov o obnovi. Kjer podatek ni vpisan v register, je starost ocenjena iz leta izgradnje stavbe.</p>
       {items.length === 0 ? (
         <p className="text-sm text-gray-400 italic">
           Ni nujnih vzdrževalnih posegov
@@ -2151,7 +2152,10 @@ function MaintenanceSection({
               <div className="text-gray-700 min-w-0">
                 <span className="font-medium">{item.name}</span>
                 <span className="ml-2 text-xs text-gray-400">
-                  ({item.age}/{item.lifespan} let{item.jeOcena ? ", ocena" : ""})
+                  ({item.age}/{item.lifespan} let
+                  {item.jeOcena && (
+                    <> · <span title="Leto zadnje obnove ni vpisano v register. Starost je ocenjena iz leta izgradnje stavbe.">ni podatka o obnovi ⓘ</span></>
+                  )})
                 </span>
               </div>
               <span
