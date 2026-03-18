@@ -49,75 +49,50 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
       className="h-[320px] lg:h-[400px] w-full rounded-lg z-0"
       attributionControl={true}
     >
-      {/* OSM base */}
+      {/* OSM fallback */}
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="&copy; OSM contributors"
         zIndex={0}
       />
 
-      {/* GURS ortofoto (satellite) */}
+      {/* GURS DOF satelitska podlaga — tloris se ujema z uradnimi koordinatami */}
       <WMSTileLayer
         url="https://storitve.eprostor.gov.si/ows-pub-wms/wms"
         layers="SI.GURS.DOF"
         format="image/png"
         transparent={false}
-        attribution="&copy; GURS"
+        attribution="&copy; GURS · Geodetska uprava RS"
         // @ts-expect-error react-leaflet v4 WMS typing
         srs="EPSG:3857"
         zIndex={1}
-        opacity={0.7}
       />
 
-      {/* Cadastral parcels WMS overlay */}
-      <WMSTileLayer
-        url="https://ipi.eprostor.gov.si/wms-si-gurs-kn/wms"
-        layers="SI.GURS.KN:PARCELE_H"
-        format="image/png"
-        transparent={true}
-        opacity={0.5}
-        // @ts-expect-error react-leaflet v4 WMS typing
-        srs="EPSG:3857"
-        zIndex={2}
-      />
-
-      {/* Buildings WMS overlay */}
-      <WMSTileLayer
-        url="https://ipi.eprostor.gov.si/wms-si-gurs-kn/wms"
-        layers="SI.GURS.KN:STAVBE_H"
-        format="image/png"
-        transparent={true}
-        opacity={0.7}
-        // @ts-expect-error react-leaflet v4 WMS typing
-        srs="EPSG:3857"
-        zIndex={3}
-      />
-
-      {/* Parcel boundaries — modra pikčasta kontura */}
+      {/* Parcelna meja — rumena debela zunanja črta (jasno ločena od stavbe) */}
       {validParcele.map((p, i) => (
         <GeoJSON
           key={`parcela-${i}`}
           data={p.geometry as unknown as GeoJSON.Geometry}
           style={{
-            color: "#1d4ed8",
-            weight: 2.5,
-            fillColor: "#3b82f6",
-            fillOpacity: 0.08,
-            dashArray: "6 4",
+            color: "#eab308",
+            weight: 3,
+            fillOpacity: 0,
+            dashArray: "8 5",
+            lineCap: "square" as const,
           }}
         />
       ))}
 
-      {/* Building footprint — krepka rdeča kontura, zapolnjena */}
+      {/* Tloris stavbe — bela obroba + rdeča polnitev */}
       {obrisGeom && (
         <GeoJSON
           key={JSON.stringify(obrisGeom.coordinates[0][0])}
           data={obrisGeom as GeoJSON.Polygon}
           style={{
-            color: "#dc2626",
-            weight: 3,
+            color: "#ffffff",
+            weight: 2,
             fillColor: "#ef4444",
-            fillOpacity: 0.25,
+            fillOpacity: 0.45,
           }}
         />
       )}
