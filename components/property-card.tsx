@@ -2098,7 +2098,7 @@ function MaintenanceSection({
         lifespan: m.lifespan,
         urgency: "Nujno",
         borderColor: "border-l-red-500",
-        pillClass: "bg-red-50 text-red-700",
+        pillClass: "text-red-600 font-semibold",
         jeOcena,
       });
     } else if (age >= m.lifespan * 0.85) {
@@ -2108,7 +2108,7 @@ function MaintenanceSection({
         lifespan: m.lifespan,
         urgency: "Priporočeno",
         borderColor: "border-l-amber-400",
-        pillClass: "bg-amber-50 text-amber-700",
+        pillClass: "text-amber-600 font-semibold",
         jeOcena,
       });
     } else if (age >= m.lifespan * 0.7) {
@@ -2118,7 +2118,7 @@ function MaintenanceSection({
         lifespan: m.lifespan,
         urgency: "Planirati",
         borderColor: "border-l-green-400",
-        pillClass: "bg-green-50 text-green-700",
+        pillClass: "text-green-600 font-semibold",
         jeOcena,
       });
     } else if (jeOcena) {
@@ -2129,7 +2129,7 @@ function MaintenanceSection({
         lifespan: m.lifespan,
         urgency: "V redu",
         borderColor: "border-l-gray-200",
-        pillClass: "bg-gray-50 text-gray-500",
+        pillClass: "text-gray-500 font-semibold",
         jeOcena,
       });
     }
@@ -2148,7 +2148,7 @@ function MaintenanceSection({
           {items.map((item) => (
             <div
               key={item.name}
-              className={`flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 border-l-4 ${item.borderColor} bg-white px-4 py-3 text-sm`}
+              className={`flex flex-wrap items-center justify-between gap-2 rounded border border-gray-100 border-l-4 ${item.borderColor} bg-white px-3 py-2 sm:px-4 sm:py-3 text-sm`}
             >
               <div className="text-gray-700 min-w-0">
                 <span className="font-medium">{item.name}</span>
@@ -2160,7 +2160,7 @@ function MaintenanceSection({
                 </span>
               </div>
               <span
-                className={`flex-shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${item.pillClass}`}
+                className={`flex-shrink-0 text-xs ${item.pillClass}`}
               >
                 {item.urgency}
               </span>

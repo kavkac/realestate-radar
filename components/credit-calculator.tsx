@@ -138,7 +138,7 @@ export function CreditCalculator() {
             <span className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
               Zahtevaj posvet
             </span>
-            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-400">
+            <span className="text-xs font-semibold text-gray-400">
               Kmalu
             </span>
           </div>

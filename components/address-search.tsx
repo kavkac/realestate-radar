@@ -546,7 +546,7 @@ export function AddressSearch() {
                 <button
                   key={tab.id}
                   onClick={() => handleSwitchTab(tab.id)}
-                  className={`group relative flex items-center gap-1.5 rounded-t-md px-3 py-2 text-sm whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
+                  className={`group relative flex items-center gap-1.5 rounded-t-md px-3 py-2 text-sm whitespace-nowrap transition-colors min-w-[100px] max-w-[220px] flex-shrink-0 ${
                     isActive
                       ? "bg-white border border-gray-200 border-b-0 rounded-t-md font-medium text-gray-900 z-10 -mb-px relative"
                       : "bg-gray-100 border border-gray-200 border-b-0 rounded-t-md text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
