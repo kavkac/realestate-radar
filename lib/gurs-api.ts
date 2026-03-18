@@ -607,20 +607,43 @@ export async function getParcele(
 
   let parceleData: WfsResponse | null = null;
 
+  // Izračunaj max dovoljeno površino parcele iz tlorisa stavbe
+  const buildingRing0 = obrisGeom?.coordinates?.[0];
+  let buildingAreaM2Tier12 = 0;
+  if (buildingRing0 && buildingRing0.length > 2) {
+    let area = 0;
+    for (let i = 0, j = buildingRing0.length - 1; i < buildingRing0.length; j = i++) {
+      area += (buildingRing0[j][0] + buildingRing0[i][0]) * (buildingRing0[j][1] - buildingRing0[i][1]);
+    }
+    buildingAreaM2Tier12 = Math.abs(area) / 2 * 111320 * 71000;
+  }
+  const maxParcelaAreaTier12 = buildingAreaM2Tier12 > 0
+    ? Math.min(Math.max(buildingAreaM2Tier12 * 20, 5000), 15000)
+    : 15000;
+
+  const isParcelaValid = (features: typeof parceleData extends null ? never[] : NonNullable<typeof parceleData>["features"]) => {
+    if (!features || features.length === 0) return false;
+    const area = features[0].properties?.POVRSINA as number | undefined;
+    if (area != null && area > maxParcelaAreaTier12) return false;
+    return true;
+  };
+
   if (stavbaData && stavbaData.features.length > 0) {
     const p = stavbaData.features[0].properties;
     const parcelaRef = p.PARCELA ?? p.ST_PARCELE;
 
     if (parcelaRef != null) {
       const parceleUrl = buildWfsUrl(BASE_KN, "SI.GURS.KN:PARCELE_H", `KO_ID=${koId} AND ST_PARCELE='${parcelaRef}'`) + "&SRSNAME=EPSG:4326";
-      parceleData = await fetchWfs(parceleUrl);
+      const res = await fetchWfs(parceleUrl);
+      if (isParcelaValid(res?.features ?? [])) parceleData = res;
     }
   }
 
   // Fallback: try linking by ST_STAVBE
   if (!parceleData || parceleData.features.length === 0) {
     const fallbackUrl = buildWfsUrl(BASE_KN, "SI.GURS.KN:PARCELE_H", `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`) + "&SRSNAME=EPSG:4326";
-    parceleData = await fetchWfs(fallbackUrl);
+    const res = await fetchWfs(fallbackUrl);
+    if (isParcelaValid(res?.features ?? [])) parceleData = res;
   }
 
   // Fallback 2: BBOX + point-in-polygon filter (INTERSECTS v GURS WFS ne deluje z EPSG:4326)
