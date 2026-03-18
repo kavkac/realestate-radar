@@ -2467,72 +2467,85 @@ function ZavarovanjeSection({
   const showTipStrehe = selectedTypes.includes("potresno") || selectedTypes.includes("pozarno");
   const showAlarm = selectedTypes.includes("pozarno");
 
-    // Tveganje za prikaz
-  const potresnoTveganje = potresno.tveganjeTocke >= 7 ? "visoko" : potresno.tveganjeTocke >= 4 ? "srednje" : "nizko";
-  const tveganjeBarva = potresnoTveganje === "visoko" ? "bg-red-100 border-red-200 text-red-800" : potresnoTveganje === "srednje" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-700";
-  const tveganjeIkona = potresnoTveganje === "visoko" ? "⚠" : potresnoTveganje === "srednje" ? "◈" : "✓";
+    // Underwriting dejavniki per tip
+  const letoIzgradnje = stavba.letoIzgradnje ?? null;
+  const konstrukcija = stavba.konstrukcija ?? "Ni podatka";
+  const etaze = stavba.steviloEtaz ?? 1;
+
+  const underwriting: Record<string, { label: string; value: string; rizik?: "visok" | "srednji" | "nizek" }[]> = {
+    potresno: [
+      { label: "Seizmična cona", value: `${seizmicni.cona} (PGA ${seizmicni.pga}g)`, rizik: seizmicni.cona === "IV" ? "visok" : seizmicni.cona === "III" ? "srednji" : "nizek" },
+      { label: "Ranljivost stavbe", value: `Razred ${potresno.razredRanljivosti} — ${potresno.opisRanljivosti}`, rizik: potresno.razredRanljivosti === "A" ? "visok" : potresno.razredRanljivosti === "B" ? "srednji" : "nizek" },
+      { label: "Leto izgradnje", value: letoIzgradnje ? String(letoIzgradnje) : "Ni podatka" },
+      { label: "Konstrukcija", value: konstrukcija },
+      { label: "Etaže", value: String(etaze) },
+      { label: "Površina", value: `${povrsina} m²` },
+      { label: "Zavarovalniška vsota", value: `${priporocenaVsota.toLocaleString("sl-SI")} €` },
+    ],
+    pozarno: [
+      { label: "Tip konstrukcije", value: jeMasivna ? "Masivna (opeka/beton)" : "Lahka (les/montažna)", rizik: jeMasivna ? "nizek" : "srednji" },
+      { label: "Ogrevanje", value: ogrevanje, rizik: stavba.prikljucki?.plin ? "srednji" : "nizek" },
+      { label: "Leto izgradnje", value: letoIzgradnje ? String(letoIzgradnje) : "Ni podatka" },
+      { label: "Površina", value: `${povrsina} m²` },
+      { label: "Zavarovalniška vsota", value: `${priporocenaVsota.toLocaleString("sl-SI")} €` },
+    ],
+    poplavno: [
+      { label: "Poplavna nevarnost (ARSO)", value: poplavnaNevarnost?.opis ?? `Stopnja: ${poplavnaNevarnost?.stopnja}`, rizik: "visok" },
+      { label: "Površina", value: `${povrsina} m²` },
+      { label: "Zavarovalniška vsota", value: `${priporocenaVsota.toLocaleString("sl-SI")} €` },
+    ],
+    odgovornost: [
+      { label: "Tip objekta", value: "Večstanovanjska stavba" },
+      { label: "Število stanovanj", value: String(stavba.steviloStanovanj ?? "—") },
+      { label: "Zavarovalniška vsota", value: "500.000 €" },
+    ],
+  };
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-2">
 
-      {/* Tveganje za to nepremičnino */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Tveganje za to nepremičnino</p>
-        <div className="grid grid-cols-1 gap-2">
-          {/* Potresno tveganje */}
-          <div className={`rounded-lg border px-4 py-3 flex items-start justify-between gap-3 ${tveganjeBarva}`}>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide">Potresno tveganje</p>
-              <p className="text-sm mt-0.5">Seizmična cona {seizmicni.cona} · PGA {seizmicni.pga}g · Ranljivost {potresno.razredRanljivosti}</p>
-              <p className="text-xs mt-1 opacity-75">{seizmicni.opisCone}</p>
-            </div>
-            <span className="text-lg flex-shrink-0 mt-0.5">{tveganjeIkona}</span>
-          </div>
-          {/* Poplavno tveganje */}
-          {imaPoplavo && poplavnaNevarnost && (
-            <div className="rounded-lg border px-4 py-3 flex items-start justify-between gap-3 bg-blue-50 border-blue-200 text-blue-800">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide">Poplavno tveganje</p>
-                <p className="text-sm mt-0.5">{poplavnaNevarnost.opis ?? `Stopnja: ${poplavnaNevarnost.stopnja}`}</p>
-              </div>
-              <span className="text-lg flex-shrink-0 mt-0.5">⚠</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Kartice tipov */}
-      <div className="space-y-2">
+      {/* Kartice tipov z underwriting podatki */}
+      <div className="space-y-3">
         {vsiTipi.map((tip) => {
           const checked = selectedTypes.includes(tip.id);
+          const uw = underwriting[tip.id] ?? [];
           return (
-            <button
-              key={tip.id}
-              onClick={() => toggleType(tip.id)}
-              className={`w-full text-left rounded-lg border px-4 py-3 transition-all ${
-                checked ? "border-[#2d6a4f] bg-green-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                  checked ? "bg-[#2d6a4f] border-[#2d6a4f]" : "border-gray-300 bg-white"
-                }`}>
+            <div key={tip.id} className={`rounded-lg border transition-all ${checked ? "border-[#2d6a4f] shadow-sm" : "border-gray-200"}`}>
+              {/* Header — klikabilen za toggle */}
+              <button
+                onClick={() => toggleType(tip.id)}
+                className={`w-full text-left px-4 py-3 rounded-t-lg flex items-start gap-3 transition-colors ${checked ? "bg-green-50" : "bg-white hover:bg-gray-50"}`}
+              >
+                <div className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-[#2d6a4f] border-[#2d6a4f]" : "border-gray-300 bg-white"}`}>
                   {checked && <span className="text-white text-[10px] font-bold leading-none">&#10003;</span>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-wide text-gray-700">{tip.naziv}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-800">{tip.naziv}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{tip.opis}</p>
-                  <div className="flex flex-wrap gap-x-4 mt-1.5 text-xs text-gray-500">
-                    <span>Vsota: <strong className="text-gray-700">{tip.vsota.toLocaleString("sl-SI")} &euro;</strong></span>
-                    <span>Premija: ~<strong className="text-gray-700">{tip.premijaMin.toLocaleString("sl-SI")} &ndash; {tip.premijaMax.toLocaleString("sl-SI")} &euro;/leto</strong></span>
+                  <div className="flex flex-wrap gap-x-4 mt-1 text-xs text-gray-600">
+                    <span>Vsota: <strong>{tip.vsota.toLocaleString("sl-SI")} &euro;</strong></span>
+                    <span>Premija: ~<strong>{tip.premijaMin.toLocaleString("sl-SI")} – {tip.premijaMax.toLocaleString("sl-SI")} &euro;/leto</strong></span>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-0.5">Osnova: {tip.osnova}</p>
+                </div>
+              </button>
+              {/* Underwriting dejavniki — vedno vidni */}
+              <div className={`border-t px-4 py-3 rounded-b-lg ${checked ? "border-green-200 bg-white" : "border-gray-100 bg-gray-50"}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Dejavniki tveganja</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {uw.map((r, i) => (
+                    <div key={i} className="flex items-baseline gap-1.5">
+                      <span className="text-[11px] text-gray-500 flex-shrink-0">{r.label}:</span>
+                      <span className={`text-[11px] font-medium flex-1 ${r.rizik === "visok" ? "text-red-600" : r.rizik === "srednji" ? "text-amber-600" : "text-gray-700"}`}>{r.value}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
+
+
 
       <button
         disabled={selectedTypes.length === 0}
