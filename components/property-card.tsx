@@ -271,7 +271,7 @@ export function PropertyCard({
                     {/* Header row: unit number left, type label right */}
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-sm text-gray-800">Enota {d.stDela}</span>
-                      {/* d.vrsta hidden — WFS vrača napačne vrednosti; prikazati ko bo KN bulk import */}
+                      {/* d.vrsta hidden - WFS vrača napačne vrednosti; prikazati ko bo KN bulk import */}
                     </div>
                     {/* Area row: skupna left, uporabna right */}
                     {(d.povrsina != null || d.uporabnaPovrsina != null) && (
@@ -582,10 +582,10 @@ function PropertySummary({ stavba, deliStavbe, energetskaIzkaznica }: {
   const prekoracene = komponente.filter(k => k.starost > k.zivljenjska);
   let stavek1 = "";
   if (prekoracene.length >= 3) {
-    stavek1 = `Stavba je stara ${letnica - leto} let. Fasada, streha in instalacije so presegle priporočeno življenjsko dobo — investicija v prenovo je visoko verjetna.`;
+    stavek1 = `Stavba je stara ${letnica - leto} let. Fasada, streha in instalacije so presegle priporočeno življenjsko dobo - investicija v prenovo je visoko verjetna.`;
   } else if (prekoracene.length === 2) {
     const imena = prekoracene.map(k => k.ime).join(" in ");
-    stavek1 = `Stavba je stara ${letnica - leto} let. ${imena.charAt(0).toUpperCase() + imena.slice(1)} presegata priporočeno življenjsko dobo — pričakujte stroške prenove.`;
+    stavek1 = `Stavba je stara ${letnica - leto} let. ${imena.charAt(0).toUpperCase() + imena.slice(1)} presegata priporočeno življenjsko dobo - pričakujte stroške prenove.`;
   } else if (prekoracene.length === 1) {
     stavek1 = `Stavba je stara ${letnica - leto} let. ${prekoracene[0].ime.charAt(0).toUpperCase() + prekoracene[0].ime.slice(1)} presega priporočeno življenjsko dobo ${prekoracene[0].zivljenjska} let.`;
   } else {
@@ -693,7 +693,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
               : null
           }
         />
-        {/* Namembnost (KN) hidden — WFS vrača napačne vrednosti; prikazati ko bo KN bulk import */}
+        {/* Namembnost (KN) hidden - WFS vrača napačne vrednosti; prikazati ko bo KN bulk import */}
         <div className="col-span-2 sm:col-span-3 -mt-2">
           <p className="text-[10px] text-gray-400">Kataster nepremičnin, GURS</p>
         </div>
@@ -798,38 +798,38 @@ function oceniEnergetskiRazred(stavba: {
   const dejavnikiBaza: string[] = [];
   const dejavnikiPrilagoditve: string[] = [];
 
-  // Faza 1 — Standard (PURES 2010 / EN ISO 52000): samo leto izgradnje
+  // Faza 1 - Standard (PURES 2010 / EN ISO 52000): samo leto izgradnje
   let scoreBaza = 0;
-  if (leto < 1946)      { scoreBaza = 95; dejavnikiBaza.push(`Zgrajeno pred 1946 — brez toplotne zaščite`); }
-  else if (leto < 1960) { scoreBaza = 88; dejavnikiBaza.push(`Zgrajeno ${leto} — predvojna gradnja`); }
-  else if (leto < 1974) { scoreBaza = 82; dejavnikiBaza.push(`Zgrajeno ${leto} — pred energetsko krizo`); }
-  else if (leto < 1980) { scoreBaza = 74; dejavnikiBaza.push(`Zgrajeno ${leto} — začetek toplotne izolacije`); }
-  else if (leto < 1988) { scoreBaza = 68; dejavnikiBaza.push(`Zgrajeno ${leto} — minimalni standardi`); }
-  else if (leto < 1994) { scoreBaza = 60; dejavnikiBaza.push(`Zgrajeno ${leto} — JUS standardi`); }
-  else if (leto < 2002) { scoreBaza = 52; dejavnikiBaza.push(`Zgrajeno ${leto} — delna toplotna izolacija`); }
-  else if (leto < 2006) { scoreBaza = 42; dejavnikiBaza.push(`Zgrajeno ${leto} — PURES 2002`); }
-  else if (leto < 2010) { scoreBaza = 36; dejavnikiBaza.push(`Zgrajeno ${leto} — PURES 2002 (strožji)`); }
-  else if (leto < 2013) { scoreBaza = 28; dejavnikiBaza.push(`Zgrajeno ${leto} — PURES 2010`); }
-  else if (leto < 2016) { scoreBaza = 22; dejavnikiBaza.push(`Zgrajeno ${leto} — PURES 2010 (strožji)`); }
-  else if (leto < 2021) { scoreBaza = 15; dejavnikiBaza.push(`Zgrajeno ${leto} — nizko-energijska gradnja`); }
-  else                  { scoreBaza = 8;  dejavnikiBaza.push(`Zgrajeno ${leto} — skoraj nič-energijska gradnja`); }
+  if (leto < 1946)      { scoreBaza = 95; dejavnikiBaza.push(`Zgrajeno pred 1946 - brez toplotne zaščite`); }
+  else if (leto < 1960) { scoreBaza = 88; dejavnikiBaza.push(`Zgrajeno ${leto} - predvojna gradnja`); }
+  else if (leto < 1974) { scoreBaza = 82; dejavnikiBaza.push(`Zgrajeno ${leto} - pred energetsko krizo`); }
+  else if (leto < 1980) { scoreBaza = 74; dejavnikiBaza.push(`Zgrajeno ${leto} - začetek toplotne izolacije`); }
+  else if (leto < 1988) { scoreBaza = 68; dejavnikiBaza.push(`Zgrajeno ${leto} - minimalni standardi`); }
+  else if (leto < 1994) { scoreBaza = 60; dejavnikiBaza.push(`Zgrajeno ${leto} - JUS standardi`); }
+  else if (leto < 2002) { scoreBaza = 52; dejavnikiBaza.push(`Zgrajeno ${leto} - delna toplotna izolacija`); }
+  else if (leto < 2006) { scoreBaza = 42; dejavnikiBaza.push(`Zgrajeno ${leto} - PURES 2002`); }
+  else if (leto < 2010) { scoreBaza = 36; dejavnikiBaza.push(`Zgrajeno ${leto} - PURES 2002 (strožji)`); }
+  else if (leto < 2013) { scoreBaza = 28; dejavnikiBaza.push(`Zgrajeno ${leto} - PURES 2010`); }
+  else if (leto < 2016) { scoreBaza = 22; dejavnikiBaza.push(`Zgrajeno ${leto} - PURES 2010 (strožji)`); }
+  else if (leto < 2021) { scoreBaza = 15; dejavnikiBaza.push(`Zgrajeno ${leto} - nizko-energijska gradnja`); }
+  else                  { scoreBaza = 8;  dejavnikiBaza.push(`Zgrajeno ${leto} - skoraj nič-energijska gradnja`); }
 
-  // Faza 2 — Prilagoditve (naš algoritem): vse korekcije v točkah (negativno = boljše)
+  // Faza 2 - Prilagoditve (naš algoritem): vse korekcije v točkah (negativno = boljše)
   let adj = 0;
 
   const letaFasade = stavba.letoObnove.fasade;
   if (letaFasade) {
     const starost = zdaj - letaFasade;
-    if (starost <= 5)       { adj -= 22; dejavnikiPrilagoditve.push(`Fasada obnovljena ${letaFasade} — nova toplotna izolacija`); }
-    else if (starost <= 10) { adj -= 18; dejavnikiPrilagoditve.push(`Fasada obnovljena ${letaFasade} — dobra toplotna izolacija`); }
-    else if (starost <= 20) { adj -= 10; dejavnikiPrilagoditve.push(`Fasada obnovljena ${letaFasade} — delna izboljšava`); }
+    if (starost <= 5)       { adj -= 22; dejavnikiPrilagoditve.push(`Fasada obnovljena ${letaFasade} - nova toplotna izolacija`); }
+    else if (starost <= 10) { adj -= 18; dejavnikiPrilagoditve.push(`Fasada obnovljena ${letaFasade} - dobra toplotna izolacija`); }
+    else if (starost <= 20) { adj -= 10; dejavnikiPrilagoditve.push(`Fasada obnovljena ${letaFasade} - delna izboljšava`); }
     else                    { adj -= 4;  dejavnikiPrilagoditve.push(`Fasada obnovljena ${letaFasade}`); }
   }
 
   const letaStrehe = stavba.letoObnove.strehe;
   if (letaStrehe) {
     const starost = zdaj - letaStrehe;
-    if (starost <= 5)       { adj -= 10; dejavnikiPrilagoditve.push(`Streha obnovljena ${letaStrehe} — nova toplotna zaščita`); }
+    if (starost <= 5)       { adj -= 10; dejavnikiPrilagoditve.push(`Streha obnovljena ${letaStrehe} - nova toplotna zaščita`); }
     else if (starost <= 15) { adj -= 7;  dejavnikiPrilagoditve.push(`Streha obnovljena ${letaStrehe}`); }
     else                    { adj -= 3;  dejavnikiPrilagoditve.push(`Streha obnovljena ${letaStrehe}`); }
   }
@@ -837,7 +837,7 @@ function oceniEnergetskiRazred(stavba: {
   const letaOken = part?.letoObnoveOken;
   if (letaOken) {
     const starost = zdaj - letaOken;
-    if (starost <= 5)       { adj -= 10; dejavnikiPrilagoditve.push(`Okna obnovljena ${letaOken} — energijsko varčna okna`); }
+    if (starost <= 5)       { adj -= 10; dejavnikiPrilagoditve.push(`Okna obnovljena ${letaOken} - energijsko varčna okna`); }
     else if (starost <= 10) { adj -= 7;  dejavnikiPrilagoditve.push(`Okna obnovljena ${letaOken}`); }
     else                    { adj -= 3;  dejavnikiPrilagoditve.push(`Okna obnovljena ${letaOken}`); }
   }
@@ -854,13 +854,13 @@ function oceniEnergetskiRazred(stavba: {
   if (etaza != null) {
     if (etaza === 1) {
       adj += 4;
-      dejavnikiPrilagoditve.push(`Pritlična enota — večje toplotne izgube skozi tla`);
+      dejavnikiPrilagoditve.push(`Pritlična enota - večje toplotne izgube skozi tla`);
     } else if (etaza === skupajEtaz) {
       adj += 5;
-      dejavnikiPrilagoditve.push(`Enota v zadnji etaži — večje toplotne izgube skozi streho`);
+      dejavnikiPrilagoditve.push(`Enota v zadnji etaži - večje toplotne izgube skozi streho`);
     } else {
       adj -= 2;
-      dejavnikiPrilagoditve.push(`Enota v srednji etaži — manjše toplotne izgube`);
+      dejavnikiPrilagoditve.push(`Enota v srednji etaži - manjše toplotne izgube`);
     }
   }
 
@@ -869,50 +869,50 @@ function oceniEnergetskiRazred(stavba: {
   if (visina != null && visina > 0) {
     if (visina > 20) {
       adj += 3;
-      dejavnikiPrilagoditve.push(`Visoka stavba (${visina.toFixed(0)} m) — večji A/V razmernik`);
+      dejavnikiPrilagoditve.push(`Visoka stavba (${visina.toFixed(0)} m) - večji A/V razmernik`);
     } else if (visina < 7) {
       adj += 2;
-      dejavnikiPrilagoditve.push(`Nizka stavba (${visina.toFixed(0)} m) — neugodna oblika`);
+      dejavnikiPrilagoditve.push(`Nizka stavba (${visina.toFixed(0)} m) - neugodna oblika`);
     }
   }
 
-  // Tip položaja — izpostavljenost zunanjim stenam
+  // Tip položaja - izpostavljenost zunanjim stenam
   const tip = stavba.tipPolozaja;
   if (tip === "vmesna vrstna") {
     adj -= 8;
-    dejavnikiPrilagoditve.push(`Vmesna vrstna stavba — 2 izpostavljeni fasadi, manj toplotnih izgub`);
+    dejavnikiPrilagoditve.push(`Vmesna vrstna stavba - 2 izpostavljeni fasadi, manj toplotnih izgub`);
   } else if (tip === "vogalna") {
     adj -= 4;
-    dejavnikiPrilagoditve.push(`Vogalna stavba — 3 izpostavljene fasade`);
+    dejavnikiPrilagoditve.push(`Vogalna stavba - 3 izpostavljene fasade`);
   } else if (tip === "samostojna") {
     adj += 5;
-    dejavnikiPrilagoditve.push(`Samostojna stavba — 4 izpostavljene fasade, večje toplotne izgube`);
+    dejavnikiPrilagoditve.push(`Samostojna stavba - 4 izpostavljene fasade, večje toplotne izgube`);
   }
 
   const konstr = stavba.konstrukcija?.toLowerCase() ?? "";
   if (konstr.includes("mont") || konstr.includes("panel")) {
     adj += 8;
-    dejavnikiPrilagoditve.push(`Montažna konstrukcija — nižja toplotna masa`);
+    dejavnikiPrilagoditve.push(`Montažna konstrukcija - nižja toplotna masa`);
   } else if (konstr.includes("les")) {
     adj += 5;
     dejavnikiPrilagoditve.push(`Lesena konstrukcija`);
   } else if (konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton")) {
     adj -= 3;
-    dejavnikiPrilagoditve.push(`Masivna konstrukcija — dobra toplotna masa`);
+    dejavnikiPrilagoditve.push(`Masivna konstrukcija - dobra toplotna masa`);
   }
 
   // Fix 1: Uporabi ZK GJI gasInfrastructure (zanesljiv) pred prikljucki.plin (nezanesljiv)
   const imaPlin = stavba.gasInfrastructure ?? (stavba.prikljucki?.plin ?? false);
   if (!imaPlin) {
     adj += 5;
-    dejavnikiPrilagoditve.push(`Brez plinskega priključka — verjetno električno ogrevanje`);
+    dejavnikiPrilagoditve.push(`Brez plinskega priključka - verjetno električno ogrevanje`);
   }
 
   // Kompaktnost (1.27 = kvadrat, višje = manj kompaktno, slabše)
   const k = stavba.kompaktnost;
   if (k != null) {
-    if (k < 1.4) { adj -= 4; dejavnikiPrilagoditve.push(`Kompaktna oblika stavbe — manjše toplotne izgube`); }
-    else if (k > 2.0) { adj += 5; dejavnikiPrilagoditve.push(`Podolgovata oblika stavbe — večje toplotne izgube`); }
+    if (k < 1.4) { adj -= 4; dejavnikiPrilagoditve.push(`Kompaktna oblika stavbe - manjše toplotne izgube`); }
+    else if (k > 2.0) { adj += 5; dejavnikiPrilagoditve.push(`Podolgovata oblika stavbe - večje toplotne izgube`); }
     else if (k > 1.7) { adj += 2; dejavnikiPrilagoditve.push(`Nekoliko podolgovata oblika stavbe`); }
   }
 
@@ -920,14 +920,15 @@ function oceniEnergetskiRazred(stavba: {
   const or = stavba.orientacija;
   if (or === "J" || or === "JZ" || or === "JV") {
     adj -= 3;
-    dejavnikiPrilagoditve.push(`${or} orientacija — pasivni solarni prispevek`);
+    dejavnikiPrilagoditve.push(`${or} orientacija - pasivni solarni prispevek`);
   } else if (or === "S" || or === "SV" || or === "SZ") {
     adj += 3;
-    dejavnikiPrilagoditve.push(`${or} orientacija — manj solarnih dobitkov`);
+    dejavnikiPrilagoditve.push(`${or} orientacija - manj solarnih dobitkov`);
   }
 
   const stDejavnikov = [letaFasade, letaStrehe, letaOken, letaInstalacij].filter(Boolean).length;
-  const zaupanje = stDejavnikov >= 3 ? "visoko" : stDejavnikov >= 1 ? "srednje" : "nizko";
+  // Algoritmična ocena brez uradne EIZ ne more biti "visoko zaupanje"
+  const zaupanje = stDejavnikov >= 1 ? "srednje" : "nizko";
 
   function toRazred(s: number): string {
     const sc = Math.max(0, Math.min(100, s));
@@ -959,15 +960,15 @@ const zaupanjeColor = {
 } as const;
 
 const zaupanjeBesedilo = {
-  visoko: "Ocena temelji na letu izgradnje in podatkih o vseh večjih prenovah. To ni uradna energetska izkaznica.",
-  srednje: "Ocena temelji na delnih podatkih o prenovah. Natančnost je omejena. To ni uradna energetska izkaznica.",
-  nizko: "Ocena temelji zgolj na letu izgradnje — podatkov o prenovah nimamo. To ni uradna energetska izkaznica.",
+  visoko: "Ocena temelji na uradni energetski izkaznici.",
+  srednje: "Algoritmična ocena na podlagi leta izgradnje in podatkov o prenovah iz katastra. Natančnost je omejena - za zanesljive podatke je potrebna uradna energetska izkaznica.",
+  nizko: "Algoritmična ocena temelji zgolj na letu izgradnje. Podatkov o prenovah ni - napaka ocene je visoka.",
 } as const;
 
 const zaupanjeLabel = {
-  visoko: "Visoko zaupanje",
-  srednje: "Srednje zaupanje",
-  nizko: "Nizko zaupanje",
+  visoko: "Uradna izkaznica",
+  srednje: "Algoritmična ocena",
+  nizko: "Nizka zanesljivost",
 } as const;
 
 // --- Energetski ukrepi ---
@@ -986,6 +987,7 @@ interface Ukrep {
   dobaPovrnitveMax: number;
   varstvoCene?: boolean; // true = cene prilagojene za kulturno dediščino
   vrednostDvig?: number; // % ocenjenega dviga vrednosti nepremičnine po izvedbi
+  kategorija: "vzdrzevanje" | "energetika";
 }
 
 function izracunajROI(ukrep: string, strosekSrednji: number, povrsina: number | null): { min: number; max: number } {
@@ -1006,14 +1008,14 @@ function izracunajROI(ukrep: string, strosekSrednji: number, povrsina: number | 
   }
 }
 
-// Varstvo kulturne dediščine — geometrijska detekcija
+// Varstvo kulturne dediščine - geometrijska detekcija
 const VARSTVENA_OBMOCJA = [
-  { naziv: "Ljubljana — Staro mestno jedro (EUP LJ-411)", latMin: 46.044, latMax: 46.052, lngMin: 14.500, lngMax: 14.513 },
-  { naziv: "Ljubljana — Mestni trg in okolica", latMin: 46.046, latMax: 46.051, lngMin: 14.503, lngMax: 14.511 },
-  { naziv: "Piran — Staro mestno jedro", latMin: 45.525, latMax: 45.532, lngMin: 13.566, lngMax: 13.577 },
-  { naziv: "Ptuj — Zgodovinsko mestno jedro", latMin: 46.418, latMax: 46.423, lngMin: 15.868, lngMax: 15.880 },
-  { naziv: "Kranj — Staro mestno jedro", latMin: 46.237, latMax: 46.242, lngMin: 14.354, lngMax: 14.363 },
-  { naziv: "Maribor — Staro mestno jedro", latMin: 46.556, latMax: 46.562, lngMin: 15.644, lngMax: 15.652 },
+  { naziv: "Ljubljana - Staro mestno jedro (EUP LJ-411)", latMin: 46.044, latMax: 46.052, lngMin: 14.500, lngMax: 14.513 },
+  { naziv: "Ljubljana - Mestni trg in okolica", latMin: 46.046, latMax: 46.051, lngMin: 14.503, lngMax: 14.511 },
+  { naziv: "Piran - Staro mestno jedro", latMin: 45.525, latMax: 45.532, lngMin: 13.566, lngMax: 13.577 },
+  { naziv: "Ptuj - Zgodovinsko mestno jedro", latMin: 46.418, latMax: 46.423, lngMin: 15.868, lngMax: 15.880 },
+  { naziv: "Kranj - Staro mestno jedro", latMin: 46.237, latMax: 46.242, lngMin: 14.354, lngMax: 14.363 },
+  { naziv: "Maribor - Staro mestno jedro", latMin: 46.556, latMax: 46.562, lngMin: 15.644, lngMax: 15.652 },
 ];
 
 function jeVVarstveniConi(lat: number | null | undefined, lng: number | null | undefined): { varuje: boolean; naziv: string | null } {
@@ -1068,13 +1070,14 @@ function predlagajUkrepe(
       strosekMin: stMin,
       strosekMax: stMax,
       osnova: varstvo.varuje
-        ? `Lesena okna po meri (ZVKDS smernice) × ${okenCenaMin}–${okenCenaMax} €/m²`
-        : `Ocena: ~15% stanovanjske površine (${povrsina ? Math.round(povrsina * 0.15) + ' m²' : 'neznano'}) × 450–650 €/m²`,
+        ? `Lesena okna po meri (ZVKDS smernice) × ${okenCenaMin}-${okenCenaMax} €/m²`
+        : `Ocena: ~15% stanovanjske površine (${povrsina ? Math.round(povrsina * 0.15) + ' m²' : 'neznano'}) × 450-650 €/m²`,
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       varstvoCene: varstvo.varuje,
       vrednostDvig: 3,
+      kategorija: "energetika",
     });
   }
 
@@ -1094,21 +1097,24 @@ function predlagajUkrepe(
         : `Ogrevalni sistem ni bil obnovljen. Posodobitev bistveno zmanjša stroške ogrevanja.`,
       strosekMin: stMin,
       strosekMax: stMax,
-      osnova: "Toplotna črpalka zrak-voda: 8.000–12.000 €; kondenzacijski kotel: 3.500–6.000 €",
+      osnova: "Toplotna črpalka zrak-voda: 8.000-12.000 €; kondenzacijski kotel: 3.500-6.000 €",
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       vrednostDvig: 4,
+      kategorija: "energetika",
     });
   }
 
   // 3. FASADA
+  const LIFESPAN_FASADE = 30;
   const letaFasade = stavba?.letoObnove?.fasade;
   const starFasade = letaFasade ? zdaj - letaFasade : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
+  const fasadaNujno = starFasade > LIFESPAN_FASADE;
   if (starFasade > 25) {
     const visinaMerov = stavba?.visina && stavba.visina > 0 ? stavba.visina : 12;
     const ocenjenaPovFasade = povrsina ? Math.round(Math.sqrt(povrsina) * 4 * visinaMerov) : 400;
-    // Varstvo: apnena malta, tradicionalni materiali → 180–280 €/m² (vs 80–130 €/m²)
+    // Varstvo: apnena malta, tradicionalni materiali → 180-280 €/m² (vs 80-130 €/m²)
     const fasadaCenaMin = varstvo.varuje ? 180 : 80;
     const fasadaCenaMax = varstvo.varuje ? 280 : 130;
     const skupniMin = Math.round(ocenjenaPovFasade * fasadaCenaMin);
@@ -1120,7 +1126,7 @@ function predlagajUkrepe(
     const delezStrosekSrednji = delezNum ? Math.round(stSrednji * delezNum) : stSrednji;
     const roi = izracunajROI("fasada", delezStrosekSrednji, povrsina);
     const opisFasada = varstvo.varuje
-      ? `POZOR — Stavba se nahaja v varstvenem območju kulturne dediščine (${varstvo.naziv}). Obnova fasade zahteva predhodno soglasje ZVKDS. Dovoljeni so samo materiali, ki ohranjajo historični izgled (apnena malta, tradicionalne barve). Kontaktirajte Zavod za varstvo kulturne dediščine: zvkds@zvkds.si`
+      ? `POZOR - Stavba se nahaja v varstvenem območju kulturne dediščine (${varstvo.naziv}). Obnova fasade zahteva predhodno soglasje ZVKDS. Dovoljeni so samo materiali, ki ohranjajo historični izgled (apnena malta, tradicionalne barve). Kontaktirajte Zavod za varstvo kulturne dediščine: zvkds@zvkds.si`
       : `Celostna obnova fasade z mineralnimi ploščami (λ ≤ 0,035 W/mK, debelina ≥ 15 cm). ${letaFasade ? `Fasada je bila nazadnje obnovljena ${letaFasade}. ` : ""}Ukrep zmanjša potrebo po ogrevanju za 20-40%.`;
     ukrepi.push({
       naziv: varstvo.varuje ? "Obnova fasade po ZVKDS smernicah" : "Toplotna izolacija fasade (ETICS sistem)",
@@ -1131,18 +1137,21 @@ function predlagajUkrepe(
       strosekMax: delezMax ?? skupniMax,
       skupniStrosekMin: skupniMin,
       skupniStrosekMax: skupniMax,
-      osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × ${fasadaCenaMin}–${fasadaCenaMax} €/m²${varstvo.varuje ? " (apnena malta, ZVKDS materiali)" : ""}`,
-      prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
+      osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × ${fasadaCenaMin}-${fasadaCenaMax} €/m²${varstvo.varuje ? " (apnena malta, ZVKDS materiali)" : ""}`,
+      prioriteta: fasadaNujno ? "visoka" : (roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka"),
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       varstvoCene: varstvo.varuje,
       vrednostDvig: varstvo.varuje ? 8 : 6,
+      kategorija: fasadaNujno ? "vzdrzevanje" : "energetika",
     });
   }
 
   // 4. STREHA
+  const LIFESPAN_STREHE = 40;
   const letaStrehe = stavba?.letoObnove?.strehe;
   const starStrehe = letaStrehe ? zdaj - letaStrehe : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
+  const strehaNujno = starStrehe > LIFESPAN_STREHE;
   if (starStrehe > 30) {
     const stMin = 15000;
     const stMax = 40000;
@@ -1161,11 +1170,12 @@ function predlagajUkrepe(
       strosekMax: strehaDelezMax ?? stMax,
       skupniStrosekMin: stMin,
       skupniStrosekMax: stMax,
-      osnova: `Glede na velikost stavbe: 15.000–40.000 €`,
-      prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
+      osnova: `Glede na velikost stavbe: 15.000-40.000 €`,
+      prioriteta: strehaNujno ? "visoka" : (roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka"),
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       vrednostDvig: 5,
+      kategorija: strehaNujno ? "vzdrzevanje" : "energetika",
     });
   }
 
@@ -1201,27 +1211,27 @@ function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: 
         {/* Opis */}
         <p className="text-xs text-gray-500 mb-2">{u.opis}</p>
 
-        {/* Strošek + ROI — linearen prikaz */}
+        {/* Strošek + ROI - linearen prikaz */}
         {showDelez ? (
           <div className="space-y-1">
             <div>
               <span className="text-xs text-gray-400">Skupni strošek objekta: </span>
               <span className="text-xs text-gray-400">
-                {u.skupniStrosekMin!.toLocaleString("sl-SI")}–{u.skupniStrosekMax!.toLocaleString("sl-SI")} €
+                {u.skupniStrosekMin!.toLocaleString("sl-SI")}-{u.skupniStrosekMax!.toLocaleString("sl-SI")} €
               </span>
             </div>
             <div>
               <span className="text-xs text-gray-500">Vaš delež ({delez}): </span>
               <span className="text-sm font-semibold text-gray-800">
-                {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
+                {u.strosekMin.toLocaleString("sl-SI")}-{u.strosekMax.toLocaleString("sl-SI")} €
               </span>
             </div>
             {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
-              <p className="text-xs text-purple-700">Vzdrževalna obveznost — preverite subvencije (EkoSklad, EU skladi)</p>
+              <p className="text-xs text-purple-700">Vzdrževalna obveznost - preverite subvencije (EkoSklad, EU skladi)</p>
             ) : u.dobaPovrnitveMin > 50 ? (
-              <p className="text-xs text-gray-500">Doba povrnitve (vaš delež): &gt; 50 let — priporočljivo preveriti razpoložljive subvencije</p>
+              <p className="text-xs text-gray-500">Doba povrnitve (vaš delež): &gt; 50 let - priporočljivo preveriti razpoložljive subvencije</p>
             ) : (
-              <p className="text-xs text-gray-400">Doba povrnitve (vaš delež): ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let</p>
+              <p className="text-xs text-gray-400">Doba povrnitve (vaš delež): ~{u.dobaPovrnitveMin}-{u.dobaPovrnitveMax} let</p>
             )}
             {u.vrednostDvig && (
               <p className="text-xs text-green-700">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
@@ -1231,14 +1241,14 @@ function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: 
           <div>
             <span className="text-xs text-gray-400">{u.nivo === "skupno" ? "Skupni strošek" : "Ocena stroška"}: </span>
             <span className="text-sm font-medium text-gray-800">
-              {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
+              {u.strosekMin.toLocaleString("sl-SI")}-{u.strosekMax.toLocaleString("sl-SI")} €
             </span>
             {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
-              <p className="text-xs text-purple-700 mt-0.5">Vzdrževalna obveznost — preverite subvencije (EkoSklad, EU skladi)</p>
+              <p className="text-xs text-purple-700 mt-0.5">Vzdrževalna obveznost - preverite subvencije (EkoSklad, EU skladi)</p>
             ) : u.dobaPovrnitveMin > 50 ? (
-              <p className="text-xs text-gray-500 mt-0.5">Doba povrnitve: &gt; 50 let — priporočljivo preveriti razpoložljive subvencije</p>
+              <p className="text-xs text-gray-500 mt-0.5">Doba povrnitve: &gt; 50 let - priporočljivo preveriti razpoložljive subvencije</p>
             ) : (
-              <p className="text-xs text-gray-400 mt-0.5">Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let</p>
+              <p className="text-xs text-gray-400 mt-0.5">Doba povrnitve: ~{u.dobaPovrnitveMin}-{u.dobaPovrnitveMax} let</p>
             )}
             {u.vrednostDvig && (
               <p className="text-xs text-green-700 mt-1">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
@@ -1246,7 +1256,7 @@ function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: 
           </div>
         )}
 
-        {/* Metodologija — skrita za collapse */}
+        {/* Metodologija - skrita za collapse */}
         <div className="mt-2 pt-2 border-t border-gray-50">
           <button
             onClick={() => setOsnOdprta(!osnOdprta)}
@@ -1275,20 +1285,17 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
     return true;
   });
 
+  const vzdrzevalni = vidniUkrepi.filter(u => u.kategorija === "vzdrzevanje");
+  const energetski = vidniUkrepi.filter(u => u.kategorija === "energetika");
+
+  const multiUnitSuffix = isMultiUnit
+    ? ` — ${hasSelectedUnit && unitLabel ? `za ${unitLabel}` : "za celoten objekt"}`
+    : "";
+
   return (
-    <section className="mt-4 pt-4 border-t border-gray-100">
-      <div className="border-b border-gray-100 pb-1 mb-3">
-        <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
-          Predlagani energetski ukrepi
-          {isMultiUnit && (
-            <span className="text-gray-400 font-normal ml-1 normal-case tracking-normal">
-              — {hasSelectedUnit && unitLabel ? `za ${unitLabel}` : "za celoten objekt"}
-            </span>
-          )}
-        </h4>
-      </div>
+    <section className="mt-4 pt-4 border-t border-gray-100 space-y-6">
       {varstvoInfo.varuje && (
-        <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded px-3 py-2 mb-3">
+        <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded px-3 py-2">
           <span className="text-purple-600 text-xs mt-0.5">🏛</span>
           <div>
             <p className="text-xs font-medium text-purple-800">Varstvo kulturne dediščine</p>
@@ -1303,18 +1310,61 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
           </div>
         </div>
       )}
-      <div>
-        {vidniUkrepi.map((u, i) => (
-          <UkrepKartica
-            key={i}
-            u={u}
-            delez={delez}
-            hasSelectedUnit={hasSelectedUnit}
-            isLast={i === vidniUkrepi.length - 1}
-          />
-        ))}
-      </div>
-      <p className="text-[11px] text-gray-300 mt-3">Stroški so okvirne ocene na podlagi ZRMK/IZS referenčnih cen 2024. Niso uradna ponudba.</p>
+
+      {vzdrzevalni.length > 0 && (
+        <div>
+          <div className="border-b border-red-100 pb-1 mb-3">
+            <h4 className="text-xs font-semibold text-red-700 uppercase tracking-widest">
+              Predlagani vzdrževalni ukrepi
+              {isMultiUnit && (
+                <span className="text-red-400 font-normal ml-1 normal-case tracking-normal">
+                  {multiUnitSuffix}
+                </span>
+              )}
+            </h4>
+            <p className="text-xs text-gray-400 italic mt-0.5">Vir: Kataster nepremičnin · GURS</p>
+          </div>
+          <div>
+            {vzdrzevalni.map((u, i) => (
+              <UkrepKartica
+                key={i}
+                u={u}
+                delez={delez}
+                hasSelectedUnit={hasSelectedUnit}
+                isLast={i === vzdrzevalni.length - 1}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {energetski.length > 0 && (
+        <div>
+          <div className="border-b border-gray-100 pb-1 mb-3">
+            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
+              Predlagani energetski ukrepi
+              {isMultiUnit && (
+                <span className="text-gray-400 font-normal ml-1 normal-case tracking-normal">
+                  {multiUnitSuffix}
+                </span>
+              )}
+            </h4>
+            <p className="text-xs text-gray-400 italic mt-0.5">Vir: ZRMK/IZS referenčne cene 2024</p>
+          </div>
+          <div>
+            {energetski.map((u, i) => (
+              <UkrepKartica
+                key={i}
+                u={u}
+                delez={delez}
+                hasSelectedUnit={hasSelectedUnit}
+                isLast={i === energetski.length - 1}
+              />
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-300 mt-3">Stroški so okvirne ocene na podlagi ZRMK/IZS referenčnih cen 2024. Niso uradna ponudba.</p>
+        </div>
+      )}
     </section>
   );
 }
@@ -1326,7 +1376,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
   lat?: number | null;
   lng?: number | null;
 }) {
-  // 1. Prava EIZ ima prednost — uradna izkaznica iz registra
+  // 1. Prava EIZ ima prednost - uradna izkaznica iz registra
   if (data?.razred) {
     return (
       <section>
@@ -1353,7 +1403,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
     );
   }
 
-  // 2. Ni uradne izkaznice — poskusi algoritmično oceno
+  // 2. Ni uradne izkaznice - poskusi algoritmično oceno
   const ocena = stavba ? oceniEnergetskiRazred(stavba, part) : null;
 
   if (!ocena) return (
@@ -1380,9 +1430,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
               ocena.zaupanje === 'srednje' ? 'bg-amber-50 text-amber-700' :
               'bg-gray-100 text-gray-500'
             }`}>
-              {ocena.zaupanje === 'visoko' ? '● Visoko zaupanje' :
-               ocena.zaupanje === 'srednje' ? '◐ Srednje zaupanje' :
-               '○ Nizko zaupanje'}
+              {zaupanjeLabel[ocena.zaupanje]}
             </span>
           </div>
         </div>
@@ -1625,7 +1673,7 @@ function EnergetskiIzracunSection({
 
   const annualCost = heatingNeed * area * HEATING_PRICE_EUR;
 
-  // Cilji po razredih (kWh/m²a) — PURES 2010
+  // Cilji po razredih (kWh/m²a) - PURES 2010
   const RAZREDI: { razred: string; target: number }[] = [
     { razred: "B1", target: 50 },
     { razred: "A2", target: 25 },
