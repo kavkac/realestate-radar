@@ -38,11 +38,7 @@ export function LoadingProgress() {
           return (
             <li key={i} className="flex items-center gap-3 text-sm">
               {done ? (
-                <span className="flex h-2.5 w-2.5 items-center justify-center text-green-500">
-                  <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
+                <span className="flex h-2.5 w-2.5 items-center justify-center text-green-500 text-xs font-bold">✓</span>
               ) : active ? (
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />

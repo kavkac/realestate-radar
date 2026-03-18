@@ -18,7 +18,7 @@ export default function HomePage() {
       <section className="flex-1 flex items-start justify-center px-4 py-8 sm:py-16">
         <div className="w-full max-w-5xl space-y-8">
           <div className="text-center space-y-3">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
               Poišči svojo nepremičnino
             </h1>
             <p className="text-muted-foreground text-base sm:text-lg">
@@ -30,6 +30,12 @@ export default function HomePage() {
           <Suspense>
             <AddressSearch />
           </Suspense>
+
+          <div className="flex flex-wrap justify-center gap-3 mt-2">
+            <div className="bg-gray-50 border rounded-lg px-4 py-2 text-center text-sm">150.000+ nepremičnin</div>
+            <div className="bg-gray-50 border rounded-lg px-4 py-2 text-center text-sm">Uradni registri GURS</div>
+            <div className="bg-gray-50 border rounded-lg px-4 py-2 text-center text-sm">Brezplačen dostop</div>
+          </div>
         </div>
       </section>
 

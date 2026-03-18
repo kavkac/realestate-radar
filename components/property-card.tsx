@@ -1517,7 +1517,7 @@ function ParceleSection({ parcele }: { parcele?: Parcela[] }) {
   return (
     <section>
       <Label vir="Zemljiški kataster · GURS">Zemljišče</Label>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-1">
         <table className="w-full text-sm min-w-[400px]">
           <thead>
             <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
@@ -1570,10 +1570,10 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
       <p className="text-xs text-gray-500 mb-3">{fmtLastniki(all.length)}</p>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-1">
         <table className="w-full text-sm min-w-[400px]">
           <thead>
-            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
+            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
               <th className="pb-2 pr-4 font-medium">Enota</th>
               <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
               <th className="pb-2 pr-4 font-medium">Delež</th>
@@ -1619,10 +1619,10 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
       <p className="text-xs text-gray-500 mb-3">{fmtLastniki(data.length)}</p>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-1">
         <table className="w-full text-sm min-w-[420px]">
           <thead>
-            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs tracking-wide">
+            <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
               <th className="pb-2 pr-4 font-medium">Tip lastnika</th>
               <th className="pb-2 pr-4 font-medium">Delež</th>
               <th className="pb-2 pr-4 font-medium">Vrsta pravice</th>
