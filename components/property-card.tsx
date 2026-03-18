@@ -537,7 +537,7 @@ function Field({
   return (
     <div>
       <span className="text-xs text-gray-400">{label}</span>
-      <p className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">{value}</p>
+      <p className="text-sm text-gray-800">{value}</p>
     </div>
   );
 }
@@ -758,14 +758,14 @@ function EnergyMeter({ razred }: { razred: string }) {
                 width: c.width,
                 marginLeft: isActive ? 0 : "20px",
                 backgroundColor: isActive ? c.color : c.lightBg,
-                color: isActive ? "#ffffff" : "transparent",
-                height: isActive ? "26px" : "16px",
+                color: isActive ? "#ffffff" : c.color,
+                height: isActive ? "26px" : "20px",
                 clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)",
                 boxShadow: isActive ? `0 1px 6px ${c.color}55` : "none",
                 transition: "all 0.15s",
               }}
             >
-              {isActive ? c.label : ""}
+              {c.label}
             </div>
           </div>
         );
