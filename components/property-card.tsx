@@ -383,12 +383,15 @@ export function PropertyCard({
           {isMultiUnit && activePart && (
             <div className="px-5 py-5 border-b border-gray-100">
               <section>
-                <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 pb-3 border-b border-gray-100">
-                  <button onClick={() => setSelectedDel(null)} className="hover:text-[#2d6a4f] transition-colors">
-                    Vse enote ({deliStavbe.length})
+                <div className="flex items-center gap-2 text-sm mb-4 pb-3 border-b border-gray-100">
+                  <button
+                    onClick={() => setSelectedDel(null)}
+                    className="text-[#2d6a4f] font-medium hover:underline flex items-center gap-1"
+                  >
+                    ← Vse enote ({deliStavbe.length})
                   </button>
                   <span className="text-gray-300">/</span>
-                  <span className="text-gray-800 font-medium">Enota {activePart.stDela}</span>
+                  <span className="text-gray-500">Enota {activePart.stDela}</span>
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Enota {activePart.stDela}</h4>
                 <PartDetail part={activePart} />
