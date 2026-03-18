@@ -564,14 +564,27 @@ export async function getParcele(
     parceleData = await fetchWfs(fallbackUrl);
   }
 
-  // Fallback 2: prostorska poizvedba po koordinatah stavbe (INTERSECTS)
+  // Fallback 2: prostorska poizvedba po koordinatah stavbe
   if ((!parceleData || parceleData.features.length === 0) && lat != null && lng != null) {
-    const spatialUrl = buildWfsUrl(
+    // Majhen BBOX (~20m) okoli točke stavbe v EPSG:4326
+    const d = 0.0002;
+    const bboxUrl = buildWfsUrl(
       BASE_KN,
       "SI.GURS.KN:PARCELE_H",
-      `INTERSECTS(SHAPE,POINT(${lng} ${lat}))`,
+      `KO_ID=${koId} AND BBOX(GEOM,${lng - d},${lat - d},${lng + d},${lat + d},'EPSG:4326')`,
     ) + "&SRSNAME=EPSG:4326";
-    parceleData = await fetchWfs(spatialUrl).catch(() => null);
+    parceleData = await fetchWfs(bboxUrl).catch(() => null);
+  }
+
+  // Fallback 3: BBOX brez KO_ID filtra
+  if ((!parceleData || parceleData.features.length === 0) && lat != null && lng != null) {
+    const d = 0.0002;
+    const bboxUrl2 = buildWfsUrl(
+      BASE_KN,
+      "SI.GURS.KN:PARCELE_H",
+      `BBOX(GEOM,${lng - d},${lat - d},${lng + d},${lat + d},'EPSG:4326')`,
+    ) + "&SRSNAME=EPSG:4326";
+    parceleData = await fetchWfs(bboxUrl2).catch(() => null);
   }
 
   if (!parceleData || parceleData.features.length === 0) return [];
