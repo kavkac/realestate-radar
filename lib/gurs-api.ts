@@ -178,6 +178,7 @@ export interface StavbaData {
   tipPolozaja: TipPolozajaStavbe;
   kompaktnost: number | null;
   orientacija: "S" | "SV" | "V" | "JV" | "J" | "JZ" | "Z" | "SZ" | null;
+  obrisGeom: { type: "Polygon"; coordinates: number[][][] } | null;
 }
 
 export interface ProstorData {
@@ -338,6 +339,7 @@ export async function getBuilding(
     datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
     visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
     tipPolozaja: null,
+    obrisGeom: (p.OBRIS_GEOM && (p.OBRIS_GEOM as any).type === "Polygon") ? (p.OBRIS_GEOM as { type: "Polygon"; coordinates: number[][][] }) : null,
     ...izracunajGeometrijo(p.OBRIS_GEOM),
   };
 }
@@ -497,6 +499,7 @@ export async function getBuildingsByParcel(
       tipPolozaja: null,
       kompaktnost: null,
       orientacija: null,
+      obrisGeom: null,
     };
   });
 }

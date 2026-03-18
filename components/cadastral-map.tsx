@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { MapContainer, TileLayer, WMSTileLayer, CircleMarker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, WMSTileLayer, CircleMarker, GeoJSON, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 interface CadastralMapProps {
@@ -10,6 +10,7 @@ interface CadastralMapProps {
   naslov: string;
   koId?: number;
   stStavbe?: number;
+  obrisGeom?: { type: "Polygon"; coordinates: number[][][] } | null;
 }
 
 /** Recenter map when coords change */
@@ -21,7 +22,7 @@ function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
   return null;
 }
 
-export default function CadastralMap({ lat, lng, naslov, koId, stStavbe }: CadastralMapProps) {
+export default function CadastralMap({ lat, lng, naslov, koId, stStavbe, obrisGeom }: CadastralMapProps) {
   return (
     <MapContainer
       center={[lat, lng]}
@@ -75,6 +76,14 @@ export default function CadastralMap({ lat, lng, naslov, koId, stStavbe }: Cadas
       />
 
       {/* Property marker */}
+      {/* Tloris stavbe */}
+      {obrisGeom && (
+        <GeoJSON
+          key={JSON.stringify(obrisGeom.coordinates[0][0])}
+          data={obrisGeom as GeoJSON.Polygon}
+          style={{ color: "#2d6a4f", weight: 2.5, fillColor: "#2d6a4f", fillOpacity: 0.15 }}
+        />
+      )}
       <CircleMarker
         center={[lat, lng]}
         radius={6}

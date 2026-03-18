@@ -250,6 +250,7 @@ export async function POST(request: NextRequest) {
         tipPolozaja: tipPolozaja ?? null,
         kompaktnost: stavba.kompaktnost,
         orientacija: stavba.orientacija,
+        obrisGeom: stavba.obrisGeom ?? null,
       },
       deliStavbe: deliStavbe.map((d, i) => ({
         stDela: d.stDelaStavbe,

@@ -95,6 +95,7 @@ interface PropertyCardProps {
     tipPolozaja?: "samostojna" | "vogalna" | "vmesna vrstna" | null;
     orientacija?: "S" | "SV" | "V" | "JV" | "J" | "JZ" | "Z" | "SZ" | null;
     kompaktnost?: number | null;
+    obrisGeom?: { type: "Polygon"; coordinates: number[][][] } | null;
   };
   deliStavbe: DelStavbe[];
   energetskaIzkaznica: EnergyData | null;
@@ -231,7 +232,7 @@ export function PropertyCard({
         {lat && lng && (
           <div>
             <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-1.5">Geodetski načrt · GURS</p>
-            <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} />
+            <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} obrisGeom={stavba?.obrisGeom ?? null} />
           </div>
         )}
       </div>
@@ -430,7 +431,7 @@ export function PropertyCard({
           {lat && lng && (
             <div>
               <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-1.5">Geodetski načrt · GURS</p>
-              <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} />
+              <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} obrisGeom={stavba?.obrisGeom ?? null} />
             </div>
           )}
         </div>
