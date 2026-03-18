@@ -2223,7 +2223,7 @@ function ZavarovanjeSection({
   const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
 
   // Vedno zagotovimo seizmične podatke — fallback po koordinatah (Ljubljana default)
-  const seizmicni: SeizmicniPodatki = seizmicniPodatki ?? { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost (PGA 0.10–0.175g)" };
+  const seizmicni: SeizmicniPodatki = seizmicniPodatki ?? { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost" };
   const potresno = izracunajPotresnoTveganje(stavba, seizmicni);
   const priporocenaVsota = potresno.priporocenaVsota;
 
@@ -2259,7 +2259,8 @@ function ZavarovanjeSection({
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Seizmična cona</p>
               <p className="text-xl font-bold text-gray-800">Cona {seizmicni.cona}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{seizmicni.opisCone} (PGA {seizmicni.pga}g)</p>
+              <p className="text-xs text-gray-500 mt-0.5">{seizmicni.opisCone}</p>
+              <p className="text-xs text-gray-400">PGA: {seizmicni.pga}g (Eurocode 8)</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ranljivost objekta</p>
@@ -2283,7 +2284,10 @@ function ZavarovanjeSection({
             </div>
             <TveganjeProgressBar tocke={potresno.tveganjeTocke} />
             <p className="text-xs text-gray-400 mt-2">
-              Osnova izračuna: seizmična cona {seizmicni.cona} → bazne točke + ranljivost {potresno.razredRanljivosti} + etažnost
+              Skupno tveganje = seizmična cona {seizmicni.cona} + ranljivost {potresno.razredRanljivosti} (starejša gradnja) + etažnost.
+              {potresno.tveganjeTocke >= 7 && (seizmicni.cona === "II" || seizmicni.cona === "III") && (
+                <> Visoko tveganje kljub zmerni/srednji coni — posledica ranljivosti starejše gradnje.</>
+              )}
             </p>
           </div>
 

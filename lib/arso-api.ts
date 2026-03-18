@@ -35,10 +35,10 @@ export interface SeizmicniPodatki {
 }
 
 const OPISCI_CONE: Record<string, string> = {
-  "I":  "Nizka potresna nevarnost (PGA < 0.05g)",
-  "II": "Zmerna potresna nevarnost (PGA 0.05–0.10g)",
-  "III":"Srednja potresna nevarnost (PGA 0.10–0.175g)",
-  "IV": "Visoka potresna nevarnost (PGA > 0.175g)",
+  "I":  "Nizka potresna nevarnost",
+  "II": "Zmerna potresna nevarnost",
+  "III":"Srednja potresna nevarnost",
+  "IV": "Visoka potresna nevarnost",
 };
 
 function pgaToCona(pga: number): string {
@@ -52,13 +52,13 @@ function pgaToCona(pga: number): string {
 // Vir: ARSO seizmična karta, Eurocode 8 national annex for Slovenia
 function fallbackCona(lat: number, lng: number): SeizmicniPodatki {
   // Posočje / zahodni rob (visoka nevarnost)
-  if (lng < 13.9 && lat > 45.9 && lat < 46.4) return { pga: 0.225, cona: "IV", opisCone: "Visoka potresna nevarnost (PGA > 0.175g)" };
+  if (lng < 13.9 && lat > 45.9 && lat < 46.4) return { pga: 0.225, cona: "IV", opisCone: "Visoka potresna nevarnost" };
   // Ljubljana in okolica
-  if (lat > 45.9 && lat < 46.2 && lng > 14.3 && lng < 14.7) return { pga: 0.175, cona: "III", opisCone: "Srednja potresna nevarnost (PGA 0.10–0.175g)" };
+  if (lat > 45.9 && lat < 46.2 && lng > 14.3 && lng < 14.7) return { pga: 0.175, cona: "III", opisCone: "Srednja potresna nevarnost" };
   // Pomurje (nižja nevarnost)
-  if (lng > 15.9 && lat > 46.4) return { pga: 0.075, cona: "II", opisCone: "Zmerna potresna nevarnost (PGA 0.05–0.10g)" };
+  if (lng > 15.9 && lat > 46.4) return { pga: 0.075, cona: "II", opisCone: "Zmerna potresna nevarnost" };
   // Default Slovenija
-  return { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost (PGA 0.10–0.175g)" };
+  return { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost" };
 }
 
 export async function getSeizmicnaCona(lat: number, lng: number): Promise<SeizmicniPodatki> {
