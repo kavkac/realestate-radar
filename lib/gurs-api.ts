@@ -310,11 +310,7 @@ export async function getBuildingEid(hsMid: number): Promise<string | null> {
 export async function getBuilding(
   eidStavba: string,
 ): Promise<StavbaData | null> {
-  const url = buildWfsUrl(
-    BASE_KN,
-    "SI.GURS.KN:STAVBE_H",
-    `EID_STAVBA='${eidStavba}'`,
-  );
+  const url = buildWfsUrl(BASE_KN, "SI.GURS.KN:STAVBE_H", `EID_STAVBA='${eidStavba}'`) + "&SRSNAME=EPSG:4326";
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return null;
 
