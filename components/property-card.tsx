@@ -843,9 +843,9 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         {(() => {
           const g = stavba.gasInfrastructure;
           if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin</span>;
-          if (g?.confidence === "high") return <span><Check on={true} /> <span title={`Ocena — plinovod ~${g.distanceM}m, verjetno priključen. Uradnega podatka v katastru ni.`} className="border-b border-dotted border-gray-400 cursor-help">Plin</span></span>;
-          if (g?.confidence === "medium") return <span className="text-gray-500"><Check on={false} /> <span title={`Plinovod v bližini (~${g.distanceM}m). Priključek ni potrjen v registru.`} className="border-b border-dotted border-gray-400 cursor-help">Plin</span></span>;
-          if (g?.confidence === "low") return <span className="text-gray-400"><Check on={false} /> <span title={`Plinovod v okolici (~${g.distanceM}m). Priključek ni verjeten.`} className="border-b border-dotted border-gray-400 cursor-help">Plin</span></span>;
+          if (g?.confidence === "high") return <span className="text-[#2d6a4f]">≈ Plin<InfoTooltip text={`Verjetno priključen — plinovod oddaljen ~${g.distanceM}m. Uradnega priključka v katastru ni, to je ocena na podlagi ZK GJI infrastrukturnih podatkov.`} /></span>;
+          if (g?.confidence === "medium") return <span className="text-gray-400">≈ Plin<InfoTooltip text={`Plinovod v bližini (~${g.distanceM}m), a priključek ni potrjen v registru.`} /></span>;
+          if (g?.confidence === "low") return <span><Check on={false} /> Plin</span>;
           return <span><Check on={false} /> Plin</span>;
         })()}
         <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
