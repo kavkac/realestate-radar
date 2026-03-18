@@ -1025,8 +1025,11 @@ function predlagajUkrepe(
   const letaOken = part?.letoObnoveOken;
   const starOken = letaOken ? zdaj - letaOken : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
   if (starOken > 20) {
-    const stMin = povrsina ? Math.round(povrsina * 0.15 * 450) : 2500;
-    const stMax = povrsina ? Math.round(povrsina * 0.15 * 650) : 4000;
+    // Varstvo kulturne dediščine: lesena okna po meri, 2-3× dražja
+    const okenCenaMin = varstvo.varuje ? 900 : 450;
+    const okenCenaMax = varstvo.varuje ? 1400 : 650;
+    const stMin = povrsina ? Math.round(povrsina * 0.15 * okenCenaMin) : (varstvo.varuje ? 5000 : 2500);
+    const stMax = povrsina ? Math.round(povrsina * 0.15 * okenCenaMax) : (varstvo.varuje ? 9000 : 4000);
     const stSrednji = Math.round((stMin + stMax) / 2);
     const roi = izracunajROI("okna", stSrednji, povrsina);
     const opisOkna = varstvo.varuje
@@ -1040,7 +1043,9 @@ function predlagajUkrepe(
       opis: opisOkna,
       strosekMin: stMin,
       strosekMax: stMax,
-      osnova: `Ocena: ~15% stanovanjske površine (${povrsina ? Math.round(povrsina * 0.15) + ' m²' : 'neznano'}) × 450–650 €/m²`,
+      osnova: varstvo.varuje
+        ? `Lesena okna po meri (ZVKDS smernice) × ${okenCenaMin}–${okenCenaMax} €/m²`
+        : `Ocena: ~15% stanovanjske površine (${povrsina ? Math.round(povrsina * 0.15) + ' m²' : 'neznano'}) × 450–650 €/m²`,
       prioriteta: starOken > 40 ? "visoka" : "srednja",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
@@ -1076,8 +1081,11 @@ function predlagajUkrepe(
   if (starFasade > 25) {
     const visinaMerov = stavba?.visina && stavba.visina > 0 ? stavba.visina : 12;
     const ocenjenaPovFasade = povrsina ? Math.round(Math.sqrt(povrsina) * 4 * visinaMerov) : 400;
-    const skupniMin = Math.round(ocenjenaPovFasade * 80);
-    const skupniMax = Math.round(ocenjenaPovFasade * 130);
+    // Varstvo: apnena malta, tradicionalni materiali → 180–280 €/m² (vs 80–130 €/m²)
+    const fasadaCenaMin = varstvo.varuje ? 180 : 80;
+    const fasadaCenaMax = varstvo.varuje ? 280 : 130;
+    const skupniMin = Math.round(ocenjenaPovFasade * fasadaCenaMin);
+    const skupniMax = Math.round(ocenjenaPovFasade * fasadaCenaMax);
     const stSrednji = Math.round((skupniMin + skupniMax) / 2);
     const roi = izracunajROI("fasada", stSrednji, povrsina);
     const delezMin = delezNum ? Math.round(skupniMin * delezNum) : null;
@@ -1086,12 +1094,12 @@ function predlagajUkrepe(
       ? `POZOR — Stavba se nahaja v varstvenem območju kulturne dediščine (${varstvo.naziv}). Obnova fasade zahteva predhodno soglasje ZVKDS. Dovoljeni so samo materiali, ki ohranjajo historični izgled (apnena malta, tradicionalne barve). Kontaktirajte Zavod za varstvo kulturne dediščine: zvkds@zvkds.si`
       : `Celostna obnova fasade z mineralnimi ploščami (λ ≤ 0,035 W/mK, debelina ≥ 15 cm). ${letaFasade ? `Fasada je bila nazadnje obnovljena ${letaFasade}. ` : ""}Ukrep zmanjša potrebo po ogrevanju za 20-40%.`;
     ukrepi.push({
-      naziv: "Toplotna izolacija fasade (ETICS sistem)",
+      naziv: varstvo.varuje ? "Obnova fasade po ZVKDS smernicah" : "Toplotna izolacija fasade (ETICS sistem)",
       nivo: "skupno",
       opis: opisFasada,
       strosekMin: skupniMin,
       strosekMax: skupniMax,
-      osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × 80–130 €/m²${delezMin != null ? `\nVaš delež (${delez}): ${delezMin.toLocaleString('sl-SI')}–${delezMax!.toLocaleString('sl-SI')} €` : ""}`,
+      osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × ${fasadaCenaMin}–${fasadaCenaMax} €/m²${varstvo.varuje ? " (apnena malta, ZVKDS materiali)" : ""}${delezMin != null ? `\nVaš delež (${delez}): ${delezMin.toLocaleString('sl-SI')}–${delezMax!.toLocaleString('sl-SI')} €` : ""}`,
       prioriteta: starFasade > 40 ? "visoka" : "srednja",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
