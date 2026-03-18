@@ -58,14 +58,15 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
           zIndex={0}
         />
 
-        {/* Esri World Imagery — shown only in satellite mode */}
-        <TileLayer
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          attribution="&copy; Esri, Maxar, Earthstar Geographics"
-          maxZoom={19}
-          zIndex={1}
-          opacity={satellite ? 1 : 0}
-        />
+        {/* Esri World Imagery — samo v satelitskem modu */}
+        {satellite && (
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            attribution="&copy; Esri, Maxar, Earthstar Geographics"
+            maxZoom={19}
+            zIndex={1}
+          />
+        )}
 
         {/* Parcelna meja — modra tanka črtkana */}
         {validParcele.map((p, i) => (
