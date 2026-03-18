@@ -329,7 +329,7 @@ export function PropertyCard({
 
           {/* L3: Stanje */}
           <MaintenanceSection stavba={stavba} part={currentPart} />
-          <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} />
+          <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} />
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
           {/* L4: Vrednost in lastništvo (vedno odprto) */}
@@ -717,20 +717,127 @@ function EnergyMeter({ razred }: { razred: string }) {
   );
 }
 
-function oceniEnergetskiRazred(letoIzgradnje: number | null): { razred: string; opis: string } | null {
-  if (!letoIzgradnje) return null;
-  if (letoIzgradnje < 1974) return { razred: "G", opis: "pred letom 1974, brez toplotne izolacije" };
-  if (letoIzgradnje < 1988) return { razred: "F", opis: "1974–1987, minimalna izolacija" };
-  if (letoIzgradnje < 2002) return { razred: "E", opis: "1988–2001, delna izolacija" };
-  if (letoIzgradnje < 2010) return { razred: "D", opis: "2002–2009, PURES 2002" };
-  if (letoIzgradnje < 2016) return { razred: "C", opis: "2010–2015, PURES 2010" };
-  if (letoIzgradnje < 2021) return { razred: "B2", opis: "2016–2020, PURES 2010 + revizija" };
-  return { razred: "A2", opis: "po letu 2021, skoraj nič-energijska gradnja" };
+function oceniEnergetskiRazred(stavba: {
+  letoIzgradnje: number | null;
+  letoObnove: { fasade: number | null; strehe: number | null };
+  konstrukcija: string | null;
+  prikljucki: { plin: boolean; vodovod: boolean; elektrika: boolean; kanalizacija: boolean };
+}, part?: {
+  letoObnoveOken: number | null;
+  letoObnoveInstalacij: number | null;
+} | null): { razred: string; tocke: number; dejavniki: string[]; zaupanje: "visoko" | "srednje" | "nizko" } | null {
+  if (!stavba.letoIzgradnje) return null;
+
+  const leto = stavba.letoIzgradnje;
+  const zdaj = new Date().getFullYear();
+  const dejavniki: string[] = [];
+
+  let score = 0;
+  if (leto < 1946)      { score = 95; dejavniki.push(`Zgrajeno pred 1946 — brez toplotne zaščite`); }
+  else if (leto < 1960) { score = 88; dejavniki.push(`Zgrajeno ${leto} — predvojna gradnja`); }
+  else if (leto < 1974) { score = 82; dejavniki.push(`Zgrajeno ${leto} — pred energetsko krizo`); }
+  else if (leto < 1980) { score = 74; dejavniki.push(`Zgrajeno ${leto} — začetek toplotne izolacije`); }
+  else if (leto < 1988) { score = 68; dejavniki.push(`Zgrajeno ${leto} — minimalni standardi`); }
+  else if (leto < 1994) { score = 60; dejavniki.push(`Zgrajeno ${leto} — JUS standardi`); }
+  else if (leto < 2002) { score = 52; dejavniki.push(`Zgrajeno ${leto} — delna toplotna izolacija`); }
+  else if (leto < 2006) { score = 42; dejavniki.push(`Zgrajeno ${leto} — PURES 2002`); }
+  else if (leto < 2010) { score = 36; dejavniki.push(`Zgrajeno ${leto} — PURES 2002 (strožji)`); }
+  else if (leto < 2013) { score = 28; dejavniki.push(`Zgrajeno ${leto} — PURES 2010`); }
+  else if (leto < 2016) { score = 22; dejavniki.push(`Zgrajeno ${leto} — PURES 2010 (strožji)`); }
+  else if (leto < 2021) { score = 15; dejavniki.push(`Zgrajeno ${leto} — nizko-energijska gradnja`); }
+  else                  { score = 8;  dejavniki.push(`Zgrajeno ${leto} — skoraj nič-energijska gradnja`); }
+
+  const letaFasade = stavba.letoObnove.fasade;
+  if (letaFasade) {
+    const starost = zdaj - letaFasade;
+    if (starost <= 5)       { score -= 22; dejavniki.push(`Fasada obnovljena ${letaFasade} — nova toplotna izolacija`); }
+    else if (starost <= 10) { score -= 18; dejavniki.push(`Fasada obnovljena ${letaFasade} — dobra toplotna izolacija`); }
+    else if (starost <= 20) { score -= 10; dejavniki.push(`Fasada obnovljena ${letaFasade} — delna izboljšava`); }
+    else                    { score -= 4;  dejavniki.push(`Fasada obnovljena ${letaFasade}`); }
+  }
+
+  const letaStrehe = stavba.letoObnove.strehe;
+  if (letaStrehe) {
+    const starost = zdaj - letaStrehe;
+    if (starost <= 5)       { score -= 10; dejavniki.push(`Streha obnovljena ${letaStrehe} — nova toplotna zaščita`); }
+    else if (starost <= 15) { score -= 7;  dejavniki.push(`Streha obnovljena ${letaStrehe}`); }
+    else                    { score -= 3;  dejavniki.push(`Streha obnovljena ${letaStrehe}`); }
+  }
+
+  const letaOken = part?.letoObnoveOken;
+  if (letaOken) {
+    const starost = zdaj - letaOken;
+    if (starost <= 5)       { score -= 10; dejavniki.push(`Okna obnovljena ${letaOken} — energijsko varčna okna`); }
+    else if (starost <= 10) { score -= 7;  dejavniki.push(`Okna obnovljena ${letaOken}`); }
+    else                    { score -= 3;  dejavniki.push(`Okna obnovljena ${letaOken}`); }
+  }
+
+  const letaInstalacij = part?.letoObnoveInstalacij;
+  if (letaInstalacij) {
+    const starost = zdaj - letaInstalacij;
+    if (starost <= 10) { score -= 5; dejavniki.push(`Instalacije obnovljene ${letaInstalacij}`); }
+  }
+
+  const konstr = stavba.konstrukcija?.toLowerCase() ?? "";
+  if (konstr.includes("mont") || konstr.includes("panel")) {
+    score += 8;
+    dejavniki.push(`Montažna konstrukcija — nižja toplotna masa`);
+  } else if (konstr.includes("les")) {
+    score += 5;
+    dejavniki.push(`Lesena konstrukcija`);
+  } else if (konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton")) {
+    score -= 3;
+    dejavniki.push(`Masivna konstrukcija — dobra toplotna masa`);
+  }
+
+  if (!stavba.prikljucki.plin && stavba.prikljucki.elektrika) {
+    score += 5;
+    dejavniki.push(`Brez plinskega priključka — verjetno električno ogrevanje`);
+  }
+
+  const stDejavnikov = [letaFasade, letaStrehe, letaOken, letaInstalacij].filter(Boolean).length;
+  const zaupanje = stDejavnikov >= 3 ? "visoko" : stDejavnikov >= 1 ? "srednje" : "nizko";
+
+  const scoreClamped = Math.max(0, Math.min(100, score));
+  let razred: string;
+  if (scoreClamped <= 10)      razred = "A1";
+  else if (scoreClamped <= 18) razred = "A2";
+  else if (scoreClamped <= 28) razred = "B1";
+  else if (scoreClamped <= 38) razred = "B2";
+  else if (scoreClamped <= 50) razred = "C";
+  else if (scoreClamped <= 62) razred = "D";
+  else if (scoreClamped <= 72) razred = "E";
+  else if (scoreClamped <= 82) razred = "F";
+  else                          razred = "G";
+
+  return { razred, tocke: scoreClamped, dejavniki, zaupanje };
 }
 
-function EnergyCertificateSection({ data, stavba }: { data: EnergyData | null; stavba: PropertyCardProps["stavba"] }) {
+const zaupanjeColor = {
+  visoko: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", icon: "ℹ" },
+  srednje: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", icon: "⚠" },
+  nizko: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", icon: "⚠" },
+} as const;
+
+const zaupanjeBesedilo = {
+  visoko: "Ocena temelji na letu izgradnje in podatkih o vseh večjih prenovah. To ni uradna energetska izkaznica.",
+  srednje: "Ocena temelji na delnih podatkih o prenovah. Natančnost je omejena. To ni uradna energetska izkaznica.",
+  nizko: "Ocena temelji zgolj na letu izgradnje — podatkov o prenovah nimamo. To ni uradna energetska izkaznica.",
+} as const;
+
+const zaupanjeLabel = {
+  visoko: "Visoko zaupanje",
+  srednje: "Srednje zaupanje",
+  nizko: "Nizko zaupanje",
+} as const;
+
+function EnergyCertificateSection({ data, stavba, part }: {
+  data: EnergyData | null;
+  stavba: PropertyCardProps["stavba"];
+  part?: PropertyCardProps["deliStavbe"][number] | null;
+}) {
   if (!data) {
-    const ocena = oceniEnergetskiRazred(stavba?.letoIzgradnje ?? null);
+    const ocena = stavba ? oceniEnergetskiRazred(stavba, part) : null;
     if (!ocena) return (
       <section>
         <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
@@ -739,18 +846,28 @@ function EnergyCertificateSection({ data, stavba }: { data: EnergyData | null; s
         </p>
       </section>
     );
+    const zc = zaupanjeColor[ocena.zaupanje];
     return (
       <section>
-        <Label vir="Ocena · PURES 2010">Energetsko stanje</Label>
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
-          <span className="text-amber-600 text-xs mt-0.5">⚠</span>
-          <p className="text-xs text-amber-700">
-            Za to stavbo ni veljavne energetske izkaznice. Spodnja ocena temelji na letu izgradnje ({stavba?.letoIzgradnje}) in veljavnih gradbenih standardih (PURES 2010). <strong>To ni uradna izkaznica.</strong>
-          </p>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <Label vir="Ocena · multi-faktorski algoritem">Energetsko stanje</Label>
+          </div>
+          <span className="text-xs text-gray-400 mt-1 ml-2 shrink-0">{zaupanjeLabel[ocena.zaupanje]}</span>
+        </div>
+        <div className={`flex items-start gap-2 ${zc.bg} border ${zc.border} rounded px-3 py-2 mb-3`}>
+          <span className={`${zc.text} text-xs mt-0.5`}>{zc.icon}</span>
+          <p className={`text-xs ${zc.text}`}>{zaupanjeBesedilo[ocena.zaupanje]}</p>
         </div>
         <EnergyMeter razred={ocena.razred} />
-        <p className="text-xs text-gray-400 mt-1">{ocena.opis}</p>
-        <p className="text-xs text-gray-300 mt-2">Vir: ocena na podlagi leta izgradnje · PURES 2010 · ni uradna energetska izkaznica</p>
+        <ul className="mt-2 space-y-0.5">
+          {ocena.dejavniki.map((d, i) => (
+            <li key={i} className="text-xs text-gray-500 flex items-start gap-1">
+              <span className="text-gray-300 mt-0.5">·</span>
+              <span>{d}</span>
+            </li>
+          ))}
+        </ul>
       </section>
     );
   }
