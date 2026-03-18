@@ -796,7 +796,6 @@ function ConditionScoreBar({ stavba }: { stavba: PropertyCardProps["stavba"] }) 
 function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
   return (
     <section>
-      <Label vir="Kataster nepremičnin · GURS">O stavbi</Label>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
         <Field label="Tip stavbe" value={stavba.tip} />
         <Field label="Stanovanj" value={stavba.steviloStanovanj} />
