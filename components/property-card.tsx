@@ -31,6 +31,13 @@ interface DelStavbe {
   lastnistvo?: LastnistvoRecord[];
   etazaDelStavbe?: number | null;
   vrstaStanovanjaUradno?: string | null;
+  vrednotenje?: {
+    posplosenaVrednost: number | null;
+    vrednostNaM2: number | null;
+    idModel: string | null;
+    letoIzgradnje: number | null;
+    povrsina: number | null;
+  } | null;
 }
 
 interface Parcela {
@@ -391,7 +398,12 @@ export function PropertyCard({
               <h3 className="text-base font-semibold text-gray-800">Vrednost in lastništvo</h3>
               <p className="text-xs text-gray-400 mt-0.5">Ocenjena vrednost, transakcije, lastništvo, parcele</p>
             </div>
-            <RenVrednostSection data={renVrednost} />
+            <OcenaVrednostiSection
+              renVrednost={renVrednost}
+              currentPartVrednotenje={currentPart?.vrednotenje}
+              deliStavbe={deliStavbe}
+              hasSelectedUnit={!!(activePart || requestedDel != null)}
+            />
             <VrednostnaAnalizaSection data={etnAnaliza} />
             {isMultiUnit && !activePart ? (
               <LastnistvoMultiSection deliStavbe={deliStavbe} />
@@ -1617,6 +1629,82 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
         </div>
       )}
       <p className="text-xs text-gray-400 mt-2">Vir: GURS zemljiška knjiga. Imena fizičnih oseb niso prikazana (GDPR).</p>
+    </section>
+  );
+}
+
+function OcenaVrednostiSection({
+  renVrednost,
+  currentPartVrednotenje,
+  deliStavbe,
+  hasSelectedUnit,
+}: {
+  renVrednost?: { vrednost: number; datumOcene: string } | null;
+  currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
+  deliStavbe: PropertyCardProps["deliStavbe"];
+  hasSelectedUnit: boolean;
+}) {
+  // Per-unit: izbrana enota z vrednotenjem
+  if (hasSelectedUnit && currentPartVrednotenje?.posplosenaVrednost != null) {
+    const posplosenaVrednost = currentPartVrednotenje.posplosenaVrednost!;
+    const vrednostNaM2 = currentPartVrednotenje.vrednostNaM2;
+    return (
+      <section>
+        <Label vir="Množično vrednotenje · GURS · EV_SLO">Ocenjena vrednost enote</Label>
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 mb-4">
+          <p className="text-2xl font-bold text-gray-800">
+            {posplosenaVrednost.toLocaleString("sl-SI")} €
+          </p>
+          {vrednostNaM2 != null && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              {vrednostNaM2.toLocaleString("sl-SI")} €/m²
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">
+            Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // Building-level: cela stavba z renVrednost
+  if (!hasSelectedUnit && renVrednost) {
+    const evSkupaj = deliStavbe.reduce(
+      (sum, d) => sum + (d.vrednotenje?.posplosenaVrednost ?? 0),
+      0,
+    );
+    return (
+      <section>
+        <Label vir="Množično vrednotenje · GURS">Ocenjena vrednost stavbe</Label>
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 mb-4">
+          <p className="text-2xl font-bold text-gray-800">
+            {renVrednost.vrednost.toLocaleString("sl-SI")} €
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Vir: GURS množično vrednotenje
+            {renVrednost.datumOcene ? ` — ${renVrednost.datumOcene}` : ""}
+          </p>
+          {evSkupaj > 0 && (
+            <p className="text-xs text-gray-400 mt-1">
+              Skupna vrednost enot (EV): {evSkupaj.toLocaleString("sl-SI")} € — informativno
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">
+            Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // Ni podatkov
+  return (
+    <section>
+      <Label vir="Množično vrednotenje · GURS">Ocenjena vrednost</Label>
+      <p className="text-sm text-gray-400">
+        Vrednostni podatek za to nepremičnino ni na voljo v evidenci GURS.
+      </p>
     </section>
   );
 }
