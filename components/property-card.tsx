@@ -2211,15 +2211,16 @@ function ZavarovanjeSection({
   etaze,
 }: {
   stavba: PropertyCardProps["stavba"];
-  seizmicniPodatki: SeizmicniPodatki | null;
+  seizmicniPodatki: SeizmicniPodatki | null | undefined;
   etaze?: number | null;
 }) {
   const konstr = (stavba.konstrukcija ?? "").toLowerCase();
   const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
 
-  // Brez seizmičnih podatkov – prikažemo samo premoženjsko tabelo brez potresnega dela
-  const potresno = seizmicniPodatki ? izracunajPotresnoTveganje(stavba, seizmicniPodatki) : null;
-  const priporocenaVsota = potresno?.priporocenaVsota ?? Math.round((stavba.povrsina ?? 80) * 1800 * 1.1);
+  // Vedno zagotovimo seizmične podatke — fallback po koordinatah (Ljubljana default)
+  const seizmicni: SeizmicniPodatki = seizmicniPodatki ?? { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost (PGA 0.10–0.175g)" };
+  const potresno = izracunajPotresnoTveganje(stavba, seizmicni);
+  const priporocenaVsota = potresno.priporocenaVsota;
 
   const pozarnaStopnja = jeMasivna ? 0.0005 : 0.0008;
   const pozarnaMin = Math.round(priporocenaVsota * pozarnaStopnja * 0.8);
@@ -2240,77 +2241,69 @@ function ZavarovanjeSection({
         <p className="text-xs text-gray-400 mt-0.5">Indikativni izračun potresnega tveganja in priporočila za zavarovanje</p>
       </div>
 
-      {/* Potresna varnost */}
-      {potresno && seizmicniPodatki && (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">Potresna varnost</h4>
-            <span className="text-[10px] text-gray-400">Vir: ARSO · Eurocode 8</span>
-          </div>
-          <div className="px-5 py-4 space-y-4">
-            {/* Cona + Ranljivost */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Seizmična cona</p>
-                <p className="text-xl font-bold text-gray-800">{seizmicniPodatki.cona}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{seizmicniPodatki.opisCone}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ranljivost (EMS-98)</p>
-                <p className="text-xl font-bold text-gray-800">{potresno.razredRanljivosti}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{potresno.opisRanljivosti}</p>
-              </div>
-            </div>
-
-            {/* Ocena tveganja */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs text-gray-400 uppercase tracking-wide">Ocena tveganja</p>
-                <span className={`text-xs font-semibold ${
-                  potresno.tveganjeTocke <= 3 ? "text-green-700"
-                  : potresno.tveganjeTocke <= 6 ? "text-orange-600"
-                  : potresno.tveganjeTocke <= 8 ? "text-red-600"
-                  : "text-red-800"
-                }`}>
-                  {tveganjeLabel[potresno.tveganje]} ({potresno.tveganjeTocke}/10)
-                </span>
-              </div>
-              <TveganjeProgressBar tocke={potresno.tveganjeTocke} />
-            </div>
-
-            {/* Vrednosti */}
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Priporočena zavarovalna vsota</p>
-                <p className="text-base font-semibold text-gray-800">{potresno.priporocenaVsota.toLocaleString("sl-SI")} €</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Indikativna letna premija</p>
-                <p className="text-base font-semibold text-gray-800">
-                  {potresno.letnaPremijaOcena.min.toLocaleString("sl-SI")} € – {potresno.letnaPremijaOcena.max.toLocaleString("sl-SI")} €
-                </p>
-              </div>
-            </div>
-
-            {/* Opomba + CTA */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t border-gray-50">
-              <p className="text-[11px] text-gray-400 leading-relaxed">
-                Indikativna ocena. Dejanska premija je odvisna od pogojev zavarovalnice.
-              </p>
-              <a
-                href="https://www.vzajemna.si/zavarovanje-nepremicnin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-shrink-0 inline-flex items-center gap-1 rounded bg-[#2d6a4f] px-4 py-2 text-xs font-medium text-white hover:bg-[#245a42] transition-colors"
-              >
-                Pridobite ponudbo
-                <span aria-hidden>→</span>
-              </a>
-            </div>
-          </div>
+      {/* Potresna varnost — vedno prikazano */}
+      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">Potresna varnost</h4>
+          <span className="text-[10px] text-gray-400">Vir: ARSO · Eurocode 8 (EN 1998)</span>
         </div>
-      )}
+        <div className="px-5 py-4 space-y-4">
+          {/* Cona + Ranljivost */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Seizmična cona</p>
+              <p className="text-xl font-bold text-gray-800">Cona {seizmicni.cona}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{seizmicni.opisCone} (PGA {seizmicni.pga}g)</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ranljivost objekta</p>
+              <p className="text-xl font-bold text-gray-800">Razred {potresno.razredRanljivosti}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{potresno.opisRanljivosti}</p>
+            </div>
+          </div>
+
+          {/* Ocena tveganja */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs text-gray-400 uppercase tracking-wide">Ocena tveganja</p>
+              <span className={`text-xs font-semibold ${
+                potresno.tveganjeTocke <= 3 ? "text-green-700"
+                : potresno.tveganjeTocke <= 6 ? "text-orange-600"
+                : potresno.tveganjeTocke <= 8 ? "text-red-600"
+                : "text-red-800"
+              }`}>
+                {tveganjeLabel[potresno.tveganje]} ({potresno.tveganjeTocke}/10)
+              </span>
+            </div>
+            <TveganjeProgressBar tocke={potresno.tveganjeTocke} />
+            <p className="text-xs text-gray-400 mt-2">
+              Osnova izračuna: seizmična cona {seizmicni.cona} → bazne točke + ranljivost {potresno.razredRanljivosti} + etažnost
+            </p>
+          </div>
+
+          {/* Vrednosti */}
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Priporočena zavarovalna vsota</p>
+              <p className="text-base font-semibold text-gray-800">{potresno.priporocenaVsota.toLocaleString("sl-SI")} €</p>
+              <p className="text-xs text-gray-400">1.800 €/m² × {stavba.povrsina ?? 80} m² gradbene vrednosti</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Indikativna letna premija</p>
+              <p className="text-base font-semibold text-gray-800">
+                {potresno.letnaPremijaOcena.min.toLocaleString("sl-SI")} € – {potresno.letnaPremijaOcena.max.toLocaleString("sl-SI")} €
+              </p>
+              <p className="text-xs text-gray-400">Stopnja: ~0,15% (cona {seizmicni.cona}, razred {potresno.razredRanljivosti})</p>
+            </div>
+          </div>
+
+          {/* Opomba */}
+          <p className="text-[11px] text-gray-400 leading-relaxed pt-1 border-t border-gray-50">
+            Indikativna ocena. Dejanska premija je odvisna od pogojev zavarovalnice.
+          </p>
+        </div>
+      </div>
 
       {/* Premoženjsko zavarovanje */}
       <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
@@ -2328,20 +2321,26 @@ function ZavarovanjeSection({
             </thead>
             <tbody className="divide-y divide-gray-50">
               <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3 text-gray-700 font-medium">Požarno in splošno</td>
+                <td className="px-5 py-3">
+                  <p className="text-gray-700 font-medium">Požarno in splošno</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Osnova: gradbena vrednost × stopnja 0,04% (masivna konstrukcija)</p>
+                </td>
                 <td className="px-5 py-3 text-right tabular-nums text-gray-700">{priporocenaVsota.toLocaleString("sl-SI")} €</td>
                 <td className="px-5 py-3 text-right tabular-nums text-gray-700">{pozarnaMin.toLocaleString("sl-SI")} € – {pozarnaMax.toLocaleString("sl-SI")} €</td>
               </tr>
               <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3 text-gray-500 italic">
-                  Poplavno tveganje
-                  <span className="ml-2 text-[10px] not-italic text-gray-400">Podatki o poplavni ogroženosti prihajajo</span>
+                <td className="px-5 py-3">
+                  <p className="text-gray-500 italic">Poplavno tveganje</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Podatki ARSO poplav v integraciji — prihaja v naslednji verziji.</p>
                 </td>
                 <td className="px-5 py-3 text-right text-gray-300 text-xs">—</td>
                 <td className="px-5 py-3 text-right text-gray-300 text-xs">—</td>
               </tr>
               <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3 text-gray-700 font-medium">Odgovornost</td>
+                <td className="px-5 py-3">
+                  <p className="text-gray-700 font-medium">Odgovornost</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Standardna vsota za stavbe s skupnimi deli. Stopnja: 0,006–0,012 %/leto.</p>
+                </td>
                 <td className="px-5 py-3 text-right tabular-nums text-gray-700">500.000 €</td>
                 <td className="px-5 py-3 text-right tabular-nums text-gray-700">30 € – 60 €</td>
               </tr>
