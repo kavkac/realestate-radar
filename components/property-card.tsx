@@ -455,8 +455,10 @@ export function PropertyCard({
             );
           })()}
 
-          {/* 6. Stroški ogrevanja — vedno odprto (ko relevantno) */}
-          {!(isMultiUnit && !(!!activePart || requestedDel != null)) && (
+          {/* 6. Stroški ogrevanja — samo če imamo EIZ podatke */}
+          {!(isMultiUnit && !(!!activePart || requestedDel != null)) &&
+           energetskaIzkaznica?.potrebnaTopota != null &&
+           energetskaIzkaznica?.kondicionirana != null && (
             <div className="px-5 py-5 border-b border-gray-100">
               <EnergetskiIzracunSection
                 energetskaIzkaznica={energetskaIzkaznica}
