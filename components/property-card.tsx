@@ -342,7 +342,7 @@ export function PropertyCard({
 
           {/* L3: Stanje */}
           <MaintenanceSection stavba={stavba} part={currentPart} />
-          <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} />
+          <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
           {/* L4: Vrednost in lastništvo (vedno odprto) */}
@@ -941,6 +941,44 @@ interface Ukrep {
   strosekMax: number;
   osnova: string;
   prioriteta: "visoka" | "srednja" | "nizka";
+  dobaPovrnitveMin: number;
+  dobaPovrnitveMax: number;
+}
+
+function izracunajROI(ukrep: string, strosekSrednji: number, povrsina: number | null): { min: number; max: number } {
+  const p = povrsina ?? 60;
+  switch (ukrep) {
+    case "okna":
+      return { min: Math.round(strosekSrednji / (p * 12)), max: Math.round(strosekSrednji / (p * 8)) };
+    case "fasada":
+      return { min: Math.round(strosekSrednji / (p * 25)), max: Math.round(strosekSrednji / (p * 15)) };
+    case "streha":
+      return { min: Math.round(strosekSrednji / (p * 20)), max: Math.round(strosekSrednji / (p * 12)) };
+    case "ogrevanje":
+      return { min: Math.round(strosekSrednji / 400), max: Math.round(strosekSrednji / 200) };
+    default:
+      return { min: Math.round(strosekSrednji / 300), max: Math.round(strosekSrednji / 150) };
+  }
+}
+
+// Varstvo kulturne dediščine — geometrijska detekcija
+const VARSTVENA_OBMOCJA = [
+  { naziv: "Ljubljana — Staro mestno jedro (EUP LJ-411)", latMin: 46.044, latMax: 46.052, lngMin: 14.500, lngMax: 14.513 },
+  { naziv: "Ljubljana — Mestni trg in okolica", latMin: 46.046, latMax: 46.051, lngMin: 14.503, lngMax: 14.511 },
+  { naziv: "Piran — Staro mestno jedro", latMin: 45.525, latMax: 45.532, lngMin: 13.566, lngMax: 13.577 },
+  { naziv: "Ptuj — Zgodovinsko mestno jedro", latMin: 46.418, latMax: 46.423, lngMin: 15.868, lngMax: 15.880 },
+  { naziv: "Kranj — Staro mestno jedro", latMin: 46.237, latMax: 46.242, lngMin: 14.354, lngMax: 14.363 },
+  { naziv: "Maribor — Staro mestno jedro", latMin: 46.556, latMax: 46.562, lngMin: 15.644, lngMax: 15.652 },
+];
+
+function jeVVarstveniConi(lat: number | null | undefined, lng: number | null | undefined): { varuje: boolean; naziv: string | null } {
+  if (!lat || !lng) return { varuje: false, naziv: null };
+  for (const obmocje of VARSTVENA_OBMOCJA) {
+    if (lat >= obmocje.latMin && lat <= obmocje.latMax && lng >= obmocje.lngMin && lng <= obmocje.lngMax) {
+      return { varuje: true, naziv: obmocje.naziv };
+    }
+  }
+  return { varuje: false, naziv: null };
 }
 
 function predlagajUkrepe(
@@ -948,7 +986,8 @@ function predlagajUkrepe(
   part: PropertyCardProps["deliStavbe"][number] | null | undefined,
   delez: string | null,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _ocena: any
+  _ocena: any,
+  varstvo: { varuje: boolean; naziv: string | null } = { varuje: false, naziv: null }
 ): Ukrep[] {
   const ukrepi: Ukrep[] = [];
   const zdaj = new Date().getFullYear();
@@ -966,16 +1005,23 @@ function predlagajUkrepe(
   if (starOken > 20) {
     const stMin = povrsina ? Math.round(povrsina * 0.15 * 450) : 2500;
     const stMax = povrsina ? Math.round(povrsina * 0.15 * 650) : 4000;
+    const stSrednji = Math.round((stMin + stMax) / 2);
+    const roi = izracunajROI("okna", stSrednji, povrsina);
+    const opisOkna = varstvo.varuje
+      ? `Stavba je v varstvenem območju (${varstvo.naziv}). Zamenjava oken zahteva soglasje ZVKDS. Dovoljeni so samo leseni okvirji z enakim profilom in delitvijo kot originalni.`
+      : letaOken
+        ? `Okna so bila nazadnje obnovljena ${letaOken} (${zdaj - letaOken} let). Energijsko varčna okna (Uw ≤ 0,9 W/m²K) zmanjšajo toplotne izgube za 15-25%.`
+        : `Okna niso bila obnovljena. Energijsko varčna okna zmanjšajo toplotne izgube za 15-25%.`;
     ukrepi.push({
       naziv: "Zamenjava oken in balkonskih vrat",
       nivo: "stanovanje",
-      opis: letaOken
-        ? `Okna so bila nazadnje obnovljena ${letaOken} (${zdaj - letaOken} let). Energijsko varčna okna (Uw ≤ 0,9 W/m²K) zmanjšajo toplotne izgube za 15-25%.`
-        : `Okna niso bila obnovljena. Energijsko varčna okna zmanjšajo toplotne izgube za 15-25%.`,
+      opis: opisOkna,
       strosekMin: stMin,
       strosekMax: stMax,
       osnova: `Ocena: ~15% stanovanjske površine (${povrsina ? Math.round(povrsina * 0.15) + ' m²' : 'neznano'}) × 450–650 €/m²`,
       prioriteta: starOken > 40 ? "visoka" : "srednja",
+      dobaPovrnitveMin: roi.min,
+      dobaPovrnitveMax: roi.max,
     });
   }
 
@@ -983,16 +1029,22 @@ function predlagajUkrepe(
   const letaInst = part?.letoObnoveInstalacij;
   const starInst = letaInst ? zdaj - letaInst : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
   if (starInst > 25) {
+    const stMin = 6000;
+    const stMax = 14000;
+    const stSrednji = Math.round((stMin + stMax) / 2);
+    const roi = izracunajROI("ogrevanje", stSrednji, povrsina);
     ukrepi.push({
       naziv: "Posodobitev ogrevalnega sistema",
       nivo: "stanovanje",
       opis: letaInst
         ? `Instalacije so bile nazadnje obnovljene ${letaInst}. Sodobna toplotna črpalka ali kondenzacijski kotel zmanjša porabo energije za ogrevanje za 30-50%.`
         : `Ogrevalni sistem ni bil obnovljen. Posodobitev bistveno zmanjša stroške ogrevanja.`,
-      strosekMin: 6000,
-      strosekMax: 14000,
+      strosekMin: stMin,
+      strosekMax: stMax,
       osnova: "Toplotna črpalka zrak-voda: 8.000–12.000 €; kondenzacijski kotel: 3.500–6.000 €",
       prioriteta: starInst > 40 ? "visoka" : "srednja",
+      dobaPovrnitveMin: roi.min,
+      dobaPovrnitveMax: roi.max,
     });
   }
 
@@ -1004,16 +1056,23 @@ function predlagajUkrepe(
     const ocenjenaPovFasade = povrsina ? Math.round(Math.sqrt(povrsina) * 4 * visinaMerov) : 400;
     const skupniMin = Math.round(ocenjenaPovFasade * 80);
     const skupniMax = Math.round(ocenjenaPovFasade * 130);
+    const stSrednji = Math.round((skupniMin + skupniMax) / 2);
+    const roi = izracunajROI("fasada", stSrednji, povrsina);
     const delezMin = delezNum ? Math.round(skupniMin * delezNum) : null;
     const delezMax = delezNum ? Math.round(skupniMax * delezNum) : null;
+    const opisFasada = varstvo.varuje
+      ? `POZOR — Stavba se nahaja v varstvenem območju kulturne dediščine (${varstvo.naziv}). Obnova fasade zahteva predhodno soglasje ZVKDS. Dovoljeni so samo materiali, ki ohranjajo historični izgled (apnena malta, tradicionalne barve). Kontaktirajte Zavod za varstvo kulturne dediščine: zvkds@zvkds.si`
+      : `Celostna obnova fasade z mineralnimi ploščami (λ ≤ 0,035 W/mK, debelina ≥ 15 cm). ${letaFasade ? `Fasada je bila nazadnje obnovljena ${letaFasade}. ` : ""}Ukrep zmanjša potrebo po ogrevanju za 20-40%.`;
     ukrepi.push({
       naziv: "Toplotna izolacija fasade (ETICS sistem)",
       nivo: "skupno",
-      opis: `Celostna obnova fasade z mineralnimi ploščami (λ ≤ 0,035 W/mK, debelina ≥ 15 cm). ${letaFasade ? `Fasada je bila nazadnje obnovljena ${letaFasade}. ` : ""}Ukrep zmanjša potrebo po ogrevanju za 20-40%.`,
+      opis: opisFasada,
       strosekMin: skupniMin,
       strosekMax: skupniMax,
       osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × 80–130 €/m²${delezMin != null ? `\nVaš delež (${delez}): ${delezMin.toLocaleString('sl-SI')}–${delezMax!.toLocaleString('sl-SI')} €` : ""}`,
       prioriteta: starFasade > 40 ? "visoka" : "srednja",
+      dobaPovrnitveMin: roi.min,
+      dobaPovrnitveMax: roi.max,
     });
   }
 
@@ -1021,21 +1080,27 @@ function predlagajUkrepe(
   const letaStrehe = stavba?.letoObnove?.strehe;
   const starStrehe = letaStrehe ? zdaj - letaStrehe : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
   if (starStrehe > 30) {
+    const stMin = 15000;
+    const stMax = 40000;
+    const stSrednji = Math.round((stMin + stMax) / 2);
+    const roi = izracunajROI("streha", stSrednji, povrsina);
     ukrepi.push({
       naziv: "Toplotna izolacija strehe / podstrešja",
       nivo: "skupno",
       opis: `Izolacija podstrešja ali strešne konstrukcije (mineralna volna ≥ 30 cm). ${letaStrehe ? `Streha je bila nazadnje obnovljena ${letaStrehe}. ` : ""}Ukrep zmanjša toplotne izgube skozi streho za 30-50%.`,
-      strosekMin: 15000,
-      strosekMax: 40000,
+      strosekMin: stMin,
+      strosekMax: stMax,
       osnova: `Glede na velikost stavbe: 15.000–40.000 €${delezNum != null ? `\nVaš delež (${delez}): ${Math.round(15000 * delezNum).toLocaleString('sl-SI')}–${Math.round(40000 * delezNum).toLocaleString('sl-SI')} €` : ""}`,
       prioriteta: starStrehe > 40 ? "visoka" : "nizka",
+      dobaPovrnitveMin: roi.min,
+      dobaPovrnitveMax: roi.max,
     });
   }
 
   return ukrepi;
 }
 
-function EnergetskiUkrepiSection({ ukrepi, delez }: { ukrepi: Ukrep[]; delez: string | null }) {
+function EnergetskiUkrepiSection({ ukrepi, delez, varstvo }: { ukrepi: Ukrep[]; delez: string | null; varstvo: { varuje: boolean; naziv: string | null } }) {
   if (ukrepi.length === 0) return null;
 
   const prioritetaColor: Record<Ukrep["prioriteta"], string> = {
@@ -1047,6 +1112,15 @@ function EnergetskiUkrepiSection({ ukrepi, delez }: { ukrepi: Ukrep[]; delez: st
   return (
     <section className="mt-4 pt-4 border-t border-gray-100">
       <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Predlagani energetski ukrepi</p>
+      {varstvo.varuje && (
+        <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded px-3 py-2 mb-3">
+          <span className="text-purple-600 text-xs mt-0.5">🏛</span>
+          <div>
+            <p className="text-xs font-medium text-purple-800">Varstvo kulturne dediščine</p>
+            <p className="text-xs text-purple-700">{varstvo.naziv} — Za vsak poseg v zunanjost stavbe je potrebno predhodno soglasje Zavoda za varstvo kulturne dediščine Slovenije (ZVKDS).</p>
+          </div>
+        </div>
+      )}
       <div className="space-y-4">
         {ukrepi.map((u, i) => (
           <div key={i} className="border border-gray-100 rounded p-3">
@@ -1065,6 +1139,9 @@ function EnergetskiUkrepiSection({ ukrepi, delez }: { ukrepi: Ukrep[]; delez: st
                 <span className="text-sm font-medium text-gray-800 ml-1">
                   {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
                 </span>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
+                </p>
               </div>
               {u.nivo === "skupno" && delez && (
                 <span className="text-xs text-gray-400">delež {delez}</span>
@@ -1084,11 +1161,15 @@ function EnergetskiUkrepiSection({ ukrepi, delez }: { ukrepi: Ukrep[]; delez: st
   );
 }
 
-function EnergyCertificateSection({ data, stavba, part }: {
+function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
   data: EnergyData | null;
   stavba: PropertyCardProps["stavba"];
   part?: PropertyCardProps["deliStavbe"][number] | null;
+  lat?: number | null;
+  lng?: number | null;
 }) {
+  const varstvo = jeVVarstveniConi(lat, lng);
+
   if (!data) {
     const ocena = stavba ? oceniEnergetskiRazred(stavba, part) : null;
     if (!ocena) return (
@@ -1136,8 +1217,9 @@ function EnergyCertificateSection({ data, stavba, part }: {
           </div>
         )}
         <EnergetskiUkrepiSection
-          ukrepi={predlagajUkrepe(stavba, part, part?.lastnistvo?.[0]?.delez ?? null, ocena)}
+          ukrepi={predlagajUkrepe(stavba, part, part?.lastnistvo?.[0]?.delez ?? null, ocena, varstvo)}
           delez={part?.lastnistvo?.[0]?.delez ?? null}
+          varstvo={varstvo}
         />
       </section>
     );
