@@ -1767,7 +1767,12 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
 function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
   const MAX_VISIBLE_LASTNIKI = 4;
   const [showAllLastniki, setShowAllLastniki] = useState(false);
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) return (
+    <section>
+      <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
+      <p className="text-xs text-gray-400 italic">Podatki o lastništvu niso javno dostopni za to nepremičnino.</p>
+    </section>
+  );
   const vidniLastniki = showAllLastniki ? data : data.slice(0, MAX_VISIBLE_LASTNIKI);
   const jePokritih = data.length > MAX_VISIBLE_LASTNIKI;
   return (
