@@ -307,43 +307,16 @@ export function PropertyCard({
         </div>
       )}
 
+      {/* Ključni podatki — vedno odprto, nad 2-stolpčnim layoutom */}
+      <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
+        <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} energetskaIzkaznica={energetskaIzkaznica} />
+      </div>
+
       {/* 2-stolpčni layout: levi stolpec + desni sidebar */}
       <div className="flex flex-col lg:flex-row gap-4 items-start">
 
         {/* ── LEVI STOLPEC — primarna vsebina ── */}
-        <div className="w-full lg:flex-1 min-w-0 space-y-0">
-
-          {/* 1. Ključni podatki — vedno odprto */}
-          <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
-            <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} energetskaIzkaznica={energetskaIzkaznica} />
-          </div>
-
-          {/* Mobile-only: karta + street view takoj za ključnimi podatki */}
-          <div className="lg:hidden space-y-3 py-3">
-            {lat && lng && (
-              <div className="rounded-lg border border-gray-200 overflow-hidden mx-3">
-                <CadastralMap
-                  key={`map-mob-${lat}-${lng}-${enolicniId.koId}-${enolicniId.stStavbe}`}
-                  lat={lat} lng={lng} naslov={naslov}
-                  koId={enolicniId.koId} stStavbe={enolicniId.stStavbe}
-                  obrisGeom={stavba?.obrisGeom ?? null}
-                  parcelGeoms={parcele ?? null}
-                />
-                <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex gap-4 text-[10px] text-gray-400">
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 bg-red-500 opacity-60 rounded-sm" /> Stavba (KN)</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-blue-600" /> Parcela (KN)</span>
-                  <span className="ml-auto">Vir: GURS DOF · KN</span>
-                </div>
-              </div>
-            )}
-            {lat && lng && (
-              <div className="rounded-lg border border-gray-200 bg-white overflow-hidden mx-3">
-                <div className="px-4 py-3">
-                  <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="w-full lg:flex-1 min-w-0 space-y-0 order-last lg:order-first">
 
           {/* 2. O stavbi — zložljivo, privzeto ZAPRTO */}
           <CollapsibleSection title="O stavbi" vir="Kataster nepremičnin · GURS" defaultOpen={false}>
@@ -552,18 +525,21 @@ export function PropertyCard({
         </div>
 
         {/* ── DESNI SIDEBAR — referenčni podatki ── */}
-        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-3 lg:sticky lg:top-4 px-3 py-3 lg:px-0 lg:pr-4 lg:pt-4">
+        {/* Na mobilnem: order-first pomakne sidebar takoj za KP, pred levi stolpec */}
+        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-3 lg:sticky lg:top-4 px-3 py-3 lg:px-0 lg:pr-4 lg:pt-4 order-first lg:order-last">
 
-          {/* 1. Katastrski načrt — hidden on mobile (shown inline above) */}
+          {/* 1. Katastrski načrt */}
           {lat && lng && (
-            <div className="hidden lg:block rounded-lg border border-gray-200 overflow-hidden">
-              <CadastralMap
-                key={`map-${lat}-${lng}-${enolicniId.koId}-${enolicniId.stStavbe}`}
-                lat={lat} lng={lng} naslov={naslov}
-                koId={enolicniId.koId} stStavbe={enolicniId.stStavbe}
-                obrisGeom={stavba?.obrisGeom ?? null}
-                parcelGeoms={parcele ?? null}
-              />
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <div className="h-[200px] lg:h-auto">
+                <CadastralMap
+                  key={`map-${lat}-${lng}-${enolicniId.koId}-${enolicniId.stStavbe}`}
+                  lat={lat} lng={lng} naslov={naslov}
+                  koId={enolicniId.koId} stStavbe={enolicniId.stStavbe}
+                  obrisGeom={stavba?.obrisGeom ?? null}
+                  parcelGeoms={parcele ?? null}
+                />
+              </div>
               <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex gap-4 text-[10px] text-gray-400">
                 <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 bg-red-500 opacity-60 rounded-sm" /> Stavba (KN)</span>
                 <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-blue-600" /> Parcela (KN)</span>
@@ -572,9 +548,9 @@ export function PropertyCard({
             </div>
           )}
 
-          {/* Street View — hidden on mobile (shown inline above) */}
+          {/* Street View */}
           {lat && lng && (
-            <div className="hidden lg:block rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
               <div className="px-4 py-3">
                 <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
               </div>
