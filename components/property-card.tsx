@@ -16,7 +16,7 @@ function InfoTooltip({ text }: { text: string }) {
     <span className="relative inline-flex items-center" ref={ref}>
       <button
         type="button"
-        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-500 text-[9px] font-bold hover:bg-gray-300 transition-colors leading-none cursor-help ml-1"
+        className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-gray-200 text-gray-500 text-[8px] font-bold hover:bg-gray-300 transition-colors leading-none cursor-help ml-0.5 translate-y-[-1px]"
         onMouseEnter={() => setVisible(true)}
         onMouseLeave={() => setVisible(false)}
         onFocus={() => setVisible(true)}
