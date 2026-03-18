@@ -650,13 +650,21 @@ export async function getParcele(
       const threshold = Math.max(1, Math.round(totalPts * 0.25));
       const relevant = scored
         .filter(x => x.hasCenter || x.score >= threshold)
-        .sort((a, b) => (b.hasCenter ? 1 : 0) - (a.hasCenter ? 1 : 0) || b.score - a.score)
-        .slice(0, 3)
+        // Med enako kvalificiranimi: preferiramo manjše parcele (ceste/koridorji so veliki)
+        .sort((a, b) => {
+          const aArea = (a.f.properties?.POVRSINA as number) ?? Infinity;
+          const bArea = (b.f.properties?.POVRSINA as number) ?? Infinity;
+          // Najprej po score (več = boljše), nato po površini (manj = boljše)
+          if (b.score !== a.score) return b.score - a.score;
+          return aArea - bArea;
+        })
+        .slice(0, 2)
         .map(x => x.f);
-      // Če nič ne ustreza, vrni parcelo ki vsebuje center (fallback)
       if (relevant.length === 0) {
-        const centerParcel = scored.filter(x => x.hasCenter).map(x => x.f);
-        parceleData = { ...bboxData, features: centerParcel.length > 0 ? centerParcel : bboxData.features.slice(0, 1) };
+        // Fallback: najmanjša parcela ki vsebuje center
+        const centerParcels = scored.filter(x => x.hasCenter)
+          .sort((a, b) => ((a.f.properties?.POVRSINA as number) ?? Infinity) - ((b.f.properties?.POVRSINA as number) ?? Infinity));
+        parceleData = { ...bboxData, features: centerParcels.length > 0 ? [centerParcels[0].f] : bboxData.features.slice(0, 1) };
       } else {
         parceleData = { ...bboxData, features: relevant };
       }
