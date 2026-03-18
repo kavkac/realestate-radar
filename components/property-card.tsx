@@ -2294,6 +2294,8 @@ interface PotresnoTveganje {
   tveganjeTocke: number;
   opisRanljivosti: string;
   priporocenaVsota: number;
+  vsotaMin: number;
+  vsotaMax: number;
   letnaPremijaOcena: { min: number; max: number };
 }
 
@@ -2364,18 +2366,31 @@ function izracunajPotresnoTveganje(
     : "zelo visoko";
 
   // Priporočena zavarovalna vsota — unitArea ima prednost pred stavba.povrsina
+  // Vir: SLO zavarovalni trg, požarno zavarovanje = 1.200–1.600 €/m² gradbene vrednosti
   const povrsina = unitArea ?? stavba.povrsina ?? 80;
-  const ocenjenVrednost = povrsina * 1800;
-  const priporocenaVsota = Math.round(ocenjenVrednost * 1.1);
+
+  // Korekcija glede na konstrukcijo
+  const konstrukcijaFaktor = (() => {
+    const k = (stavba.konstrukcija ?? "").toLowerCase();
+    if (k.includes("les")) return 0.85;          // lesena — nižja gradbena vrednost
+    if (k.includes("montaž")) return 0.88;        // montažna
+    if (k.includes("jekl")) return 1.10;          // jeklena — višja
+    if (k.includes("armir") || k.includes("beton")) return 1.05; // AB
+    return 1.00; // masivna (kamen, opeka) — standard
+  })();
+
+  const vsotaMin = Math.round(povrsina * 1200 * konstrukcijaFaktor / 1000) * 1000;
+  const vsotaMax = Math.round(povrsina * 1600 * konstrukcijaFaktor / 1000) * 1000;
+  const priporocenaVsota = Math.round((vsotaMin + vsotaMax) / 2);
 
   // Letna premija
   const stopnja = tveganjeTocke <= 3 ? 0.0008 : tveganjeTocke <= 6 ? 0.0015 : 0.0025;
   const letnaPremijaOcena = {
-    min: Math.round(priporocenaVsota * stopnja * 0.8),
-    max: Math.round(priporocenaVsota * stopnja * 1.3),
+    min: Math.round(vsotaMin * stopnja * 0.8),
+    max: Math.round(vsotaMax * stopnja * 1.3),
   };
 
-  return { razredRanljivosti, tveganje, tveganjeTocke, opisRanljivosti, priporocenaVsota, letnaPremijaOcena };
+  return { razredRanljivosti, tveganje, tveganjeTocke, opisRanljivosti, priporocenaVsota, vsotaMin, vsotaMax, letnaPremijaOcena };
 }
 
 function TveganjeProgressBar({ tocke }: { tocke: number }) {
@@ -2426,6 +2441,9 @@ function ZavarovanjeSection({
   const seizmicni: SeizmicniPodatki = seizmicniPodatki ?? { pga: 0.125, cona: "III", opisCone: "Srednja potresna nevarnost" };
   const potresno = izracunajPotresnoTveganje(stavba, seizmicni, unitArea);
   const priporocenaVsota = potresno.priporocenaVsota;
+  const vsotaMin = potresno.vsotaMin;
+  const vsotaMax = potresno.vsotaMax;
+  const vsotaRazpon = `${vsotaMin.toLocaleString("sl-SI")} – ${vsotaMax.toLocaleString("sl-SI")} €`;
 
   const konstr = (stavba.konstrukcija ?? "").toLowerCase();
   const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
@@ -2549,19 +2567,19 @@ function ZavarovanjeSection({
       { label: "Konstrukcija", value: konstrukcija },
       { label: "Etaže", value: String(etaze) },
       { label: "Površina", value: `${povrsina} m²` },
-      { label: "Zavarovalniška vsota", value: `${priporocenaVsota.toLocaleString("sl-SI")} €` },
+      { label: "Indikativna zavarovalna vsota", value: vsotaRazpon },
     ],
     pozarno: [
       { label: "Tip konstrukcije", value: jeMasivna ? "Masivna (opeka/beton)" : "Lahka (les/montažna)", rizik: jeMasivna ? "nizek" : "srednji" },
       { label: "Ogrevanje", value: ogrevanje, rizik: imaPlinZavar ? "srednji" : "nizek" },
       { label: "Leto izgradnje", value: letoIzgradnje ? String(letoIzgradnje) : "Ni podatka" },
       { label: "Površina", value: `${povrsina} m²` },
-      { label: "Zavarovalniška vsota", value: `${priporocenaVsota.toLocaleString("sl-SI")} €` },
+      { label: "Indikativna zavarovalna vsota", value: vsotaRazpon },
     ],
     poplavno: [
       { label: "Poplavna nevarnost (ARSO)", value: poplavnaNevarnost?.opis ?? `Stopnja: ${poplavnaNevarnost?.stopnja}`, rizik: "visok" },
       { label: "Površina", value: `${povrsina} m²` },
-      { label: "Zavarovalniška vsota", value: `${priporocenaVsota.toLocaleString("sl-SI")} €` },
+      { label: "Indikativna zavarovalna vsota", value: vsotaRazpon },
     ],
     odgovornost: [
       { label: "Tip objekta", value: "Večstanovanjska stavba" },
