@@ -345,14 +345,27 @@ export function PropertyCard({
           <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
-          {stavba && (
-            <EnergetskiUkrepiSection
-              ukrepi={predlagajUkrepe(stavba, currentPart, currentPart?.lastnistvo?.[0]?.delez ?? null, null)}
-              delez={currentPart?.lastnistvo?.[0]?.delez ?? null}
-              lat={lat}
-              lng={lng}
-            />
-          )}
+          {stavba && (() => {
+            const unitArea = currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null;
+            const totalArea = stavba.povrsina ?? null;
+            const stStan = stavba.steviloStanovanj;
+            // Prednostno: površinski delež (unitArea/totalArea); fallback: 1/N stanovanj
+            let delezSkupnih: string | null = null;
+            if (unitArea && totalArea && totalArea > 0) {
+              const d = Math.round(totalArea / unitArea);
+              delezSkupnih = d > 1 ? `1/${d}` : null;
+            } else if (stStan && stStan > 1) {
+              delezSkupnih = `1/${stStan}`;
+            }
+            return (
+              <EnergetskiUkrepiSection
+                ukrepi={predlagajUkrepe(stavba, currentPart, delezSkupnih, null)}
+                delez={delezSkupnih}
+                lat={lat}
+                lng={lng}
+              />
+            );
+          })()}
 
           {/* L4: Vrednost in lastništvo (vedno odprto) */}
           <div className="border-t border-gray-100 pt-6 space-y-8">
@@ -1482,12 +1495,14 @@ function EnergetskiIzracunSection({
   const area = energetskaIzkaznica.kondicionirana;
   const annualCost = heatingNeed * area * HEATING_PRICE_EUR;
 
-  const targetB2 = 75;
-  const targetA2 = 25;
-  const costB2 = targetB2 * area * HEATING_PRICE_EUR;
-  const costA2 = targetA2 * area * HEATING_PRICE_EUR;
-  const savingsB2 = annualCost - costB2;
-  const savingsA2 = annualCost - costA2;
+  // Cilji po razredih (kWh/m²a) — PURES 2010
+  const RAZREDI: { razred: string; target: number }[] = [
+    { razred: "B1", target: 50 },
+    { razred: "A2", target: 25 },
+    { razred: "A1", target: 10 },
+  ];
+  // Prikaži 2 naslednja boljša razreda od trenutnega
+  const boljsiRazredi = RAZREDI.filter(r => r.target < heatingNeed).slice(0, 2);
   return (
     <section>
       <Label vir="Register energetskih izkaznic · MOP">Stroški ogrevanja</Label>
@@ -1497,15 +1512,12 @@ function EnergetskiIzracunSection({
             label="Letni strošek ogrevanja"
             value={`${fmt(annualCost)} \u20AC`}
           />
-          {savingsB2 > 0 ? (
-            <Field label="Prihranek do B2" value={`${fmt(savingsB2)} €/leto`} />
-          ) : (
-            <Field label="Razred B2" value="✓ Že doseženo" />
-          )}
-          {savingsA2 > 0 ? (
-            <Field label="Prihranek do A2" value={`${fmt(savingsA2)} €/leto`} />
-          ) : (
-            <Field label="Razred A2" value="✓ Že doseženo" />
+          {boljsiRazredi.length === 0 ? (
+            <Field label="Energetski razred" value="✓ Vrhunska učinkovitost" />
+          ) : boljsiRazredi.map(r => {
+            const savings = annualCost - r.target * area * HEATING_PRICE_EUR;
+            return <Field key={r.razred} label={`Prihranek do ${r.razred}`} value={`${fmt(savings)} €/leto`} />;
+          })
           )}
         </div>
 
