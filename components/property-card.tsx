@@ -352,16 +352,19 @@ export function PropertyCard({
           />
 
           {stavba && (() => {
+            const hasUnit = !!(activePart || requestedDel != null);
             const unitArea = currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null;
             const totalArea = stavba.povrsina ?? null;
             const stStan = stavba.steviloStanovanj;
-            // Prednostno: površinski delež (unitArea/totalArea); fallback: 1/N stanovanj
+            // Delež skupnih stroškov samo ko je enota izbrana
             let delezSkupnih: string | null = null;
-            if (unitArea && totalArea && totalArea > 0) {
-              const d = Math.round(totalArea / unitArea);
-              delezSkupnih = d > 1 ? `1/${d}` : null;
-            } else if (stStan && stStan > 1) {
-              delezSkupnih = `1/${stStan}`;
+            if (hasUnit) {
+              if (unitArea && totalArea && totalArea > 0) {
+                const d = Math.round(totalArea / unitArea);
+                delezSkupnih = d > 1 ? `1/${d}` : null;
+              } else if (stStan && stStan > 1) {
+                delezSkupnih = `1/${stStan}`;
+              }
             }
             const varstvo = jeVVarstveniConi(lat, lng);
             return (
@@ -372,7 +375,7 @@ export function PropertyCard({
                 lat={lat}
                 lng={lng}
                 isMultiUnit={isMultiUnit}
-                hasSelectedUnit={!!activePart || requestedDel != null}
+                hasSelectedUnit={hasUnit}
                 unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
               />
             );
