@@ -1128,6 +1128,11 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng }: { ukrepi: Ukrep[];
           <div>
             <p className="text-xs font-medium text-purple-800">Varstvo kulturne dediščine</p>
             <p className="text-xs text-purple-700">{varstvo.naziv} — Za vsak poseg v zunanjost stavbe je potrebno predhodno soglasje Zavoda za varstvo kulturne dediščine Slovenije (ZVKDS).</p>
+      <p className="text-xs text-purple-700 mt-1">
+        📞 <a href="tel:+38614244200" className="underline">01 424 42 00</a>
+        {" · "}✉️ <a href="mailto:gp.zvkds@gov.si" className="underline">gp.zvkds@gov.si</a>
+        {" · "}🌐 <a href="https://www.zvkds.si" target="_blank" rel="noopener noreferrer" className="underline">zvkds.si</a>
+      </p>
           </div>
         </div>
       )}
