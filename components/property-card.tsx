@@ -329,7 +329,7 @@ export function PropertyCard({
 
           {/* L3: Stanje */}
           <MaintenanceSection stavba={stavba} part={currentPart} />
-          <EnergyCertificateSection data={energetskaIzkaznica} />
+          <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} />
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
           {/* L4: Vrednost in lastništvo (vedno odprto) */}
@@ -717,72 +717,103 @@ function EnergyMeter({ razred }: { razred: string }) {
   );
 }
 
-function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
-  return (
-    <section>
-      <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
-      {data ? (
-        <div className="space-y-4">
-          <div>
-            <EnergyMeter razred={data.razred} />
-            <div className="text-sm text-gray-500 mt-1">
-              <p>Veljavna do {data.veljaDo}</p>
-              {data.tip && <p className="mt-0.5">Tip: {data.tip}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-            <Field
-              label="Potrebna toplota"
-              value={
-                data.potrebnaTopota != null
-                  ? `${fmtDec(data.potrebnaTopota)} kWh/m\u00B2a`
-                  : null
-              }
-            />
-            <Field
-              label="Dovedena energija"
-              value={
-                data.dovedenaEnergija != null
-                  ? `${fmtDec(data.dovedenaEnergija)} kWh/m\u00B2a`
-                  : null
-              }
-            />
-            <Field
-              label="Električna energija"
-              value={
-                data.elektricnaEnergija != null
-                  ? `${fmtDec(data.elektricnaEnergija)} kWh/m\u00B2a`
-                  : null
-              }
-            />
-            <Field
-              label="Primarna energija"
-              value={
-                data.primaryEnergy != null
-                  ? `${fmtDec(data.primaryEnergy)} kWh/m\u00B2a`
-                  : null
-              }
-            />
-            <Field
-              label={"CO\u2082 emisije"}
-              value={data.co2 != null ? `${fmtDec(data.co2)} kg/m\u00B2a` : null}
-            />
-            <Field
-              label="Kondicionirana površina"
-              value={
-                data.kondicionirana != null
-                  ? `${fmtDec(data.kondicionirana)} m\u00B2`
-                  : null
-              }
-            />
-            <Field label="Datum izdaje" value={data.datumIzdaje} />
-          </div>
-        </div>
-      ) : (
+function oceniEnergetskiRazred(letoIzgradnje: number | null): { razred: string; opis: string } | null {
+  if (!letoIzgradnje) return null;
+  if (letoIzgradnje < 1974) return { razred: "G", opis: "pred letom 1974, brez toplotne izolacije" };
+  if (letoIzgradnje < 1988) return { razred: "F", opis: "1974–1987, minimalna izolacija" };
+  if (letoIzgradnje < 2002) return { razred: "E", opis: "1988–2001, delna izolacija" };
+  if (letoIzgradnje < 2010) return { razred: "D", opis: "2002–2009, PURES 2002" };
+  if (letoIzgradnje < 2016) return { razred: "C", opis: "2010–2015, PURES 2010" };
+  if (letoIzgradnje < 2021) return { razred: "B2", opis: "2016–2020, PURES 2010 + revizija" };
+  return { razred: "A2", opis: "po letu 2021, skoraj nič-energijska gradnja" };
+}
+
+function EnergyCertificateSection({ data, stavba }: { data: EnergyData | null; stavba: PropertyCardProps["stavba"] }) {
+  if (!data) {
+    const ocena = oceniEnergetskiRazred(stavba?.letoIzgradnje ?? null);
+    if (!ocena) return (
+      <section>
+        <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
         <p className="text-sm text-gray-400 italic">
           Energetska izkaznica za to nepremičnino ni vpisana v register.
         </p>
-      )}
+      </section>
+    );
+    return (
+      <section>
+        <Label vir="Ocena · PURES 2010">Energetsko stanje</Label>
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
+          <span className="text-amber-600 text-xs mt-0.5">⚠</span>
+          <p className="text-xs text-amber-700">
+            Za to stavbo ni veljavne energetske izkaznice. Spodnja ocena temelji na letu izgradnje ({stavba?.letoIzgradnje}) in veljavnih gradbenih standardih (PURES 2010). <strong>To ni uradna izkaznica.</strong>
+          </p>
+        </div>
+        <EnergyMeter razred={ocena.razred} />
+        <p className="text-xs text-gray-400 mt-1">{ocena.opis}</p>
+        <p className="text-xs text-gray-300 mt-2">Vir: ocena na podlagi leta izgradnje · PURES 2010 · ni uradna energetska izkaznica</p>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
+      <div className="space-y-4">
+        <div>
+          <EnergyMeter razred={data.razred} />
+          <div className="text-sm text-gray-500 mt-1">
+            <p>Veljavna do {data.veljaDo}</p>
+            {data.tip && <p className="mt-0.5">Tip: {data.tip}</p>}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+          <Field
+            label="Potrebna toplota"
+            value={
+              data.potrebnaTopota != null
+                ? `${fmtDec(data.potrebnaTopota)} kWh/m\u00B2a`
+                : null
+            }
+          />
+          <Field
+            label="Dovedena energija"
+            value={
+              data.dovedenaEnergija != null
+                ? `${fmtDec(data.dovedenaEnergija)} kWh/m\u00B2a`
+                : null
+            }
+          />
+          <Field
+            label="Električna energija"
+            value={
+              data.elektricnaEnergija != null
+                ? `${fmtDec(data.elektricnaEnergija)} kWh/m\u00B2a`
+                : null
+            }
+          />
+          <Field
+            label="Primarna energija"
+            value={
+              data.primaryEnergy != null
+                ? `${fmtDec(data.primaryEnergy)} kWh/m\u00B2a`
+                : null
+            }
+          />
+          <Field
+            label={"CO\u2082 emisije"}
+            value={data.co2 != null ? `${fmtDec(data.co2)} kg/m\u00B2a` : null}
+          />
+          <Field
+            label="Kondicionirana površina"
+            value={
+              data.kondicionirana != null
+                ? `${fmtDec(data.kondicionirana)} m\u00B2`
+                : null
+            }
+          />
+          <Field label="Datum izdaje" value={data.datumIzdaje} />
+        </div>
+      </div>
     </section>
   );
 }
