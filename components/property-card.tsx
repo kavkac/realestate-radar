@@ -985,6 +985,7 @@ interface Ukrep {
   dobaPovrnitveMin: number;
   dobaPovrnitveMax: number;
   varstvoCene?: boolean; // true = cene prilagojene za kulturno dediščino
+  vrednostDvig?: number; // % ocenjenega dviga vrednosti nepremičnine po izvedbi
 }
 
 function izracunajROI(ukrep: string, strosekSrednji: number, povrsina: number | null): { min: number; max: number } {
@@ -1073,6 +1074,7 @@ function predlagajUkrepe(
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       varstvoCene: varstvo.varuje,
+      vrednostDvig: 3,
     });
   }
 
@@ -1096,6 +1098,7 @@ function predlagajUkrepe(
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
+      vrednostDvig: 4,
     });
   }
 
@@ -1133,6 +1136,7 @@ function predlagajUkrepe(
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       varstvoCene: varstvo.varuje,
+      vrednostDvig: varstvo.varuje ? 8 : 6,
     });
   }
 
@@ -1161,6 +1165,7 @@ function predlagajUkrepe(
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
+      vrednostDvig: 5,
     });
   }
 
@@ -1239,9 +1244,18 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
                         {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400">
-                      Doba povrnitve (vaš delež): ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
-                    </p>
+                    {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
+                      <p className="text-xs text-purple-700">Vzdrževalna obveznost — preverite subvencije (EkoSklad, EU skladi)</p>
+                    ) : u.dobaPovrnitveMin > 50 ? (
+                      <p className="text-xs text-gray-500">Doba povrnitve (vaš delež): &gt; 50 let — priporočljivo preveriti razpoložljive subvencije</p>
+                    ) : (
+                      <p className="text-xs text-gray-400">
+                        Doba povrnitve (vaš delež): ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
+                      </p>
+                    )}
+                    {u.vrednostDvig && (
+                      <p className="text-xs text-green-700 mt-1">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -1251,9 +1265,18 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
                     <span className="text-sm font-medium text-gray-800 ml-1">
                       {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
                     </span>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
-                    </p>
+                    {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
+                      <p className="text-xs text-purple-700">Vzdrževalna obveznost — preverite subvencije (EkoSklad, EU skladi)</p>
+                    ) : u.dobaPovrnitveMin > 50 ? (
+                      <p className="text-xs text-gray-500">Doba povrnitve: &gt; 50 let — priporočljivo preveriti razpoložljive subvencije</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
+                      </p>
+                    )}
+                    {u.vrednostDvig && (
+                      <p className="text-xs text-green-700 mt-1">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
+                    )}
                   </div>
                 )}
               </div>
