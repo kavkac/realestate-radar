@@ -345,6 +345,15 @@ export function PropertyCard({
           <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
           <EnergetskiIzracunSection energetskaIzkaznica={energetskaIzkaznica} />
 
+          {stavba && (
+            <EnergetskiUkrepiSection
+              ukrepi={predlagajUkrepe(stavba, currentPart, currentPart?.lastnistvo?.[0]?.delez ?? null, null)}
+              delez={currentPart?.lastnistvo?.[0]?.delez ?? null}
+              lat={lat}
+              lng={lng}
+            />
+          )}
+
           {/* L4: Vrednost in lastništvo (vedno odprto) */}
           <div className="border-t border-gray-100 pt-6 space-y-8">
             <div>
@@ -1100,7 +1109,8 @@ function predlagajUkrepe(
   return ukrepi;
 }
 
-function EnergetskiUkrepiSection({ ukrepi, delez, varstvo }: { ukrepi: Ukrep[]; delez: string | null; varstvo: { varuje: boolean; naziv: string | null } }) {
+function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng }: { ukrepi: Ukrep[]; delez: string | null; lat?: number | null; lng?: number | null }) {
+  const varstvo = jeVVarstveniConi(lat, lng);
   if (ukrepi.length === 0) return null;
 
   const prioritetaColor: Record<Ukrep["prioriteta"], string> = {
@@ -1168,8 +1178,6 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
   lat?: number | null;
   lng?: number | null;
 }) {
-  const varstvo = jeVVarstveniConi(lat, lng);
-
   if (!data) {
     const ocena = stavba ? oceniEnergetskiRazred(stavba, part) : null;
     if (!ocena) return (
@@ -1216,11 +1224,6 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
             </ul>
           </div>
         )}
-        <EnergetskiUkrepiSection
-          ukrepi={predlagajUkrepe(stavba, part, part?.lastnistvo?.[0]?.delez ?? null, ocena, varstvo)}
-          delez={part?.lastnistvo?.[0]?.delez ?? null}
-          varstvo={varstvo}
-        />
       </section>
     );
   }
@@ -1480,34 +1483,6 @@ function EnergetskiIzracunSection({
   const costA2 = targetA2 * area * HEATING_PRICE_EUR;
   const savingsB2 = annualCost - costB2;
   const savingsA2 = annualCost - costA2;
-
-  const fasadaArea = Math.sqrt(area) * 12;
-  const windowCount = Math.floor(area / 15);
-  const roofArea = area * 0.8;
-
-  const improvements = [
-    {
-      name: "Toplotna izolacija fasade",
-      costRange: `${fmt(fasadaArea * 80)} \u2013 ${fmt(fasadaArea * 120)} \u20AC`,
-      midCost: fasadaArea * 100,
-    },
-    {
-      name: "Menjava oken",
-      costRange: `${fmt(windowCount * 400)} \u2013 ${fmt(windowCount * 800)} \u20AC`,
-      midCost: windowCount * 600,
-    },
-    {
-      name: "Toplotna črpalka",
-      costRange: "8.000 \u2013 15.000 \u20AC",
-      midCost: 11500,
-    },
-    {
-      name: "Strešna izolacija",
-      costRange: `${fmt(roofArea * 40)} \u2013 ${fmt(roofArea * 80)} \u20AC`,
-      midCost: roofArea * 60,
-    },
-  ];
-
   return (
     <section>
       <Label vir="Register energetskih izkaznic · MOP">Stroški ogrevanja</Label>
@@ -1531,42 +1506,6 @@ function EnergetskiIzracunSection({
           />
         </div>
 
-        <div>
-          <SubLabel>Predlagane izboljšave</SubLabel>
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[380px]">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-gray-500 text-xs uppercase tracking-wide">
-                <th className="pb-2 pr-4 font-medium">Ukrep</th>
-                <th className="pb-2 pr-4 text-right font-medium whitespace-nowrap">
-                  Ocena stroška
-                </th>
-                <th className="pb-2 text-right font-medium whitespace-nowrap">ROI (let)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {improvements.map((imp) => {
-                const roi =
-                  savingsB2 > 0 ? imp.midCost / savingsB2 : null;
-                return (
-                  <tr
-                    key={imp.name}
-                    className="border-b border-gray-50 last:border-0 odd:bg-gray-50"
-                  >
-                    <td className="py-2 pr-4 text-gray-700">{imp.name}</td>
-                    <td className="py-2 pr-4 text-right tabular-nums text-gray-700">
-                      {imp.costRange}
-                    </td>
-                    <td className="py-2 text-right tabular-nums text-gray-700">
-                      {roi != null ? `~${Math.round(roi)}` : "\u2014"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        </div>
       </div>
     </section>
   );
