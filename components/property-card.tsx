@@ -564,10 +564,9 @@ export function PropertyCard({
                 </div>
               );
             }
-            if (!lastnistvoData || lastnistvoData.length === 0) return null;
             return (
               <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-                <LastnistvoSection data={lastnistvoData} />
+                <LastnistvoSection data={lastnistvoData ?? []} />
               </div>
             );
           })()}
@@ -1769,6 +1768,14 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
       <p className="text-xs text-gray-400 italic">Podatki o lastništvu niso javno dostopni za to nepremičnino.</p>
+      <a
+        href="https://www.e-sodstvo.si/ekn/SredisnjiRegister?action=ZacetnaStran"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+      >
+        Preveri lastništvo v Zemljiški knjigi →
+      </a>
     </section>
   );
   const vidniLastniki = showAllLastniki ? data : data.slice(0, MAX_VISIBLE_LASTNIKI);
