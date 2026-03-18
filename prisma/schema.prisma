@@ -117,6 +117,13 @@ model LeadEmail {
   @@map("lead_emails")
 }
 
+model DeliStavbNamembnost {
+  eidDelStavbe     String @id
+  vrstaNamembnosti Int?   // VRSTA_DEJANSKE_RABE_DEL_ST_ID šifra
+
+  @@map("deli_stavb_namembnost")
+}
+
 model EvidencaVrednotenja {
   id                Int      @id @default(autoincrement())
   eidDelStavbe      String   @unique

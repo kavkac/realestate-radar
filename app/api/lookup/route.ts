@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure } from "@/lib/gurs-api";
+import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, VRSTA_DEJANSKE_RABE } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
 import { prisma } from "@/lib/prisma";
@@ -171,8 +171,8 @@ export async function POST(request: NextRequest) {
         ? await checkGasInfrastructure(lat, lng).catch(() => null)
         : null;
 
-    // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, and EV in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, evResults, ...ownershipResults] = await Promise.all([
+    // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, and KN namembnost in parallel
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -184,6 +184,13 @@ export async function POST(request: NextRequest) {
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
+            .findUnique({ where: { eidDelStavbe: String(d.eidDelStavbe) } })
+            .catch(() => null)
+        )
+      ),
+      Promise.all(
+        deliStavbe.map((d) =>
+          prisma.deliStavbNamembnost
             .findUnique({ where: { eidDelStavbe: String(d.eidDelStavbe) } })
             .catch(() => null)
         )
@@ -243,7 +250,9 @@ export async function POST(request: NextRequest) {
         stDela: d.stDelaStavbe,
         povrsina: d.povrsina,
         uporabnaPovrsina: d.uporabnaPovrsina,
-        vrsta: d.vrsta,
+        vrsta: namembnostResults[i]?.vrstaNamembnosti
+          ? (VRSTA_DEJANSKE_RABE[namembnostResults[i]!.vrstaNamembnosti!] ?? d.vrsta)
+          : d.vrsta,
         letoObnoveInstalacij: d.letoObnoveInstalacij,
         letoObnoveOken: d.letoObnoveOken,
         dvigalo: d.dvigalo,
