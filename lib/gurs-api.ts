@@ -841,3 +841,73 @@ export async function getTipPolozajaStavbe(
     return null;
   }
 }
+
+// --- Ocena stanja stavbe (condition score) ---
+
+export interface OcenaStanja {
+  ocena: number; // 0-100
+  opis: string;
+  razred: "odlično" | "dobro" | "srednje" | "slabše" | "slabo";
+  color: "green" | "lime" | "amber" | "orange" | "red";
+}
+
+const LIFESPAN: Record<string, number> = {
+  "Masivna (kamen, opeka)": 80,
+  "Armiran beton": 80,
+  "Montažna": 40,
+  "Lesena": 60,
+  "Jeklo": 70,
+  "Kombinirana": 60,
+};
+
+const DEFAULT_LIFESPAN = 65;
+
+export function izracunajOcenaStanja(stavba: {
+  letoIzgradnje: number | null;
+  letoObnove?: { fasade: number | null; strehe: number | null } | null;
+  konstrukcija?: string | null;
+}): OcenaStanja | null {
+  if (!stavba.letoIzgradnje) return null;
+
+  const leto = new Date().getFullYear();
+  const lifespan = LIFESPAN[stavba.konstrukcija ?? ""] ?? DEFAULT_LIFESPAN;
+
+  // Efektivna starost: upoštevaj renovacije kot delno pomlajenje
+  let starostBase = leto - stavba.letoIzgradnje;
+
+  // Renovacije zmanjšajo efektivno starost
+  const renovacij = [stavba.letoObnove?.fasade, stavba.letoObnove?.strehe].filter(Boolean) as number[];
+  if (renovacij.length > 0) {
+    const zadnjaRenovacija = Math.max(...renovacij);
+    const starostPoRenovaciji = leto - zadnjaRenovacija;
+    // Vsaka renovacija "pomladiti" stavbo za 30% efektivne starosti
+    const bonus = (starostBase - starostPoRenovaciji) * 0.3;
+    starostBase = starostBase - bonus;
+  }
+
+  const ratio = Math.min(starostBase / lifespan, 0.70);
+  const ocena = Math.round((1 - ratio) * 100);
+
+  let razred: OcenaStanja["razred"];
+  let color: OcenaStanja["color"];
+  let opis: string;
+
+  if (ocena >= 80) {
+    razred = "odlično"; color = "green";
+    opis = "Stavba je v odličnem stanju glede na starost in tip konstrukcije.";
+  } else if (ocena >= 60) {
+    razred = "dobro"; color = "lime";
+    opis = "Stavba je v dobrem stanju. Manjše vzdrževanje je pričakovano.";
+  } else if (ocena >= 40) {
+    razred = "srednje"; color = "amber";
+    opis = "Stavba kaže znake staranja. Priporoča se pregled ključnih komponent.";
+  } else if (ocena >= 20) {
+    razred = "slabše"; color = "orange";
+    opis = "Stavba je v slabšem stanju. Večja investicija v prenovo je verjetna.";
+  } else {
+    razred = "slabo"; color = "red";
+    opis = "Stavba je v slabem stanju. Celovita prenova je nujno potrebna.";
+  }
+
+  return { ocena, opis, razred, color };
+}

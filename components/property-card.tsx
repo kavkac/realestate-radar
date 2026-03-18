@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
+import { izracunajOcenaStanja } from "@/lib/gurs-api";
 
 const CadastralMap = dynamic(() => import("./cadastral-map"), { ssr: false });
 
@@ -618,20 +619,44 @@ function PropertySummary({ stavba, deliStavbe, energetskaIzkaznica }: {
     stavek1 = `Stavba je stara ${letnica - leto} let. Glede na zabeležene obnove so ključne komponente v pričakovani življenjski dobi.`;
   }
 
-  // --- Stavek 2: Energetska ocena (samo če ni EIZ) ---
+  // --- Condition score insight ---
+  const conditionOcena = izracunajOcenaStanja({
+    letoIzgradnje: stavba.letoIzgradnje,
+    letoObnove: stavba.letoObnove,
+    konstrukcija: stavba.konstrukcija,
+  });
+  const stavekCondition = conditionOcena
+    ? `Ocena stanja stavbe: ${conditionOcena.ocena}/100 (${conditionOcena.razred}). ${conditionOcena.opis}`
+    : "";
+
+  // --- Stavek 2: Energetska ocena z kontekstom ---
   let stavek2 = "";
   if (!energetskaIzkaznica) {
     let ocenjenRazred = "";
-    if (leto < 1945) ocenjenRazred = "E ali F";
-    else if (leto < 1980) ocenjenRazred = "D ali E";
-    else if (leto < 2002) ocenjenRazred = "C ali D";
-    else if (leto < 2010) ocenjenRazred = "B ali C";
-    else ocenjenRazred = "B";
-    stavek2 = `Energetska izkaznica za to stavbo ni vpisana v register. Glede na leto izgradnje je pričakovan energetski razred ${ocenjenRazred}.`;
+    let kontekst = "";
+    if (leto < 1945) { ocenjenRazred = "E ali F"; kontekst = "Pod povprečjem za sodobne standarde"; }
+    else if (leto < 1980) { ocenjenRazred = "D ali E"; kontekst = "Pod povprečjem — pred energetsko sanacijo"; }
+    else if (leto < 2002) { ocenjenRazred = "C ali D"; kontekst = "Blizu povprečja za letnik"; }
+    else if (leto < 2010) { ocenjenRazred = "B ali C"; kontekst = "Nad povprečjem za letnik"; }
+    else { ocenjenRazred = "B"; kontekst = "Nad povprečjem — novejša gradnja"; }
+    stavek2 = `Energetska izkaznica ni v registru. Ocenjeni razred: ${ocenjenRazred} (${kontekst}).`;
+  } else {
+    // EIZ obstaja — dodaj kontekst glede letnika
+    const razred = energetskaIzkaznica.razred;
+    const povprecjeZaLetnik = leto < 1980 ? ["E","F","G"] : leto < 2002 ? ["C","D","E"] : ["B","C"];
+    const jeBoljsi = povprecjeZaLetnik.includes(razred)
+      ? false
+      : razred < povprecjeZaLetnik[0]; // nižja črka = boljši razred
+    if (jeBoljsi) {
+      stavek2 = `Energetski razred ${razred}: nad povprečjem za stavbe tega letnika.`;
+    } else {
+      stavek2 = `Energetski razred ${razred}: pod povprečjem za stavbe tega letnika — investicija v sanacijo se splača.`;
+    }
   }
 
   return (
     <div className="text-sm text-gray-600 leading-relaxed border-l-4 border-gray-200 pl-4 py-1 space-y-1.5">
+      {stavekCondition && <p>{stavekCondition}</p>}
       <p>{stavek1}</p>
       {stavek2 && <p>{stavek2}</p>}
       <p className="text-[10px] text-gray-400">Ocena na podlagi podatkov Katastra nepremičnin · GURS</p>
@@ -669,6 +694,37 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
   );
 }
 
+const CONDITION_COLORS = {
+  green: { bar: "bg-green-500", text: "text-green-700", bg: "bg-green-50" },
+  lime: { bar: "bg-lime-500", text: "text-lime-700", bg: "bg-lime-50" },
+  amber: { bar: "bg-amber-500", text: "text-amber-700", bg: "bg-amber-50" },
+  orange: { bar: "bg-orange-500", text: "text-orange-700", bg: "bg-orange-50" },
+  red: { bar: "bg-red-500", text: "text-red-700", bg: "bg-red-50" },
+};
+
+function ConditionScoreBar({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
+  const ocena = izracunajOcenaStanja({
+    letoIzgradnje: stavba.letoIzgradnje,
+    letoObnove: stavba.letoObnove,
+    konstrukcija: stavba.konstrukcija,
+  });
+  if (!ocena) return null;
+  const c = CONDITION_COLORS[ocena.color];
+  return (
+    <div className={`rounded-lg p-3 ${c.bg} mt-4`}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-medium text-gray-600">Ocena stanja stavbe</span>
+        <span className={`text-sm font-bold ${c.text}`}>{ocena.ocena}/100 — {ocena.razred.charAt(0).toUpperCase() + ocena.razred.slice(1)}</span>
+      </div>
+      <div className="w-full bg-white rounded-full h-2 overflow-hidden">
+        <div className={`${c.bar} h-2 rounded-full transition-all`} style={{ width: `${ocena.ocena}%` }} />
+      </div>
+      <p className="text-xs text-gray-500 mt-1.5">{ocena.opis}</p>
+      <p className="text-[10px] text-gray-400 mt-0.5">Formula: ISO 15686-7 · prilagojeno za Slovenijo</p>
+    </div>
+  );
+}
+
 function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
   return (
     <section>
@@ -698,6 +754,7 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
         <span><Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija</span>
       </div>
+      <ConditionScoreBar stavba={stavba} />
     </section>
   );
 }
