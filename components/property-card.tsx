@@ -2386,7 +2386,8 @@ function ZavarovanjeSection({
   const povrsina = unitArea ?? stavba.povrsina ?? 80;
 
   // Ogrevanje iz GURS plin podatka — readonly, brez dropdowna
-  const ogrevanje = stavba.prikljucki?.plin ? "Centralno (plin)" : "Električno / drugo";
+  const imaPlinZavar = stavba.gasInfrastructure ?? stavba.prikljucki?.plin ?? false;
+  const ogrevanje = imaPlinZavar ? "Centralno (plin)" : "Električno / drugo";
 
   const vsiTipi: ZavarovalniskiTip[] = [
     {
@@ -2436,6 +2437,12 @@ function ZavarovanjeSection({
   const [alarm, setAlarm] = useState("brez");
   const [skode, setSkode] = useState("0");
   const [placilo, setPlacilo] = useState("letno");
+  // Uredljivi podatki iz registrov (korak 1) — prednapolnjeni iz GURS, user lahko popravi
+  const [editMode, setEditMode] = useState(false);
+  const [editPovrsina, setEditPovrsina] = useState(String(povrsina));
+  const [editLetoIzgradnje, setEditLetoIzgradnje] = useState(String(stavba.letoIzgradnje ?? ""));
+  const [editKonstrukcija, setEditKonstrukcija] = useState(stavba.konstrukcija ?? "");
+  const [editOgrevanje, setEditOgrevanje] = useState(ogrevanje);
 
   // Step 3
   const [selectedPonudnik, setSelectedPonudnik] = useState<string | null>(null);
@@ -2497,7 +2504,7 @@ function ZavarovanjeSection({
     ],
     pozarno: [
       { label: "Tip konstrukcije", value: jeMasivna ? "Masivna (opeka/beton)" : "Lahka (les/montažna)", rizik: jeMasivna ? "nizek" : "srednji" },
-      { label: "Ogrevanje", value: ogrevanje, rizik: stavba.prikljucki?.plin ? "srednji" : "nizek" },
+      { label: "Ogrevanje", value: ogrevanje, rizik: imaPlinZavar ? "srednji" : "nizek" },
       { label: "Leto izgradnje", value: letoIzgradnje ? String(letoIzgradnje) : "Ni podatka" },
       { label: "Površina", value: `${povrsina} m²` },
       { label: "Zavarovalniška vsota", value: `${priporocenaVsota.toLocaleString("sl-SI")} €` },
@@ -2625,23 +2632,73 @@ function ZavarovanjeSection({
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">Podatki o nepremi&#269;nini (iz registrov GURS)</p>
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-100 text-sm">
-                      {([
-                        ["Naslov", naslov || "\u2014"],
-                        ["Povr&#353;ina", povrsina + " m\u00B2"],
-                        ["Leto izgradnje", String(stavba.letoIzgradnje ?? "\u2014")],
-                        ["Konstrukcija", stavba.konstrukcija ?? "\u2014"],
-                        ["Seizmi&#269;na cona", seizmicni.cona + " (PGA " + seizmicni.pga + "g)"],
-                        ["Ogrevanje", ogrevanje],
-                      ] as [string, string][]).map(([label, val]) => (
-                        <div key={label} className="flex justify-between px-4 py-2">
-                          <span className="text-gray-500 shrink-0 mr-3" dangerouslySetInnerHTML={{ __html: label }} />
-                          <span className="text-gray-800 font-medium text-right" dangerouslySetInnerHTML={{ __html: val }} />
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Podatki o nepremičnini</p>
+                      <button onClick={() => setEditMode(!editMode)} className="text-xs text-[#2d6a4f] hover:underline font-medium">
+                        {editMode ? "Zapri urejanje" : "Uredi podatke"}
+                      </button>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-1.5">Vir: Kataster nepremi&#269;nin &middot; ARSO &middot; GURS</p>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-100 text-sm">
+                      {/* Naslov — vedno readonly */}
+                      <div className="flex justify-between px-4 py-2">
+                        <span className="text-gray-500 shrink-0 mr-3">Naslov</span>
+                        <span className="text-gray-800 font-medium text-right">{naslov || "—"}</span>
+                      </div>
+                      {/* Površina */}
+                      <div className="flex justify-between items-center px-4 py-2">
+                        <span className="text-gray-500 shrink-0 mr-3">Površina</span>
+                        {editMode ? (
+                          <div className="flex items-center gap-1">
+                            <input type="number" value={editPovrsina} onChange={e => setEditPovrsina(e.target.value)}
+                              className="w-20 border border-gray-300 rounded px-2 py-0.5 text-sm text-right" />
+                            <span className="text-gray-500 text-sm">m²</span>
+                          </div>
+                        ) : <span className="text-gray-800 font-medium">{editPovrsina} m²</span>}
+                      </div>
+                      {/* Leto izgradnje */}
+                      <div className="flex justify-between items-center px-4 py-2">
+                        <span className="text-gray-500 shrink-0 mr-3">Leto izgradnje</span>
+                        {editMode ? (
+                          <input type="number" value={editLetoIzgradnje} onChange={e => setEditLetoIzgradnje(e.target.value)}
+                            className="w-24 border border-gray-300 rounded px-2 py-0.5 text-sm text-right" />
+                        ) : <span className="text-gray-800 font-medium">{editLetoIzgradnje || "—"}</span>}
+                      </div>
+                      {/* Konstrukcija */}
+                      <div className="flex justify-between items-center px-4 py-2">
+                        <span className="text-gray-500 shrink-0 mr-3">Konstrukcija</span>
+                        {editMode ? (
+                          <select value={editKonstrukcija} onChange={e => setEditKonstrukcija(e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-0.5 text-sm bg-white">
+                            <option value="Masivna">Masivna (opeka)</option>
+                            <option value="Armiran beton">Armiran beton</option>
+                            <option value="Montažna">Montažna</option>
+                            <option value="Lesena">Lesena</option>
+                            <option value="Jeklo">Jeklo</option>
+                          </select>
+                        ) : <span className="text-gray-800 font-medium text-right">{editKonstrukcija || "—"}</span>}
+                      </div>
+                      {/* Seizmična cona — vedno readonly */}
+                      <div className="flex justify-between px-4 py-2">
+                        <span className="text-gray-500 shrink-0 mr-3">Seizmična cona</span>
+                        <span className="text-gray-800 font-medium">{seizmicni.cona} (PGA {seizmicni.pga}g)</span>
+                      </div>
+                      {/* Ogrevanje */}
+                      <div className="flex justify-between items-center px-4 py-2">
+                        <span className="text-gray-500 shrink-0 mr-3">Ogrevanje</span>
+                        {editMode ? (
+                          <select value={editOgrevanje} onChange={e => setEditOgrevanje(e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-0.5 text-sm bg-white">
+                            <option value="Centralno (plin)">Centralno (plin)</option>
+                            <option value="Električno / drugo">Električno / drugo</option>
+                            <option value="Daljinsko ogrevanje">Daljinsko ogrevanje</option>
+                            <option value="Lesna biomasa">Lesna biomasa</option>
+                            <option value="Toplotna črpalka">Toplotna črpalka</option>
+                          </select>
+                        ) : <span className="text-gray-800 font-medium">{editOgrevanje}</span>}
+                      </div>
+                    </div>
+                    {editMode && <p className="text-[11px] text-amber-600 mt-1.5">Urejate podatke — spremembe vplivajo samo na izračun premije.</p>}
+                    {!editMode && <p className="text-[11px] text-gray-400 mt-1.5">Vir: Kataster nepremičnin · ARSO · GURS</p>}
                   </div>
 
                   {selectedTipi.length > 0 && (
