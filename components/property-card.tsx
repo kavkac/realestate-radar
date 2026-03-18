@@ -664,19 +664,60 @@ function PartDetail({ part }: { part: DelStavbe }) {
   );
 }
 
+function EnergyMeter({ razred }: { razred: string }) {
+  const classes = [
+    { label: "A1", color: "#1a9f3f", width: "45%" },
+    { label: "A2", color: "#4caf50", width: "52%" },
+    { label: "B1", color: "#8bc34a", width: "59%" },
+    { label: "B2", color: "#cddc39", width: "66%" },
+    { label: "C",  color: "#ffeb3b", width: "73%" },
+    { label: "D",  color: "#ffc107", width: "80%" },
+    { label: "E",  color: "#ff9800", width: "87%" },
+    { label: "F",  color: "#f44336", width: "94%" },
+    { label: "G",  color: "#b71c1c", width: "100%" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-[2px] my-3 max-w-[280px]">
+      {classes.map((c) => {
+        const isActive = c.label === razred;
+        return (
+          <div key={c.label} className="flex items-center gap-2">
+            <div
+              className="flex items-center justify-end pr-2 text-white font-bold text-xs"
+              style={{
+                width: c.width,
+                backgroundColor: c.color,
+                height: isActive ? "26px" : "18px",
+                clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)",
+                opacity: isActive ? 1 : 0.45,
+                transition: "all 0.15s",
+              }}
+            >
+              {c.label}
+            </div>
+            {isActive && (
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-bold" style={{ color: c.color }}>◀</span>
+                <span className="text-sm font-bold text-gray-800">{c.label}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function EnergyCertificateSection({ data }: { data: EnergyData | null }) {
   return (
     <section>
       <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
       {data ? (
         <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <span
-              className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-2xl font-bold ${ENERGY_COLORS[data.razred] ?? "bg-gray-100 text-gray-800"}`}
-            >
-              {data.razred}
-            </span>
-            <div className="text-sm text-gray-500">
+          <div>
+            <EnergyMeter razred={data.razred} />
+            <div className="text-sm text-gray-500 mt-1">
               <p>Veljavna do {data.veljaDo}</p>
               {data.tip && <p className="mt-0.5">Tip: {data.tip}</p>}
             </div>
