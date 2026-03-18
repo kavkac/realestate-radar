@@ -1514,10 +1514,13 @@ function EnergetskiIzracunSection({
           />
           {boljsiRazredi.length === 0 ? (
             <Field label="Energetski razred" value="✓ Vrhunska učinkovitost" />
-          ) : boljsiRazredi.map(r => {
-            const savings = annualCost - r.target * area * HEATING_PRICE_EUR;
-            return <Field key={r.razred} label={`Prihranek do ${r.razred}`} value={`${fmt(savings)} €/leto`} />;
-          })
+          ) : (
+            <>
+              {boljsiRazredi.map(r => {
+                const savings = annualCost - r.target * area * HEATING_PRICE_EUR;
+                return <Field key={r.razred} label={`Prihranek do ${r.razred}`} value={`${fmt(savings)} €/leto`} />;
+              })}
+            </>
           )}
         </div>
 
