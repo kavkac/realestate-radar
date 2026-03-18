@@ -1201,7 +1201,7 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
         </div>
       )}
       <div className="space-y-4">
-        {ukrepi.map((u, i) => (
+        {ukrepi.filter(u => !isMultiUnit || hasSelectedUnit || u.nivo === "skupno").map((u, i) => (
           <div key={i} className="border border-gray-100 rounded p-3">
             <div className="flex items-start justify-between gap-2 mb-1">
               <div>
