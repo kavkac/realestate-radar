@@ -281,6 +281,37 @@ export async function getStreetId(streetName: string): Promise<number | null> {
   return data.features[0].properties.UL_MID as number;
 }
 
+/** Fallback za podeželske naslove brez ulice: išče po NASELJE + hišna številka */
+export async function getHouseBySettlement(
+  settlementName: string,
+  houseNumber: string,
+  suffix?: string,
+): Promise<{ hsMid: number; lat: number | null; lng: number | null } | null> {
+  // 1. Poišči NA_MID za naselje
+  const naUrl = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:NA_G", `NA_UIME ILIKE '${settlementName.trim()}'`);
+  const naData = await fetchWfs(naUrl);
+  if (!naData || naData.features.length === 0) return null;
+  const naMid = naData.features[0].properties.NA_MID as number;
+
+  // 2. Poišči hišno številko po NA_MID
+  let filter = `NA_MID=${naMid} AND HS=${houseNumber}`;
+  if (suffix) filter += ` AND HD='${suffix}'`;
+  const hsUrl = `${buildWfsUrl(BASE_RPE, "SI.GURS.RPE:HS_G", filter)}&SRSNAME=EPSG:4326`;
+  const hsData = await fetchWfs(hsUrl);
+  if (!hsData || hsData.features.length === 0) return null;
+
+  const feature = hsData.features[0];
+  const hsMid = feature.properties.HS_MID as number;
+  let lat: number | null = null;
+  let lng: number | null = null;
+  const geom = feature.geometry as { type?: string; coordinates?: number[] } | null;
+  if (geom?.type === "Point" && geom.coordinates) {
+    lng = geom.coordinates[0];
+    lat = geom.coordinates[1];
+  }
+  return { hsMid, lat, lng };
+}
+
 export async function getHouseNumberId(
   ulMid: number,
   houseNumber: string,
@@ -671,9 +702,14 @@ export async function lookupByAddress(address: string): Promise<{
   if (!parsed) return null;
 
   const ulMid = await getStreetId(parsed.street);
-  if (!ulMid) return null;
 
-  const hsResult = await getHouseNumberId(ulMid, parsed.number, parsed.suffix);
+  // Fallback za podeželske naslove brez ulice (npr. "Spodnje Loke 30")
+  let hsResult;
+  if (!ulMid) {
+    hsResult = await getHouseBySettlement(parsed.street, parsed.number, parsed.suffix);
+  } else {
+    hsResult = await getHouseNumberId(ulMid, parsed.number, parsed.suffix);
+  }
   if (!hsResult) return null;
 
   const eidStavba = await getBuildingEid(hsResult.hsMid);
