@@ -146,6 +146,17 @@ export async function POST(request: NextRequest) {
 
     const { stavba, deliStavbe, lat, lng } = result;
 
+    // Validate requested del stavbe
+    if (delStavbe != null) {
+      const exists = deliStavbe.some(d => d.stDelaStavbe === delStavbe);
+      if (!exists) {
+        return NextResponse.json({
+          success: false,
+          error: `Del stavbe ${delStavbe} ne obstaja. Stavba ima dele: ${deliStavbe.map(d => d.stDelaStavbe).join(', ')}.`
+        }, { status: 400 });
+      }
+    }
+
     // Determine stDelaStavbe for energy cert lookup
     const stDelaStavbe =
       delStavbe ?? (deliStavbe.length === 1 ? deliStavbe[0].stDelaStavbe : undefined);

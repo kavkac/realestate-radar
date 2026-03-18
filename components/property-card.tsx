@@ -98,6 +98,7 @@ interface PropertyCardProps {
   lat?: number | null;
   lng?: number | null;
   requestedDel?: number;
+  onClearDel?: () => void;
 }
 
 const ENERGY_COLORS: Record<string, string> = {
@@ -134,6 +135,7 @@ export function PropertyCard({
   lat,
   lng,
   requestedDel,
+  onClearDel,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
@@ -199,6 +201,18 @@ export function PropertyCard({
           </button>
         </div>
       </div>
+
+      {/* Back to all units button */}
+      {requestedDel != null && deliStavbe.length > 1 && (
+        <div className="px-6 pt-3 pb-1">
+          <button
+            onClick={() => onClearDel?.()}
+            className="text-xs text-[#2d6a4f] hover:underline flex items-center gap-1"
+          >
+            ← Prikaži vse dele stavbe ({deliStavbe.length})
+          </button>
+        </div>
+      )}
 
       {/* Cadastral map - full width on mobile, hidden on desktop (shown in right col) */}
       <div className="lg:hidden border-b border-gray-100 space-y-4 p-4">

@@ -607,6 +607,9 @@ export function AddressSearch() {
               lat={activeTab.data.lat}
               lng={activeTab.data.lng}
               requestedDel={activeTab.del}
+              onClearDel={() => {
+                setTabs(tabs.map(t => t.id === activeTabId ? { ...t, del: undefined } : t));
+              }}
             />
           )}
         </div>
