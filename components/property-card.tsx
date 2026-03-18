@@ -1704,7 +1704,9 @@ function fmtLastniki(n: number): string {
 }
 
 function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps["deliStavbe"] }) {
-  const all = deliStavbe.flatMap(d => (d.lastnistvo ?? []).map(l => ({ ...l, enota: d.stDela })));
+  const all = deliStavbe
+    .flatMap(d => (d.lastnistvo ?? []).map(l => ({ ...l, enota: d.stDela })))
+    .sort((a, b) => a.enota - b.enota);
   const MAX_VISIBLE_LASTNIKI = 4;
   const [showAllLastniki, setShowAllLastniki] = useState(false);
   const vidniLastniki = showAllLastniki ? all : all.slice(0, MAX_VISIBLE_LASTNIKI);
