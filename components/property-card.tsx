@@ -223,8 +223,8 @@ export function PropertyCard({
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
   const [showAllUnits, setShowAllUnits] = useState(false);
-  const VISIBLE_DEFAULT = 6; // 2 polni vrstici × 3 stolpci
-  const FADE_ROW = 3; // 3. vrsta vidna a fadirana
+  const VISIBLE_DEFAULT = 4; // 2 polni vrstici × 2 stolpci
+  const FADE_ROW = 0; // ni fade vrstice — samo prve 4 + button
 
   const sortedParts = [...deliStavbe].sort((a, b) => a.stDela - b.stDela);
   const filteredParts =
@@ -327,7 +327,7 @@ export function PropertyCard({
                 </p>
                 <div className="relative">
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {(showAllUnits ? sortedParts : sortedParts.slice(0, VISIBLE_DEFAULT + FADE_ROW)).map((d) => (
+                  {(deliStavbe.length <= 6 || showAllUnits ? sortedParts : sortedParts.slice(0, VISIBLE_DEFAULT)).map((d) => (
                     <button
                       key={d.stDela}
                       onClick={() => setSelectedDel(d.stDela)}
@@ -362,11 +362,11 @@ export function PropertyCard({
                     </button>
                   ))}
                 </div>
-                {!showAllUnits && sortedParts.length > VISIBLE_DEFAULT && (
-                  <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+                {!showAllUnits && deliStavbe.length > 6 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-white to-transparent pointer-events-none" />
                 )}
                 </div>
-                {deliStavbe.length > VISIBLE_DEFAULT && (
+                {deliStavbe.length > 6 && (
                   <button
                     onClick={() => setShowAllUnits(!showAllUnits)}
                     className="w-full mt-2 py-2 text-sm text-[#2d6a4f] hover:underline"
