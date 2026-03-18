@@ -2402,6 +2402,8 @@ function ZavarovanjeSection({
         stavba={stavba}
         potresno={potresno}
         poplavnaNevarnost={poplavnaNevarnost ?? null}
+        unitArea={unitArea}
+        seizmicni={seizmicni}
       />
 
       {/* Disclaimer */}
@@ -2434,15 +2436,27 @@ function ZavarovalniskiMarketplace({
   stavba,
   potresno,
   poplavnaNevarnost,
+  unitArea,
+  seizmicni,
 }: {
   naslov: string;
   stavba: PropertyCardProps["stavba"];
   potresno: ReturnType<typeof izracunajPotresnoTveganje>;
   poplavnaNevarnost?: PoplavnaNevarnost | null;
+  unitArea?: number | null;
+  seizmicni?: SeizmicniPodatki;
 }) {
   const [selectedPonudnik, setSelectedPonudnik] = useState<ZavarovalniskiProdukt | null>(null);
   const [formData, setFormData] = useState({ ime: "", email: "", tel: "" });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  // Sekcija B — dodatni podatki za natančen izračun
+  const [tipStrehe, setTipStrehe] = useState("dvokapnica");
+  const [ogrevanje, setOgrevanje] = useState("plin");
+  const [alarm, setAlarm] = useState("brez");
+  const [skode, setSkode] = useState("0");
+  const [obstojeceZavarovanje, setObstojeceZavarovanje] = useState("ni");
+  const [placilo, setPlacilo] = useState("letno");
 
   const { priporocenaVsota, letnaPremijaOcena } = potresno;
   const imaPoplavo = poplavnaNevarnost && poplavnaNevarnost.stopnja !== "ni";
@@ -2622,135 +2636,221 @@ function ZavarovalniskiMarketplace({
       </div>
 
       {/* Modal */}
-      {selectedPonudnik && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg relative">
-            {/* Modal header */}
-            <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-gray-100">
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest mb-0.5">Zahtevek za zavarovanje</p>
-                <h3 className="text-base font-semibold text-gray-800">
-                  {selectedPonudnik.ponudnik} — {selectedPonudnik.produkt}
-                </h3>
-              </div>
-              <button
-                onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
-                className="text-gray-400 hover:text-gray-600 text-lg leading-none p-1"
-                aria-label="Zapri"
-              >
-                ✕
-              </button>
-            </div>
+      {selectedPonudnik && (() => {
+        // Dinamični modifikatorji premije
+        const tipaStreheMod = tipStrehe === "ravna" ? 1.15 : 1.0;
+        const ogrevanjeMod = ogrevanje === "elektricno" ? 1.08 : ogrevanje === "plin" ? 1.05 : 1.0;
+        const alarmMod = alarm === "alarm+resetke" ? 0.90 : alarm === "alarm" ? 0.95 : 1.0;
+        const skodeMod = skode === "2+" ? 1.35 : skode === "1" ? 1.15 : 1.0;
+        const mesecnoMod = placilo === "mesecno" ? 1.03 : 1.0;
+        const skupniMod = tipaStreheMod * ogrevanjeMod * alarmMod * skodeMod * mesecnoMod;
+        const base = potresno.letnaPremijaOcena;
+        const prilagojenaMin = Math.round(base.min * skupniMod);
+        const prilagojenaMax = Math.round(base.max * skupniMod);
 
-            <div className="px-6 py-5 space-y-5">
-              {/* Podatki o nepremičnini */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
-                  Podatki o nepremičnini (iz registrov GURS)
-                </p>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-100 text-sm">
-                  {[
-                    ["Naslov", naslov || "—"],
-                    ["Leto izgradnje", stavba.letoIzgradnje ?? "—"],
-                    ["Konstrukcija", stavba.konstrukcija ?? "—"],
-                    ["Površina", stavba.povrsina ? `${stavba.povrsina} m²` : "—"],
-                  ].map(([label, val]) => (
-                    <div key={String(label)} className="flex justify-between px-4 py-2">
-                      <span className="text-gray-500">{label}</span>
-                      <span className="text-gray-800 font-medium">{String(val)}</span>
+        // Površina za prikaz
+        const prikazanaPovrsina = unitArea ?? stavba.povrsina;
+        const povrsinaLabel = unitArea
+          ? `Površina enote: ${unitArea} m²`
+          : stavba.povrsina
+          ? `Površina stavbe: ${stavba.povrsina} m²`
+          : "Površina: —";
+
+        const selectClass = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300 bg-white";
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg relative my-4">
+              {/* Modal header */}
+              <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-widest mb-0.5">Zahtevek za zavarovanje</p>
+                  <h3 className="text-base font-semibold text-gray-800">
+                    {selectedPonudnik.ponudnik} — {selectedPonudnik.produkt}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none p-1"
+                  aria-label="Zapri"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+
+                {/* ── Sekcija A: Podatki iz registrov GURS (readonly) ── */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                    A — Podatki iz registrov GURS
+                  </p>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-100 text-sm">
+                    {[
+                      ["Naslov", naslov || "—"],
+                      ["Leto izgradnje", stavba.letoIzgradnje ?? "—"],
+                      ["Konstrukcija", stavba.konstrukcija ?? "—"],
+                      ["Površina", prikazanaPovrsina ? `${prikazanaPovrsina} m²` : "—"],
+                      ["Seizmična cona", seizmicni ? `Cona ${seizmicni.cona} (PGA ${seizmicni.pga}g)` : "—"],
+                      ["Potresna ranljivost", `Razred ${potresno.razredRanljivosti} — ${potresno.opisRanljivosti}`],
+                    ].map(([label, val]) => (
+                      <div key={String(label)} className="flex justify-between px-4 py-2">
+                        <span className="text-gray-500 shrink-0 mr-3">{label}</span>
+                        <span className="text-gray-800 font-medium text-right">{String(val)}</span>
+                      </div>
+                    ))}
+                    {/* Zavarovalna vsota */}
+                    <div className="flex justify-between px-4 py-2 bg-gray-100 rounded-b-lg">
+                      <span className="text-gray-600 font-medium">Zavarovalna vsota</span>
+                      <span className="text-gray-900 font-semibold">
+                        {selectedPonudnik.kritjeVsota.toLocaleString("sl-SI")} €
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Predlagano kritje */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
-                  Predlagano kritje
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                    <p className="text-[11px] text-gray-400 mb-0.5">Zavarovalna vsota</p>
-                    <p className="text-sm font-semibold text-gray-800">{selectedPonudnik.kritjeVsota.toLocaleString("sl-SI")} €</p>
                   </div>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                    <p className="text-[11px] text-gray-400 mb-0.5">Indikativna premija</p>
-                    <p className="text-sm font-semibold text-gray-800">
-                      {selectedPonudnik.letnaPremijaMin.toLocaleString("sl-SI")} € – {selectedPonudnik.letnaPremijaMax.toLocaleString("sl-SI")} € / leto
+                  <p className="text-[11px] text-gray-400 mt-1.5">{povrsinaLabel} · 1.800 €/m² × 1,1 (faktor)</p>
+                </div>
+
+                {/* ── Sekcija B: Dodatni podatki za natančen izračun ── */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
+                    B — Dodatni podatki za natančen izračun
+                  </p>
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Tip strehe</label>
+                        <select value={tipStrehe} onChange={(e) => setTipStrehe(e.target.value)} className={selectClass}>
+                          <option value="dvokapnica">Dvokapnica</option>
+                          <option value="ravna">Ravna streha (+15%)</option>
+                          <option value="mansarda">Mansarda</option>
+                          <option value="enokapnica">Enokapnica</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Ogrevanje</label>
+                        <select value={ogrevanje} onChange={(e) => setOgrevanje(e.target.value)} className={selectClass}>
+                          <option value="plin">Centralno (plin) (+5%)</option>
+                          <option value="elektricno">Električno (+8%)</option>
+                          <option value="tc">Toplotna črpalka</option>
+                          <option value="daljinsko">Daljinsko</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Protivlomna zaščita</label>
+                        <select value={alarm} onChange={(e) => setAlarm(e.target.value)} className={selectClass}>
+                          <option value="brez">Brez</option>
+                          <option value="alarm">Alarm (−5%)</option>
+                          <option value="resetke">Rešetke</option>
+                          <option value="alarm+resetke">Alarm + rešetke (−10%)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Škode zadnjih 5 let</label>
+                        <select value={skode} onChange={(e) => setSkode(e.target.value)} className={selectClass}>
+                          <option value="0">Ni škod</option>
+                          <option value="1">1 škoda (+15%)</option>
+                          <option value="2+">2+ škodi (+35%)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Obstoječe zavarovanje</label>
+                        <select value={obstojeceZavarovanje} onChange={(e) => setObstojeceZavarovanje(e.target.value)} className={selectClass}>
+                          <option value="ni">Ni</option>
+                          <option value="izteka">Da — izteka se</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-gray-400 mb-1">Plačilo</label>
+                        <select value={placilo} onChange={(e) => setPlacilo(e.target.value)} className={selectClass}>
+                          <option value="letno">Letno</option>
+                          <option value="mesecno">Mesečno (+3%)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Prilagojena premija */}
+                  <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                    <p className="text-[11px] text-blue-500 uppercase tracking-wide mb-0.5">Prilagojena letna premija</p>
+                    <p className="text-lg font-bold text-blue-800">
+                      {prilagojenaMin.toLocaleString("sl-SI")} € – {prilagojenaMax.toLocaleString("sl-SI")} €
                     </p>
+                    <p className="text-[11px] text-blue-400 mt-0.5">↑ posodobljeno glede na vaše podatke</p>
                   </div>
                 </div>
-              </div>
 
-              {/* Kontaktni podatki */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
-                  Vaši kontaktni podatki
-                </p>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+                {/* ── Sekcija C: Kontaktni podatki ── */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                    C — Vaši kontaktni podatki
+                  </p>
+                  <div className="space-y-2">
                     <input
                       type="text"
                       placeholder="Ime in priimek"
                       value={formData.ime}
                       onChange={(e) => setFormData((f) => ({ ...f, ime: e.target.value }))}
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
                     />
                     <input
                       type="email"
                       placeholder="E-mail"
                       value={formData.email}
                       onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
-                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Telefonska številka"
+                      value={formData.tel}
+                      onChange={(e) => setFormData((f) => ({ ...f, tel: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
                     />
                   </div>
-                  <input
-                    type="tel"
-                    placeholder="Telefonska številka"
-                    value={formData.tel}
-                    onChange={(e) => setFormData((f) => ({ ...f, tel: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                  />
                 </div>
-              </div>
 
-              {/* Demo opomba */}
-              <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
-                Demo: Ob pritisku &ldquo;Pošlji zahtevek&rdquo; bodo podatki shranjeni za testiranje. Dejanska sklenitev prihaja.
-              </div>
-
-              {/* Status message */}
-              {status === "sent" && (
-                <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-xs text-green-800 font-medium">
-                  Zahtevek poslan. Kontaktirali vas bomo.
+                {/* Demo opomba */}
+                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+                  Demo: Ob pritisku &ldquo;Pošlji zahtevek&rdquo; bodo podatki shranjeni za testiranje. Dejanska sklenitev prihaja.
                 </div>
-              )}
-              {status === "error" && (
-                <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-800">
-                  Prišlo je do napake. Poskusite znova.
-                </div>
-              )}
 
-              {/* Gumba */}
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  onClick={handleSend}
-                  disabled={status === "sending" || status === "sent"}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60 transition-colors"
-                >
-                  {status === "sending" ? "Pošiljam..." : "Pošlji zahtevek →"}
-                </button>
-                <button
-                  onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
-                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Prekliči
-                </button>
+                {/* Status message */}
+                {status === "sent" && (
+                  <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-xs text-green-800 font-medium">
+                    Zahtevek poslan. Kontaktirali vas bomo.
+                  </div>
+                )}
+                {status === "error" && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-800">
+                    Prišlo je do napake. Poskusite znova.
+                  </div>
+                )}
+
+                {/* Gumba */}
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    onClick={handleSend}
+                    disabled={status === "sending" || status === "sent"}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60 transition-colors"
+                  >
+                    {status === "sending" ? "Pošiljam..." : "Pošlji zahtevek →"}
+                  </button>
+                  <button
+                    onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
+                    className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    Prekliči
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 }
