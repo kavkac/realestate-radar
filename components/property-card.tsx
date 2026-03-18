@@ -973,8 +973,8 @@ const zaupanjeColor = {
 
 const zaupanjeBesedilo = {
   visoko: "Ocena temelji na uradni energetski izkaznici.",
-  srednje: "Ocena energetskega razreda je izračunana na podlagi standardnih toplotnih lastnosti gradiv za posamezno gradbeno obdobje (PURES 2010 / EN ISO 52000), prilagojenih glede na evidentirane obnove v katastru nepremičnin. To ni uradna energetska izkaznica — za pravno veljavno oceno je potrebna izkaznica certificiranega energetskega svetovalca.",
-  nizko: "Ocena temelji izključno na letu izgradnje — podatkov o prenovah ni. Napaka ocene je visoka (±1–2 razreda). To ni uradna energetska izkaznica.",
+  srednje: "Ocena na podlagi gradbenega obdobja, evidentiranih obnov, konstrukcije, lege enote in tipa stavbe. Ni uradna energetska izkaznica.",
+  nizko: "Ocena temelji samo na letu izgradnje — podatkov o prenovah ni. Napaka ocene je visoka. Ni uradna energetska izkaznica.",
 } as const;
 
 const zaupanjeLabel = {
@@ -1466,10 +1466,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
             </span>
           </div>
         </div>
-        <div className={`flex items-start gap-2 ${zc.bg} border ${zc.border} rounded px-3 py-2 mb-3`}>
-          <span className={`${zc.text} text-xs mt-0.5`}>{zc.icon}</span>
-          <p className={`text-xs ${zc.text}`}>{zaupanjeBesedilo[ocena.zaupanje]}</p>
-        </div>
+        <p className="text-xs text-gray-400 mb-3">{zaupanjeBesedilo[ocena.zaupanje]}</p>
         {/* Sekcija 1: Standard */}
         <div className="mb-3">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Osnova · PURES 2010 / EN ISO 52000</p>
