@@ -193,13 +193,19 @@ function CollapsibleSection({
         onClick={() => setOpen(!open)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">{title}</span>
-          {badge && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">{badge}</span>}
-          {vir && <span className="text-[10px] text-gray-400 font-normal normal-case">{vir}</span>}
+          <span className="border-l-[3px] border-[#2d6a4f] pl-2 text-sm font-semibold text-gray-800">{title}</span>
+          {badge && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">{badge}</span>}
+          {vir && <span className="text-[10px] text-gray-400 font-normal">{vir}</span>}
         </div>
-        <span className="text-gray-400 text-sm">{open ? "▲" : "▼"}</span>
+        <span className="text-gray-400 text-xs flex items-center gap-1">
+          {open ? "Skrij" : "Prikaži"} <span className="text-sm">{open ? "▲" : "▼"}</span>
+        </span>
       </button>
-      {open && <div className="px-5 pb-5">{children}</div>}
+      {open && (
+        <div className="px-5 pb-5 bg-gray-50/40 border-l-[3px] border-[#2d6a4f]/20 ml-5 mr-5 mb-4 rounded-sm">
+          <div className="pt-4">{children}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -308,7 +314,7 @@ export function PropertyCard({
         <div className="w-full lg:flex-1 min-w-0 space-y-0">
 
           {/* 1. Ključni podatki — vedno odprto */}
-          <div className="px-5 py-5 border-b border-gray-100">
+          <div className="px-5 py-6 border-b border-gray-100">
             <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} />
           </div>
 
@@ -319,7 +325,7 @@ export function PropertyCard({
 
           {/* Stanovanja in prostori (multi-unit selector) */}
           {isMultiUnit && !activePart && (
-            <div className="px-5 py-5 border-b border-gray-100">
+            <div className="px-5 py-6 border-b border-gray-100">
               <section>
                 <Label vir="Kataster nepremičnin · GURS">Stanovanja in prostori ({deliStavbe.length})</Label>
                 <p className="text-sm text-gray-400 mb-3 flex items-center gap-1">
@@ -381,7 +387,7 @@ export function PropertyCard({
           )}
 
           {isMultiUnit && activePart && (
-            <div className="px-5 py-5 border-b border-gray-100">
+            <div className="px-5 py-6 border-b border-gray-100">
               <section>
                 <div className="flex items-center gap-2 text-sm mb-4 pb-3 border-b border-gray-100">
                   <button
@@ -400,7 +406,7 @@ export function PropertyCard({
           )}
 
           {!isMultiUnit && filteredParts.length > 0 && (
-            <div className="px-5 py-5 border-b border-gray-100">
+            <div className="px-5 py-6 border-b border-gray-100">
               <section>
                 <Label vir="Kataster nepremičnin · GURS">
                   {filteredParts.length === 1
@@ -415,12 +421,12 @@ export function PropertyCard({
           )}
 
           {/* 3. Stanje — vedno odprto */}
-          <div className="px-5 py-5 border-b border-gray-100">
+          <div className="px-5 py-6 border-b border-gray-100">
             <MaintenanceSection stavba={stavba} part={currentPart} />
           </div>
 
           {/* 4. Energetsko stanje — vedno odprto */}
-          <div className="px-5 py-5 border-b border-gray-100">
+          <div className="px-5 py-6 border-b border-gray-100">
             <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
           </div>
 
@@ -462,7 +468,7 @@ export function PropertyCard({
           {!(isMultiUnit && !(!!activePart || requestedDel != null)) &&
            energetskaIzkaznica?.potrebnaTopota != null &&
            energetskaIzkaznica?.kondicionirana != null && (
-            <div className="px-5 py-5 border-b border-gray-100">
+            <div className="px-5 py-6 border-b border-gray-100">
               <EnergetskiIzracunSection
                 energetskaIzkaznica={energetskaIzkaznica}
                 unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
@@ -495,7 +501,7 @@ export function PropertyCard({
           {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
           {/* 9. Storitve — vedno odprto */}
-          <div className="px-5 py-5 border-b border-gray-100">
+          <div className="px-5 py-6 border-b border-gray-100">
             <ServicesSection />
           </div>
 
@@ -671,11 +677,11 @@ function LeadCaptureSection({ naslov }: { naslov: string }) {
 function Label({ children, vir }: { children: React.ReactNode; vir?: string }) {
   return (
     <div className="border-b border-gray-100 pb-1 mb-3">
-      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
+      <h4 className="border-l-[3px] border-[#2d6a4f] pl-2 text-sm font-semibold text-gray-800">
         {children}
       </h4>
       {vir && (
-        <p className="text-xs text-gray-400 italic mt-0.5">Vir: {vir}</p>
+        <p className="text-xs text-gray-400 mt-0.5 pl-[11px]">Vir: {vir}</p>
       )}
     </div>
   );
@@ -1521,16 +1527,14 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
 
       {vzdrzevalni.length > 0 && (
         <div>
-          <div className="border-b border-red-100 pb-1 mb-3">
-            <h4 className="text-xs font-semibold text-red-700 uppercase tracking-widest">
-              Predlagani vzdrževalni ukrepi
+          <div className="border-b border-gray-100 pb-1 mb-3">
+            <h4 className="border-l-[3px] border-[#2d6a4f]/50 pl-2 text-sm font-semibold text-gray-700">
+              Vzdrževanje
               {isMultiUnit && (
-                <span className="text-red-400 font-normal ml-1 normal-case tracking-normal">
-                  {multiUnitSuffix}
-                </span>
+                <span className="text-xs text-gray-400 font-normal ml-1">{multiUnitSuffix}</span>
               )}
             </h4>
-            <p className="text-xs text-gray-400 italic mt-0.5">Vir: Kataster nepremičnin · GURS</p>
+            <p className="text-xs text-gray-400 mt-0.5 pl-[11px]">Vir: Kataster nepremičnin · GURS</p>
           </div>
           <div>
             {vzdrzevalni.map((u, i) => (
@@ -1549,15 +1553,13 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
       {energetski.length > 0 && (
         <div>
           <div className="border-b border-gray-100 pb-1 mb-3">
-            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
-              Predlagani energetski ukrepi
+            <h4 className="border-l-[3px] border-[#2d6a4f]/50 pl-2 text-sm font-semibold text-gray-700">
+              Energetski ukrepi
               {isMultiUnit && (
-                <span className="text-gray-400 font-normal ml-1 normal-case tracking-normal">
-                  {multiUnitSuffix}
-                </span>
+                <span className="text-xs text-gray-400 font-normal ml-1">{multiUnitSuffix}</span>
               )}
             </h4>
-            <p className="text-xs text-gray-400 italic mt-0.5">Vir: ZRMK/IZS referenčne cene 2024</p>
+            <p className="text-xs text-gray-400 mt-0.5 pl-[11px]">Vir: ZRMK/IZS referenčne cene 2024</p>
           </div>
           <div>
             {energetski.map((u, i) => (
