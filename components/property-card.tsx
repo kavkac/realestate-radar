@@ -254,7 +254,7 @@ export function PropertyCard({
         {/* Left column: main data (60% on desktop) */}
         <div className="lg:w-[60%] min-w-0 p-6 space-y-8">
           {/* L1: Kratek opis */}
-          <PropertySummary stavba={stavba} deliStavbe={deliStavbe} energetskaIzkaznica={energetskaIzkaznica} />
+          {/* PropertySummary skrita — algoritmične ocene ne prikazujemo na vrhu */}
 
           {/* L1: Ključni podatki */}
           <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} />
@@ -651,7 +651,7 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
           </div>
         ))}
       </div>
-      <ConditionScoreBar stavba={stavba} />
+      {/* ConditionScoreBar skrita — algoritmična ocena zaenkrat ni prikazana */}
     </section>
   );
 }
