@@ -907,48 +907,45 @@ function PartDetail({ part }: { part: DelStavbe }) {
 }
 
 function EnergyMeter({ razred }: { razred: string }) {
+  // Enakomerni koraki: 20, 30, 40, 50, 60, 70, 80, 90, 100
   const classes = [
-    { label: "A1", color: "#1a9f3f", bg: "#c8ecd4", w: 30 },
-    { label: "A2", color: "#2e9e4f", bg: "#b6e4c2", w: 38 },
-    { label: "B1", color: "#7cb83e", bg: "#d4edaa", w: 50 },
-    { label: "B2", color: "#aac520", bg: "#e4f0a0", w: 58 },
-    { label: "C",  color: "#d4a017", bg: "#f5dfa0", w: 66 },
-    { label: "D",  color: "#e8a000", bg: "#f8d880", w: 74 },
-    { label: "E",  color: "#e07000", bg: "#f5b870", w: 82 },
-    { label: "F",  color: "#d93030", bg: "#f0a0a0", w: 91 },
-    { label: "G",  color: "#a01010", bg: "#e07070", w: 100 },
+    { label: "A1", color: "#1a9f3f", w: 20 },
+    { label: "A2", color: "#4caf50", w: 30 },
+    { label: "B1", color: "#8bc34a", w: 40 },
+    { label: "B2", color: "#c0ca33", w: 50 },
+    { label: "C",  color: "#f0b429", w: 60 },
+    { label: "D",  color: "#ffa000", w: 70 },
+    { label: "E",  color: "#e65100", w: 80 },
+    { label: "F",  color: "#d32f2f", w: 90 },
+    { label: "G",  color: "#8b0000", w: 100 },
   ];
 
   return (
-    <div className="flex flex-col gap-[2px] my-3 w-full max-w-[300px]">
+    <div className="flex flex-col gap-[2px] my-3 w-full max-w-[280px]">
       {classes.map((c) => {
         const isActive = c.label === razred;
         return (
           <div key={c.label} className="flex items-center gap-1.5">
-            {/* Marker za aktiven razred */}
-            <span className="w-3 flex-shrink-0 text-xs font-bold text-gray-700">
+            <span className="w-3 flex-shrink-0 text-[10px] font-bold text-gray-600">
               {isActive ? "▶" : ""}
             </span>
-            {/* Bar */}
             <div
               style={{
                 width: `${c.w}%`,
-                backgroundColor: isActive ? c.color : c.bg,
+                backgroundColor: isActive ? c.color : `${c.color}22`,
                 height: isActive ? "24px" : "18px",
                 clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "flex-end",
-                paddingRight: "14px",
-                boxShadow: isActive ? `0 2px 8px ${c.color}66` : "none",
-                outline: isActive ? `2px solid ${c.color}` : "none",
-                outlineOffset: "1px",
+                paddingRight: "13px",
+                boxShadow: isActive ? `0 1px 6px ${c.color}55` : "none",
               }}
             >
               <span style={{
-                fontSize: isActive ? "13px" : "11px",
+                fontSize: isActive ? "12px" : "10px",
                 fontWeight: "700",
-                color: isActive ? "#fff" : c.color,
+                color: isActive ? "#fff" : `${c.color}bb`,
                 lineHeight: 1,
               }}>
                 {c.label}
