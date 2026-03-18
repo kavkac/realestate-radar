@@ -973,8 +973,8 @@ const zaupanjeColor = {
 
 const zaupanjeBesedilo = {
   visoko: "Ocena temelji na uradni energetski izkaznici.",
-  srednje: "Algoritmična ocena na podlagi leta izgradnje in podatkov o prenovah iz katastra. Natančnost je omejena - za zanesljive podatke je potrebna uradna energetska izkaznica.",
-  nizko: "Algoritmična ocena temelji zgolj na letu izgradnje. Podatkov o prenovah ni - napaka ocene je visoka.",
+  srednje: "Ocena energetskega razreda je izračunana na podlagi standardnih toplotnih lastnosti gradiv za posamezno gradbeno obdobje (PURES 2010 / EN ISO 52000), prilagojenih glede na evidentirane obnove v katastru nepremičnin. To ni uradna energetska izkaznica — za pravno veljavno oceno je potrebna izkaznica certificiranega energetskega svetovalca.",
+  nizko: "Ocena temelji izključno na letu izgradnje — podatkov o prenovah ni. Napaka ocene je visoka (±1–2 razreda). To ni uradna energetska izkaznica.",
 } as const;
 
 const zaupanjeLabel = {
@@ -1141,7 +1141,7 @@ function predlagajUkrepe(
       ? `POZOR - Stavba se nahaja v varstvenem območju kulturne dediščine (${varstvo.naziv}). Obnova fasade zahteva predhodno soglasje ZVKDS. Dovoljeni so samo materiali, ki ohranjajo historični izgled (apnena malta, tradicionalne barve). Kontaktirajte Zavod za varstvo kulturne dediščine: zvkds@zvkds.si`
       : `Celostna obnova fasade z mineralnimi ploščami (λ ≤ 0,035 W/mK, debelina ≥ 15 cm). ${letaFasade ? `Fasada je bila nazadnje obnovljena ${letaFasade}. ` : ""}Ukrep zmanjša potrebo po ogrevanju za 20-40%.`;
     ukrepi.push({
-      naziv: varstvo.varuje ? "Obnova fasade po ZVKDS smernicah" : "Toplotna izolacija fasade (ETICS sistem)",
+      naziv: varstvo.varuje ? "Obnova fasade po ZVKDS smernicah" : fasadaNujno ? "Obnova fasade" : "Toplotna izolacija fasade (ETICS sistem)",
       nivo: "skupno",
       opis: opisFasada,
       // Bug 4 fix: ko je enota izbrana, strosekMin/Max = vaš delež; skupni strošek objekta shranimo ločeno
@@ -1173,6 +1173,26 @@ function predlagajUkrepe(
     // Bug 3 fix: ROI temelji na deležu stroška, ne skupnem
     const strehaDelezSrednji = delezNum ? Math.round(stSrednji * delezNum) : stSrednji;
     const roi = izracunajROI("streha", strehaDelezSrednji, povrsina);
+    const area = stavba?.povrsina ?? 80;
+    // Ko je kritina dotrajana (>40 let), dodamo vzdrževalni ukrep zamenjave kritine PRED izolacijo
+    if (strehaNujno) {
+      ukrepi.push({
+        naziv: "Zamenjava strešne kritine",
+        nivo: "skupno" as const,
+        kategorija: "vzdrzevanje" as const,
+        opis: `Strešna kritina je stara ${starStrehe} let (življenjska doba: 40 let). Zamenjava kritine je nujna za ohranitev vodotesnosti in preprečitev poškodb konstrukcije.`,
+        strosekMin: delezNum ? Math.round(200 * area * delezNum) : Math.round(200 * area),
+        strosekMax: delezNum ? Math.round(350 * area * delezNum) : Math.round(350 * area),
+        skupniStrosekMin: Math.round(200 * area),
+        skupniStrosekMax: Math.round(350 * area),
+        osnova: "ZRMK referenčne cene 2024: 200–350 €/m² (streha)",
+        prioriteta: "visoka" as const,
+        dobaPovrnitveMin: 999,
+        dobaPovrnitveMax: 999,
+        varstvoCene: varstvo.varuje,
+        vrednostDvig: 5,
+      });
+    }
     ukrepi.push({
       naziv: "Toplotna izolacija strehe / podstrešja",
       nivo: "skupno",
@@ -1187,7 +1207,7 @@ function predlagajUkrepe(
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
       vrednostDvig: 5,
-      kategorija: strehaNujno ? "vzdrzevanje" : "energetika",
+      kategorija: "energetika",
     });
   }
 
