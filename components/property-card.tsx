@@ -1,12 +1,39 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
 import { izracunajOcenaStanja } from "@/lib/gurs-api";
 
 const CadastralMap = dynamic(() => import("./cadastral-map"), { ssr: false });
+
+// Info tooltip — prikaže razlagalni tekst ob hover
+function InfoTooltip({ text }: { text: string }) {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  return (
+    <span className="relative inline-flex items-center" ref={ref}>
+      <button
+        type="button"
+        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-500 text-[9px] font-bold hover:bg-gray-300 transition-colors leading-none cursor-help ml-1"
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        onFocus={() => setVisible(true)}
+        onBlur={() => setVisible(false)}
+        aria-label="Več informacij"
+      >
+        i
+      </button>
+      {visible && (
+        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-gray-800 text-white text-[11px] rounded px-3 py-2 shadow-lg pointer-events-none leading-relaxed">
+          {text}
+          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+        </span>
+      )}
+    </span>
+  );
+}
 
 interface Prostor {
   vrsta: string;
@@ -1505,7 +1532,7 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
               />
             ))}
           </div>
-          <p className="text-[11px] text-gray-300 mt-3">Stroški so okvirne ocene na podlagi ZRMK/IZS referenčnih cen 2024. Niso uradna ponudba.</p>
+          <InfoTooltip text="Stroški so okvirne ocene na podlagi ZRMK/IZS referenčnih cen 2024. Niso uradna ponudba izvajalca." />
         </div>
       )}
     </section>
@@ -1581,7 +1608,9 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
             </span>
           </div>
         </div>
-        <p className="text-xs text-gray-400 mb-3">{zaupanjeBesedilo[ocena.zaupanje]}</p>
+        <span className="inline-flex items-center text-xs text-gray-400 mb-3">
+          Algoritmična ocena<InfoTooltip text={zaupanjeBesedilo[ocena.zaupanje]} />
+        </span>
         {/* Sekcija 1: Standard */}
         <div className="mb-3">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Osnova · PURES 2010 / EN ISO 52000</p>
@@ -1760,7 +1789,7 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
           </button>
         </div>
       )}
-      <p className="text-xs text-gray-400 mt-2">Vir: GURS zemljiška knjiga. Imena fizičnih oseb niso prikazana (GDPR).</p>
+      <span className="inline-flex items-center text-xs text-gray-400 mt-2">Vir: Zemljiška knjiga · GURS<InfoTooltip text="Lastniki so prikazani kot tip osebe (fizična/pravna) in delež. Osebna imena niso prikazana v skladu z GDPR." /></span>
     </section>
   );
 }
@@ -2416,7 +2445,7 @@ function ZavarovanjeSection({
 
           {/* Opomba */}
           <p className="text-[11px] text-gray-400 leading-relaxed pt-1 border-t border-gray-50">
-            Indikativna ocena. Dejanska premija je odvisna od pogojev zavarovalnice.
+            Indikativna ocena<InfoTooltip text="Dejanska premija je odvisna od pogojev zavarovalnice in podrobnega pregleda nepremičnine." />
           </p>
         </div>
       </div>
@@ -2474,19 +2503,11 @@ function ZavarovanjeSection({
         </div>
       </div>
 
-      {/* Zavarovalniški marketplace */}
-      <ZavarovalniskiMarketplace
-        naslov={naslov ?? ""}
-        stavba={stavba}
-        potresno={potresno}
-        poplavnaNevarnost={poplavnaNevarnost ?? null}
-        unitArea={unitArea}
-        seizmicni={seizmicni}
-      />
+      {/* Zavarovalniški marketplace — prihaja */}
 
       {/* Disclaimer */}
       <div className="text-[11px] text-gray-400 leading-relaxed space-y-0.5">
-        <p>Izračuni so indikativni in temeljijo na javno dostopnih podatkih (ARSO, KN GURS). Niso nadomestilo za uradno ponudbo certificiranega zavarovalnega zastopnika.</p>
+        <span className="inline-flex items-center gap-1">Indikativni izračun<InfoTooltip text="Izračuni temeljijo na javno dostopnih podatkih (ARSO, KN GURS). Niso nadomestilo za uradno ponudbo certificiranega zavarovalnega zastopnika." /></span>
         <p>Vir: ARSO potresna nevarnost · Eurocode 8 (EN 1998) · EMS-98 lestvica ranljivosti</p>
       </div>
     </section>
@@ -2494,444 +2515,25 @@ function ZavarovanjeSection({
 }
 
 /* ────────────────────────────────────────────────────────────────
-   ZavarovalniskiMarketplace — demo primerjalna tabela ponudnikov
+   ZavarovanjeSection — ločeni tipi zavarovanja + koračni modal
    ──────────────────────────────────────────────────────────────── */
 
-interface ZavarovalniskiProdukt {
-  ponudnik: string;
-  logo: string;
-  produkt: string;
-  letnaPremijaMin: number;
-  letnaPremijaMax: number;
-  kritjeVsota: number;
-  vkljuceno: string[];
-  izpostavljeno: string;
-  status: "demo";
+interface ZavarovalniskiTip {
+  id: "potresno" | "pozarno" | "poplavno" | "odgovornost";
+  naziv: string;
+  opis: string;
+  vsota: number;
+  premijaMin: number;
+  premijaMax: number;
+  osnova: string;
 }
 
-function ZavarovalniskiMarketplace({
-  naslov,
-  stavba,
-  potresno,
-  poplavnaNevarnost,
-  unitArea,
-  seizmicni,
-}: {
-  naslov: string;
-  stavba: PropertyCardProps["stavba"];
-  potresno: ReturnType<typeof izracunajPotresnoTveganje>;
-  poplavnaNevarnost?: PoplavnaNevarnost | null;
-  unitArea?: number | null;
-  seizmicni?: SeizmicniPodatki;
-}) {
-  const [selectedPonudnik, setSelectedPonudnik] = useState<ZavarovalniskiProdukt | null>(null);
-  const [formData, setFormData] = useState({ ime: "", email: "", tel: "" });
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-
-  // Sekcija B — dodatni podatki za natančen izračun
-  const [tipStrehe, setTipStrehe] = useState("dvokapnica");
-  const [ogrevanje, setOgrevanje] = useState("plin");
-  const [alarm, setAlarm] = useState("brez");
-  const [skode, setSkode] = useState("0");
-  const [obstojeceZavarovanje, setObstojeceZavarovanje] = useState("ni");
-  const [placilo, setPlacilo] = useState("letno");
-
-  const { priporocenaVsota, letnaPremijaOcena } = potresno;
-  const imaPoplavo = poplavnaNevarnost && poplavnaNevarnost.stopnja !== "ni";
-
-  const vkljucenoBase = ["Potresna škoda", "Požar", "Vlom"];
-  if (imaPoplavo) vkljucenoBase.splice(1, 0, "Poplava");
-
-  const produkti: ZavarovalniskiProdukt[] = [
-    {
-      ponudnik: "Triglav",
-      logo: "TR",
-      produkt: "Hiša in Dom Premium",
-      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 0.95),
-      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 0.9),
-      kritjeVsota: priporocenaVsota,
-      vkljuceno: imaPoplavo
-        ? ["Potresna škoda", "Poplava", "Požar", "Vlom"]
-        : ["Potresna škoda", "Požar", "Vlom"],
-      izpostavljeno: "Najnižja premija",
-      status: "demo",
-    },
-    {
-      ponudnik: "Zavarovalnica Sava",
-      logo: "SA",
-      produkt: "Dom Zavarovanje",
-      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 1.05),
-      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 1.0),
-      kritjeVsota: Math.round(priporocenaVsota * 1.05),
-      vkljuceno: ["Potresna škoda", "Poplava", "Požar", "Vlom"],
-      izpostavljeno: "Najboljša ocena",
-      status: "demo",
-    },
-    {
-      ponudnik: "Generali",
-      logo: "GE",
-      produkt: "Moj Dom",
-      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 1.1),
-      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 1.15),
-      kritjeVsota: Math.round(priporocenaVsota * 1.1),
-      vkljuceno: ["Potresna škoda", "Poplava", "Požar", "Vlom", "Odgovornost"],
-      izpostavljeno: "Najširše kritje",
-      status: "demo",
-    },
-    {
-      ponudnik: "Allianz SI",
-      logo: "AL",
-      produkt: "Home Protect",
-      letnaPremijaMin: Math.round(letnaPremijaOcena.min * 1.0),
-      letnaPremijaMax: Math.round(letnaPremijaOcena.max * 1.05),
-      kritjeVsota: priporocenaVsota,
-      vkljuceno: ["Potresna škoda", "Požar"],
-      izpostavljeno: "",
-      status: "demo",
-    },
-  ];
-
-  const badgeClass = (izpostavljeno: string) => {
-    if (izpostavljeno === "Najnižja premija") return "bg-green-100 text-green-800";
-    if (izpostavljeno === "Najširše kritje") return "bg-blue-100 text-blue-800";
-    if (izpostavljeno === "Najboljša ocena") return "bg-amber-100 text-amber-800";
-    return "";
-  };
-
-  // naslov passed as prop
-
-  const handleSend = async () => {
-    setStatus("sending");
-    try {
-      await fetch("/api/lead", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          phone: formData.tel,
-          naslov,
-          ponudnik: selectedPonudnik?.ponudnik,
-          produkt: selectedPonudnik?.produkt,
-          vsota: selectedPonudnik?.kritjeVsota,
-          premija_min: selectedPonudnik?.letnaPremijaMin,
-          premija_max: selectedPonudnik?.letnaPremijaMax,
-        }),
-      });
-      setStatus("sent");
-      setTimeout(() => {
-        setSelectedPonudnik(null);
-        setStatus("idle");
-        setFormData({ ime: "", email: "", tel: "" });
-      }, 2000);
-    } catch {
-      setStatus("error");
-    }
-  };
-
-  return (
-    <>
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-          <div>
-            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">
-              Ponudniki zavarovanj
-            </h4>
-            <p className="text-[11px] text-gray-400 mt-0.5">
-              Primerjava na podlagi podatkov o nepremičnini. Dejanske premije se določijo ob sklenitvi.
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-500">
-            Demo prikaz — integracija v pripravi
-          </span>
-        </div>
-
-        {/* Table header */}
-        <div className="hidden sm:grid grid-cols-[2fr_2fr_2fr_2fr_3fr_auto] gap-x-4 px-5 py-2 border-b border-gray-100 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
-          <span>Ponudnik</span>
-          <span>Produkt</span>
-          <span>Letna premija</span>
-          <span>Kritje</span>
-          <span>Vključeno</span>
-          <span></span>
-        </div>
-
-        {/* Rows */}
-        <div className="divide-y divide-gray-50">
-          {produkti.map((p) => (
-            <div
-              key={p.ponudnik}
-              className="grid grid-cols-1 sm:grid-cols-[2fr_2fr_2fr_2fr_3fr_auto] gap-x-4 gap-y-1 px-5 py-3.5 items-center hover:bg-gray-50 transition-colors"
-            >
-              {/* Ponudnik */}
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">
-                  {p.logo}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{p.ponudnik}</p>
-                  {p.izpostavljeno && (
-                    <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded ${badgeClass(p.izpostavljeno)}`}>
-                      {p.izpostavljeno}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Produkt */}
-              <p className="text-xs text-gray-600">{p.produkt}</p>
-
-              {/* Premija */}
-              <p className="text-sm font-semibold text-gray-800 tabular-nums">
-                {p.letnaPremijaMin.toLocaleString("sl-SI")} € – {p.letnaPremijaMax.toLocaleString("sl-SI")} €
-              </p>
-
-              {/* Kritje */}
-              <p className="text-sm text-gray-700 tabular-nums">
-                {p.kritjeVsota.toLocaleString("sl-SI")} €
-              </p>
-
-              {/* Vključeno */}
-              <div className="flex flex-wrap gap-1">
-                {p.vkljuceno.map((v) => (
-                  <span key={v} className="inline-flex items-center gap-1 text-[10px] text-gray-600">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
-                    {v}
-                  </span>
-                ))}
-              </div>
-
-              {/* Gumb */}
-              <button
-                onClick={() => { setSelectedPonudnik(p); setStatus("idle"); }}
-                className="inline-flex items-center gap-1 rounded bg-gray-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-700 transition-colors whitespace-nowrap"
-              >
-                Skleni <span aria-hidden>→</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Modal */}
-      {selectedPonudnik && (() => {
-        // Dinamični modifikatorji premije
-        const tipaStreheMod = tipStrehe === "ravna" ? 1.15 : 1.0;
-        const ogrevanjeMod = ogrevanje === "elektricno" ? 1.08 : ogrevanje === "plin" ? 1.05 : 1.0;
-        const alarmMod = alarm === "alarm+resetke" ? 0.90 : alarm === "alarm" ? 0.95 : 1.0;
-        const skodeMod = skode === "2+" ? 1.35 : skode === "1" ? 1.15 : 1.0;
-        const mesecnoMod = placilo === "mesecno" ? 1.03 : 1.0;
-        const skupniMod = tipaStreheMod * ogrevanjeMod * alarmMod * skodeMod * mesecnoMod;
-        const base = potresno.letnaPremijaOcena;
-        const prilagojenaMin = Math.round(base.min * skupniMod);
-        const prilagojenaMax = Math.round(base.max * skupniMod);
-
-        // Površina za prikaz
-        const prikazanaPovrsina = unitArea ?? stavba.povrsina;
-        const povrsinaLabel = unitArea
-          ? `Površina enote: ${unitArea} m²`
-          : stavba.povrsina
-          ? `Površina stavbe: ${stavba.povrsina} m²`
-          : "Površina: —";
-
-        const selectClass = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300 bg-white";
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg relative my-4">
-              {/* Modal header */}
-              <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-gray-100">
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-widest mb-0.5">Zahtevek za zavarovanje</p>
-                  <h3 className="text-base font-semibold text-gray-800">
-                    {selectedPonudnik.ponudnik} — {selectedPonudnik.produkt}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
-                  className="text-gray-400 hover:text-gray-600 text-lg leading-none p-1"
-                  aria-label="Zapri"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="px-6 py-5 space-y-5">
-
-                {/* ── Sekcija A: Podatki iz registrov GURS (readonly) ── */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
-                    A — Podatki iz registrov GURS
-                  </p>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 divide-y divide-gray-100 text-sm">
-                    {[
-                      ["Naslov", naslov || "—"],
-                      ["Leto izgradnje", stavba.letoIzgradnje ?? "—"],
-                      ["Konstrukcija", stavba.konstrukcija ?? "—"],
-                      ["Površina", prikazanaPovrsina ? `${prikazanaPovrsina} m²` : "—"],
-                      ["Seizmična cona", seizmicni ? `Cona ${seizmicni.cona} (PGA ${seizmicni.pga}g)` : "—"],
-                      ["Potresna ranljivost", `Razred ${potresno.razredRanljivosti} — ${potresno.opisRanljivosti}`],
-                    ].map(([label, val]) => (
-                      <div key={String(label)} className="flex justify-between px-4 py-2">
-                        <span className="text-gray-500 shrink-0 mr-3">{label}</span>
-                        <span className="text-gray-800 font-medium text-right">{String(val)}</span>
-                      </div>
-                    ))}
-                    {/* Zavarovalna vsota */}
-                    <div className="flex justify-between px-4 py-2 bg-gray-100 rounded-b-lg">
-                      <span className="text-gray-600 font-medium">Zavarovalna vsota</span>
-                      <span className="text-gray-900 font-semibold">
-                        {selectedPonudnik.kritjeVsota.toLocaleString("sl-SI")} €
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-1.5">{povrsinaLabel} · 1.800 €/m² × 1,1 (faktor)</p>
-                </div>
-
-                {/* ── Sekcija B: Dodatni podatki za natančen izračun ── */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
-                    B — Dodatni podatki za natančen izračun
-                  </p>
-                  <div className="space-y-2.5">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">Tip strehe</label>
-                        <select value={tipStrehe} onChange={(e) => setTipStrehe(e.target.value)} className={selectClass}>
-                          <option value="dvokapnica">Dvokapnica</option>
-                          <option value="ravna">Ravna streha (+15%)</option>
-                          <option value="mansarda">Mansarda</option>
-                          <option value="enokapnica">Enokapnica</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">Ogrevanje</label>
-                        <select value={ogrevanje} onChange={(e) => setOgrevanje(e.target.value)} className={selectClass}>
-                          <option value="plin">Centralno (plin) (+5%)</option>
-                          <option value="elektricno">Električno (+8%)</option>
-                          <option value="tc">Toplotna črpalka</option>
-                          <option value="daljinsko">Daljinsko</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">Protivlomna zaščita</label>
-                        <select value={alarm} onChange={(e) => setAlarm(e.target.value)} className={selectClass}>
-                          <option value="brez">Brez</option>
-                          <option value="alarm">Alarm (−5%)</option>
-                          <option value="resetke">Rešetke</option>
-                          <option value="alarm+resetke">Alarm + rešetke (−10%)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">Škode zadnjih 5 let</label>
-                        <select value={skode} onChange={(e) => setSkode(e.target.value)} className={selectClass}>
-                          <option value="0">Ni škod</option>
-                          <option value="1">1 škoda (+15%)</option>
-                          <option value="2+">2+ škodi (+35%)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">Obstoječe zavarovanje</label>
-                        <select value={obstojeceZavarovanje} onChange={(e) => setObstojeceZavarovanje(e.target.value)} className={selectClass}>
-                          <option value="ni">Ni</option>
-                          <option value="izteka">Da — izteka se</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">Plačilo</label>
-                        <select value={placilo} onChange={(e) => setPlacilo(e.target.value)} className={selectClass}>
-                          <option value="letno">Letno</option>
-                          <option value="mesecno">Mesečno (+3%)</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Prilagojena premija */}
-                  <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-                    <p className="text-[11px] text-blue-500 uppercase tracking-wide mb-0.5">Prilagojena letna premija</p>
-                    <p className="text-lg font-bold text-blue-800">
-                      {prilagojenaMin.toLocaleString("sl-SI")} € – {prilagojenaMax.toLocaleString("sl-SI")} €
-                    </p>
-                    <p className="text-[11px] text-blue-400 mt-0.5">↑ posodobljeno glede na vaše podatke</p>
-                  </div>
-                </div>
-
-                {/* ── Sekcija C: Kontaktni podatki ── */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
-                    C — Vaši kontaktni podatki
-                  </p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Ime in priimek"
-                      value={formData.ime}
-                      onChange={(e) => setFormData((f) => ({ ...f, ime: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                    />
-                    <input
-                      type="email"
-                      placeholder="E-mail"
-                      value={formData.email}
-                      onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Telefonska številka"
-                      value={formData.tel}
-                      onChange={(e) => setFormData((f) => ({ ...f, tel: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                    />
-                  </div>
-                </div>
-
-                {/* Demo opomba */}
-                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
-                  Demo: Ob pritisku &ldquo;Pošlji zahtevek&rdquo; bodo podatki shranjeni za testiranje. Dejanska sklenitev prihaja.
-                </div>
-
-                {/* Status message */}
-                {status === "sent" && (
-                  <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-xs text-green-800 font-medium">
-                    Zahtevek poslan. Kontaktirali vas bomo.
-                  </div>
-                )}
-                {status === "error" && (
-                  <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-800">
-                    Prišlo je do napake. Poskusite znova.
-                  </div>
-                )}
-
-                {/* Gumba */}
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    onClick={handleSend}
-                    disabled={status === "sending" || status === "sent"}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60 transition-colors"
-                  >
-                    {status === "sending" ? "Pošiljam..." : "Pošlji zahtevek →"}
-                  </button>
-                  <button
-                    onClick={() => { setSelectedPonudnik(null); setStatus("idle"); }}
-                    className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    Prekliči
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-    </>
-  );
-}
+const PONUDNIKI = [
+  { naziv: "Triglav",            logo: "TR", mod: 0.95 },
+  { naziv: "Zavarovalnica Sava", logo: "SA", mod: 1.05 },
+  { naziv: "Generali",           logo: "GE", mod: 1.15 },
+  { naziv: "Allianz SI",         logo: "AL", mod: 1.00 },
+] as const;
 
 function ServicesSection() {
   const cards = [
