@@ -531,7 +531,6 @@ export function PropertyCard({
 
           {/* 2. Ocenjena vrednost */}
           <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">Ocenjena vrednost</p>
             <OcenaVrednostiSection
               renVrednost={renVrednost}
               currentPartVrednotenje={currentPart?.vrednotenje}
