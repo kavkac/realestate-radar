@@ -1399,7 +1399,7 @@ function predlagajUkrepe(
 }
 
 function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: string | null; hasSelectedUnit: boolean | undefined; isLast: boolean }) {
-  const [osnOdprta, setOsnOdprta] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
 
   const borderColor = u.prioriteta === "visoka" ? "#ef4444" : u.prioriteta === "srednja" ? "#f59e0b" : "#d1d5db";
   const prioritetaLabel = u.prioriteta === "visoka" ? "↑ prednostno" : u.prioriteta === "srednja" ? "priporočeno" : "opcijsko";
@@ -1407,84 +1407,59 @@ function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: 
 
   const showDelez = u.nivo === "skupno" && hasSelectedUnit && delez && u.skupniStrosekMin != null;
 
+  const strosekLabel = showDelez
+    ? `${u.strosekMin.toLocaleString("sl-SI")}–${u.strosekMax.toLocaleString("sl-SI")} € (vaš delež)`
+    : `${u.strosekMin.toLocaleString("sl-SI")}–${u.strosekMax.toLocaleString("sl-SI")} €`;
+
   return (
     <div
-      className={`border border-gray-100 rounded bg-white overflow-hidden${isLast ? "" : " mb-3"}`}
-      style={{ borderLeftWidth: "4px", borderLeftColor: borderColor }}
+      className={`border border-gray-100 rounded bg-white overflow-hidden${isLast ? "" : " mb-2"}`}
+      style={{ borderLeftWidth: "3px", borderLeftColor: borderColor }}
     >
-      <div className="p-3">
-        {/* Naziv + prioriteta */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div>
-            <p className="text-sm font-medium text-gray-800">{u.naziv}</p>
-            {u.varstvoCene && (
-              <p className="text-xs text-purple-600 mt-0.5">🏛 Cene prilagojene za varstvo kulturne dediščine</p>
-            )}
-          </div>
-          <span className={`text-xs flex-shrink-0 mt-0.5 ${prioritetaTextColor}`}>{prioritetaLabel}</span>
+      {/* Kompaktna vrstica — vedno vidna */}
+      <button
+        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-sm font-medium text-gray-800 truncate">{u.naziv}</span>
+          <span className="text-sm text-gray-500 flex-shrink-0">{strosekLabel}</span>
         </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className={`text-xs ${prioritetaTextColor}`}>{prioritetaLabel}</span>
+          <span className="text-gray-300 text-xs">{expanded ? "▲" : "▼"}</span>
+        </div>
+      </button>
 
-        {/* Opis */}
-        <p className="text-xs text-gray-500 mb-2">{u.opis}</p>
+      {/* Podrobnosti — razvijejo se na klik */}
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-gray-50 pt-2 space-y-1.5">
+          <p className="text-xs text-gray-500">{u.opis}</p>
 
-        {/* Strošek + ROI - linearen prikaz */}
-        {showDelez ? (
-          <div className="space-y-1">
-            <div>
-              <span className="text-xs text-gray-400">Skupni strošek objekta: </span>
-              <span className="text-xs text-gray-400">
-                {u.skupniStrosekMin!.toLocaleString("sl-SI")}-{u.skupniStrosekMax!.toLocaleString("sl-SI")} €
-              </span>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">Vaš delež ({delez}): </span>
-              <span className="text-sm font-semibold text-gray-800">
-                {u.strosekMin.toLocaleString("sl-SI")}-{u.strosekMax.toLocaleString("sl-SI")} €
-              </span>
-            </div>
-            {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
-              <p className="text-xs text-purple-700">Vzdrževalna obveznost - preverite subvencije (EkoSklad, EU skladi)</p>
-            ) : u.dobaPovrnitveMin > 50 ? (
-              <p className="text-xs text-gray-500">Doba povrnitve (vaš delež): &gt; 50 let - priporočljivo preveriti razpoložljive subvencije</p>
-            ) : (
-              <p className="text-xs text-gray-400">Doba povrnitve (vaš delež): ~{u.dobaPovrnitveMin}-{u.dobaPovrnitveMax} let</p>
-            )}
-            {u.vrednostDvig && (
-              <p className="text-xs text-green-700">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
-            )}
-          </div>
-        ) : (
-          <div>
-            <span className="text-xs text-gray-400">{u.nivo === "skupno" ? "Skupni strošek" : "Ocena stroška"}: </span>
-            <span className="text-sm font-medium text-gray-800">
-              {u.strosekMin.toLocaleString("sl-SI")}-{u.strosekMax.toLocaleString("sl-SI")} €
-            </span>
-            {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
-              <p className="text-xs text-purple-700 mt-0.5">Vzdrževalna obveznost - preverite subvencije (EkoSklad, EU skladi)</p>
-            ) : u.dobaPovrnitveMin > 50 ? (
-              <p className="text-xs text-gray-500 mt-0.5">Doba povrnitve: &gt; 50 let - priporočljivo preveriti razpoložljive subvencije</p>
-            ) : (
-              <p className="text-xs text-gray-400 mt-0.5">Doba povrnitve: ~{u.dobaPovrnitveMin}-{u.dobaPovrnitveMax} let</p>
-            )}
-            {u.vrednostDvig && (
-              <p className="text-xs text-green-700 mt-1">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
-            )}
-          </div>
-        )}
+          {showDelez && u.skupniStrosekMin != null && (
+            <p className="text-xs text-gray-400">
+              Skupni strošek objekta: {u.skupniStrosekMin.toLocaleString("sl-SI")}–{u.skupniStrosekMax!.toLocaleString("sl-SI")} €
+              {delez && <span className="ml-1">(vaš delež: {delez})</span>}
+            </p>
+          )}
 
-        {/* Metodologija - skrita za collapse */}
-        <div className="mt-2 pt-2 border-t border-gray-50">
-          <button
-            onClick={() => setOsnOdprta(!osnOdprta)}
-            className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            {osnOdprta ? "▲ Skrij metodologijo" : "▼ Metodologija in osnova"}
-          </button>
-          {osnOdprta && (
-            <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{u.osnova}</p>
+          {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
+            <p className="text-xs text-purple-700">Vzdrževalna obveznost — preverite subvencije (EkoSklad, EU skladi)</p>
+          ) : u.dobaPovrnitveMin > 50 ? (
+            <p className="text-xs text-gray-400">Doba povrnitve: &gt; 50 let — priporočljivo preveriti subvencije</p>
+          ) : (
+            <p className="text-xs text-gray-400">Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let</p>
+          )}
+
+          {u.vrednostDvig && (
+            <p className="text-xs text-green-700">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
+          )}
+
+          {u.osnova && (
+            <p className="text-[11px] text-gray-400 pt-1 border-t border-gray-50">{u.osnova}</p>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
