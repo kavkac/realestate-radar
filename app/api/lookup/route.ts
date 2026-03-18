@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
         stStavbe: stavba.stStavbe,
         stDelaStavbe,
       }).catch(() => null),
-      getParcele(stavba.koId, stavba.stStavbe),
+      getParcele(stavba.koId, stavba.stStavbe, lat, lng),
       getRenVrednost(stavba.koId, stavba.stStavbe),
       getEtnAnaliza(stavba.koId, useableArea).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),

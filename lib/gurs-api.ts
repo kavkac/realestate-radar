@@ -535,6 +535,8 @@ export interface RenVrednostData {
 export async function getParcele(
   koId: number,
   stStavbe: number,
+  lat?: number | null,
+  lng?: number | null,
 ): Promise<ParcelaData[]> {
   // First: get STAVBE_TABELA to find parcel link
   const stavbaUrl = buildWfsUrl(
@@ -560,6 +562,16 @@ export async function getParcele(
   if (!parceleData || parceleData.features.length === 0) {
     const fallbackUrl = buildWfsUrl(BASE_KN, "SI.GURS.KN:PARCELE_H", `KO_ID=${koId} AND ST_STAVBE=${stStavbe}`) + "&SRSNAME=EPSG:4326";
     parceleData = await fetchWfs(fallbackUrl);
+  }
+
+  // Fallback 2: prostorska poizvedba po koordinatah stavbe (INTERSECTS)
+  if ((!parceleData || parceleData.features.length === 0) && lat != null && lng != null) {
+    const spatialUrl = buildWfsUrl(
+      BASE_KN,
+      "SI.GURS.KN:PARCELE_H",
+      `INTERSECTS(SHAPE,POINT(${lng} ${lat}))`,
+    ) + "&SRSNAME=EPSG:4326";
+    parceleData = await fetchWfs(spatialUrl).catch(() => null);
   }
 
   if (!parceleData || parceleData.features.length === 0) return [];
