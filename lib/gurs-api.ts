@@ -1,5 +1,16 @@
 import { getCached, setCached } from "./wfs-cache";
 
+/** Preveri ali katerakoli točka poligona A leži v poligonu B ali obratno → presečišče */
+function polygonsIntersect(ringA: number[][], ringB: number[][]): boolean {
+  for (const pt of ringA) {
+    if (pointInPolygon(pt as [number, number], ringB)) return true;
+  }
+  for (const pt of ringB) {
+    if (pointInPolygon(pt as [number, number], ringA)) return true;
+  }
+  return false;
+}
+
 /** Ray-casting point-in-polygon (WGS84 coords [lng, lat]) */
 function pointInPolygon(point: [number, number], ring: number[][]): boolean {
   const [px, py] = point;
@@ -582,6 +593,7 @@ export async function getParcele(
   stStavbe: number,
   lat?: number | null,
   lng?: number | null,
+  obrisGeom?: { type: "Polygon"; coordinates: number[][][] } | null,
 ): Promise<ParcelaData[]> {
   // First: get STAVBE_TABELA to find parcel link
   const stavbaUrl = buildWfsUrl(
@@ -619,14 +631,19 @@ export async function getParcele(
     ) + "&SRSNAME=EPSG:4326";
     const bboxData = await fetchWfs(bboxUrl).catch(() => null);
     if (bboxData && bboxData.features.length > 0) {
-      // Point-in-polygon: obdrži samo parcelo ki vsebuje točko stavbe
-      const containing = bboxData.features.filter((f) => {
+      const buildingRing = obrisGeom?.coordinates?.[0];
+      const filtered = bboxData.features.filter((f) => {
         const geom = f.geometry as { type: string; coordinates: number[][][] } | null;
         if (!geom || geom.type !== "Polygon") return false;
-        return pointInPolygon([lng, lat], geom.coordinates[0]);
+        const parcelRing = geom.coordinates[0];
+        // Če imamo tloris stavbe: pokaži vse parcele ki se stikajo z njim
+        if (buildingRing && buildingRing.length > 0) {
+          return polygonsIntersect(buildingRing, parcelRing);
+        }
+        // Fallback: točka stavbe mora biti v parceli
+        return pointInPolygon([lng, lat], parcelRing);
       });
-      // Če najdemo vsebujočo parcelo, vzamemo jo; sicer vzamemo vse iz BBOX (fallback)
-      parceleData = { ...bboxData, features: containing.length > 0 ? containing : bboxData.features.slice(0, 1) };
+      parceleData = { ...bboxData, features: filtered.length > 0 ? filtered : bboxData.features.slice(0, 1) };
     }
   }
 
