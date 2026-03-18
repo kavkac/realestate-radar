@@ -520,6 +520,7 @@ export function PropertyCard({
           {lat && lng && (
             <div className="rounded-lg border border-gray-200 overflow-hidden">
               <CadastralMap
+                key={`map-${lat}-${lng}-${enolicniId.koId}-${enolicniId.stStavbe}`}
                 lat={lat} lng={lng} naslov={naslov}
                 koId={enolicniId.koId} stStavbe={enolicniId.stStavbe}
                 obrisGeom={stavba?.obrisGeom ?? null}
