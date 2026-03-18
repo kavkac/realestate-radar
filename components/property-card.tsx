@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
+import type { SeizmicniPodatki } from "@/lib/arso-api";
 
 const CadastralMap = dynamic(() => import("./cadastral-map"), { ssr: false });
 
@@ -113,6 +114,7 @@ interface PropertyCardProps {
   lng?: number | null;
   requestedDel?: number;
   onClearDel?: () => void;
+  seizmicniPodatki?: SeizmicniPodatki | null;
 }
 
 const ENERGY_COLORS: Record<string, string> = {
@@ -150,6 +152,7 @@ export function PropertyCard({
   lng,
   requestedDel,
   onClearDel,
+  seizmicniPodatki,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
@@ -413,7 +416,14 @@ export function PropertyCard({
             <ParceleSection parcele={parcele} />
           </div>
 
-          {/* L5: Storitve */}
+          {/* L5: Zavarovanje nepremičnine */}
+          <ZavarovanjeSection
+            stavba={stavba}
+            seizmicniPodatki={seizmicniPodatki ?? null}
+            etaze={stavba.steviloEtaz}
+          />
+
+          {/* L6: Storitve */}
           <ServicesSection />
 
           {/* L6: Izračunaj kredit */}
@@ -2085,6 +2095,278 @@ function AerialMap({
       </a>
       <p className="text-[10px] text-gray-400">Vir: Google Maps · Satelitski posnetek</p>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// ZAVAROVANJE NEPREMIČNINE
+// ─────────────────────────────────────────────────────────────
+
+interface PotresnoTveganje {
+  razredRanljivosti: "A" | "B" | "C" | "D";
+  tveganje: "nizko" | "zmerno" | "srednje" | "visoko" | "zelo visoko";
+  tveganjeTocke: number;
+  opisRanljivosti: string;
+  priporocenaVsota: number;
+  letnaPremijaOcena: { min: number; max: number };
+}
+
+function izracunajPotresnoTveganje(
+  stavba: PropertyCardProps["stavba"],
+  seizmicni: SeizmicniPodatki,
+): PotresnoTveganje {
+  const leto = stavba.letoIzgradnje ?? 1980;
+  const konstr = (stavba.konstrukcija ?? "").toLowerCase();
+  const jeMontatna = konstr.includes("mont") || konstr.includes("panel");
+  const jeLeseena = konstr.includes("les");
+  const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
+
+  // EMS-98 razred ranljivosti
+  let razredRanljivosti: "A" | "B" | "C" | "D";
+  let opisRanljivosti: string;
+
+  if (leto >= 2009) {
+    razredRanljivosti = "D";
+    opisRanljivosti = "Moderna gradnja po Eurocode 8 (2009+)";
+  } else if ((jeLeseena || jeMontatna) && leto < 1964) {
+    razredRanljivosti = "A";
+    opisRanljivosti = "Lesena ali montažna gradnja, pred 1964";
+  } else if (
+    ((jeMasivna || (!jeLeseena && !jeMontatna)) && leto < 1964) ||
+    (jeMontatna && leto >= 1964 && leto < 1987)
+  ) {
+    razredRanljivosti = "B";
+    opisRanljivosti = jeMasivna && leto < 1964
+      ? "Masivna gradnja, pred 1964"
+      : "Montažna gradnja, 1964–1987";
+  } else if (
+    ((jeMasivna || (!jeLeseena && !jeMontatna)) && leto >= 1964 && leto < 2009) ||
+    (jeMontatna && leto >= 1987 && leto < 2009)
+  ) {
+    razredRanljivosti = "C";
+    opisRanljivosti = jeMontatna
+      ? "Montažna gradnja, po 1987"
+      : "Masivna gradnja, 1964–2009";
+  } else {
+    // Fallback: stara gradnja brez specifičnih podatkov
+    if (leto < 1964) {
+      razredRanljivosti = "B";
+      opisRanljivosti = "Starejša gradnja, pred 1964";
+    } else if (leto < 2009) {
+      razredRanljivosti = "C";
+      opisRanljivosti = "Gradnja 1964–2009";
+    } else {
+      razredRanljivosti = "D";
+      opisRanljivosti = "Moderna gradnja po 2009";
+    }
+  }
+
+  // Točke tveganja
+  const bazaTocke: Record<string, number> = { "I": 1, "II": 3, "III": 5, "IV": 8 };
+  const ranljivostMod: Record<string, number> = { "A": 2, "B": 1, "C": 0, "D": -1 };
+  const etaze = stavba.steviloEtaz ?? 1;
+  const etazeMod = etaze >= 5 ? 1 : etaze >= 3 ? 0.5 : 0;
+  const tveganjeTockeRaw = (bazaTocke[seizmicni.cona] ?? 3) + ranljivostMod[razredRanljivosti] + etazeMod;
+  const tveganjeTocke = Math.min(10, Math.max(1, Math.round(tveganjeTockeRaw)));
+
+  const tveganje: PotresnoTveganje["tveganje"] =
+    tveganjeTocke <= 2 ? "nizko"
+    : tveganjeTocke <= 4 ? "zmerno"
+    : tveganjeTocke <= 6 ? "srednje"
+    : tveganjeTocke <= 8 ? "visoko"
+    : "zelo visoko";
+
+  // Priporočena zavarovalna vsota
+  const povrsina = stavba.povrsina ?? 80;
+  const ocenjenVrednost = povrsina * 1800;
+  const priporocenaVsota = Math.round(ocenjenVrednost * 1.1);
+
+  // Letna premija
+  const stopnja = tveganjeTocke <= 3 ? 0.0008 : tveganjeTocke <= 6 ? 0.0015 : 0.0025;
+  const letnaPremijaOcena = {
+    min: Math.round(priporocenaVsota * stopnja * 0.8),
+    max: Math.round(priporocenaVsota * stopnja * 1.3),
+  };
+
+  return { razredRanljivosti, tveganje, tveganjeTocke, opisRanljivosti, priporocenaVsota, letnaPremijaOcena };
+}
+
+function TveganjeProgressBar({ tocke }: { tocke: number }) {
+  const color =
+    tocke <= 3 ? "bg-green-500"
+    : tocke <= 6 ? "bg-orange-400"
+    : tocke <= 8 ? "bg-red-500"
+    : "bg-red-800";
+  const width = `${tocke * 10}%`;
+  return (
+    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+      <div className={`h-2.5 rounded-full transition-all ${color}`} style={{ width }} />
+    </div>
+  );
+}
+
+function ZavarovanjeSection({
+  stavba,
+  seizmicniPodatki,
+  etaze,
+}: {
+  stavba: PropertyCardProps["stavba"];
+  seizmicniPodatki: SeizmicniPodatki | null;
+  etaze?: number | null;
+}) {
+  const konstr = (stavba.konstrukcija ?? "").toLowerCase();
+  const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
+
+  // Brez seizmičnih podatkov – prikažemo samo premoženjsko tabelo brez potresnega dela
+  const potresno = seizmicniPodatki ? izracunajPotresnoTveganje(stavba, seizmicniPodatki) : null;
+  const priporocenaVsota = potresno?.priporocenaVsota ?? Math.round((stavba.povrsina ?? 80) * 1800 * 1.1);
+
+  const pozarnaStopnja = jeMasivna ? 0.0005 : 0.0008;
+  const pozarnaMin = Math.round(priporocenaVsota * pozarnaStopnja * 0.8);
+  const pozarnaMax = Math.round(priporocenaVsota * pozarnaStopnja * 1.3);
+
+  const tveganjeLabel: Record<string, string> = {
+    "nizko": "Nizko",
+    "zmerno": "Zmerno",
+    "srednje": "Srednje",
+    "visoko": "Visoko",
+    "zelo visoko": "Zelo visoko",
+  };
+
+  return (
+    <section className="border-t border-gray-100 pt-6 space-y-6">
+      <div>
+        <h3 className="text-base font-semibold text-gray-800">Zavarovanje nepremičnine</h3>
+        <p className="text-xs text-gray-400 mt-0.5">Indikativni izračun potresnega tveganja in priporočila za zavarovanje</p>
+      </div>
+
+      {/* Potresna varnost */}
+      {potresno && seizmicniPodatki && (
+        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">Potresna varnost</h4>
+            <span className="text-[10px] text-gray-400">Vir: ARSO · Eurocode 8</span>
+          </div>
+          <div className="px-5 py-4 space-y-4">
+            {/* Cona + Ranljivost */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Seizmična cona</p>
+                <p className="text-xl font-bold text-gray-800">{seizmicniPodatki.cona}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{seizmicniPodatki.opisCone}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Ranljivost (EMS-98)</p>
+                <p className="text-xl font-bold text-gray-800">{potresno.razredRanljivosti}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{potresno.opisRanljivosti}</p>
+              </div>
+            </div>
+
+            {/* Ocena tveganja */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Ocena tveganja</p>
+                <span className={`text-xs font-semibold ${
+                  potresno.tveganjeTocke <= 3 ? "text-green-700"
+                  : potresno.tveganjeTocke <= 6 ? "text-orange-600"
+                  : potresno.tveganjeTocke <= 8 ? "text-red-600"
+                  : "text-red-800"
+                }`}>
+                  {tveganjeLabel[potresno.tveganje]} ({potresno.tveganjeTocke}/10)
+                </span>
+              </div>
+              <TveganjeProgressBar tocke={potresno.tveganjeTocke} />
+            </div>
+
+            {/* Vrednosti */}
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Priporočena zavarovalna vsota</p>
+                <p className="text-base font-semibold text-gray-800">{potresno.priporocenaVsota.toLocaleString("sl-SI")} €</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Indikativna letna premija</p>
+                <p className="text-base font-semibold text-gray-800">
+                  {potresno.letnaPremijaOcena.min.toLocaleString("sl-SI")} € – {potresno.letnaPremijaOcena.max.toLocaleString("sl-SI")} €
+                </p>
+              </div>
+            </div>
+
+            {/* Opomba + CTA */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 border-t border-gray-50">
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Indikativna ocena. Dejanska premija je odvisna od pogojev zavarovalnice.
+              </p>
+              <a
+                href="https://www.vzajemna.si/zavarovanje-nepremicnin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 inline-flex items-center gap-1 rounded bg-[#2d6a4f] px-4 py-2 text-xs font-medium text-white hover:bg-[#245a42] transition-colors"
+              >
+                Pridobite ponudbo
+                <span aria-hidden>→</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premoženjsko zavarovanje */}
+      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-widest">Premoženjsko zavarovanje</h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-left text-gray-400 text-[11px] uppercase tracking-wide">
+                <th className="px-5 py-2.5 font-medium">Vrsta zavarovanja</th>
+                <th className="px-5 py-2.5 font-medium text-right">Priporočena vsota</th>
+                <th className="px-5 py-2.5 font-medium text-right">Indikativna premija/leto</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-5 py-3 text-gray-700 font-medium">Požarno in splošno</td>
+                <td className="px-5 py-3 text-right tabular-nums text-gray-700">{priporocenaVsota.toLocaleString("sl-SI")} €</td>
+                <td className="px-5 py-3 text-right tabular-nums text-gray-700">{pozarnaMin.toLocaleString("sl-SI")} € – {pozarnaMax.toLocaleString("sl-SI")} €</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-5 py-3 text-gray-500 italic">
+                  Poplavno tveganje
+                  <span className="ml-2 text-[10px] not-italic text-gray-400">Podatki o poplavni ogroženosti prihajajo</span>
+                </td>
+                <td className="px-5 py-3 text-right text-gray-300 text-xs">—</td>
+                <td className="px-5 py-3 text-right text-gray-300 text-xs">—</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-5 py-3 text-gray-700 font-medium">Odgovornost</td>
+                <td className="px-5 py-3 text-right tabular-nums text-gray-700">500.000 €</td>
+                <td className="px-5 py-3 text-right tabular-nums text-gray-700">30 € – 60 €</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="px-5 py-3 border-t border-gray-50 flex justify-end">
+          <a
+            href="https://www.vzajemna.si/zavarovanje-nepremicnin"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded bg-[#2d6a4f] px-4 py-2 text-xs font-medium text-white hover:bg-[#245a42] transition-colors"
+          >
+            Pridobite ponudbo
+            <span aria-hidden>→</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="text-[11px] text-gray-400 leading-relaxed space-y-0.5">
+        <p>Izračuni so indikativni in temeljijo na javno dostopnih podatkih (ARSO, KN GURS). Niso nadomestilo za uradno ponudbo certificiranega zavarovalnega zastopnika.</p>
+        <p>Vir: ARSO potresna nevarnost · Eurocode 8 (EN 1998) · EMS-98 lestvica ranljivosti</p>
+      </div>
+    </section>
   );
 }
 
