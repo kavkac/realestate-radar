@@ -68,31 +68,30 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
         zIndex={1}
       />
 
-      {/* Parcelna meja — rumena debela zunanja črta (jasno ločena od stavbe) */}
+      {/* Parcelna meja — modra tanka črtkana */}
       {validParcele.map((p, i) => (
         <GeoJSON
           key={`parcela-${i}`}
           data={p.geometry as unknown as GeoJSON.Geometry}
           style={{
-            color: "#eab308",
-            weight: 3,
+            color: "#2563eb",
+            weight: 1.5,
             fillOpacity: 0,
-            dashArray: "8 5",
-            lineCap: "square" as const,
+            dashArray: "6 4",
           }}
         />
       ))}
 
-      {/* Tloris stavbe — bela obroba + rdeča polnitev */}
+      {/* Tloris stavbe — rdeča tanka kontura + svetla polnitev */}
       {obrisGeom && (
         <GeoJSON
           key={JSON.stringify(obrisGeom.coordinates[0][0])}
           data={obrisGeom as GeoJSON.Polygon}
           style={{
-            color: "#ffffff",
-            weight: 2,
+            color: "#dc2626",
+            weight: 1.5,
             fillColor: "#ef4444",
-            fillOpacity: 0.45,
+            fillOpacity: 0.3,
           }}
         />
       )}

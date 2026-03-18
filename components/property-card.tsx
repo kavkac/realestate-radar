@@ -526,8 +526,8 @@ export function PropertyCard({
                 parcelGeoms={parcele ?? null}
               />
               <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex gap-4 text-[10px] text-gray-400">
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-red-400 opacity-70 rounded-sm" /> Stavba (KN)</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-yellow-500" /> Parcela (KN)</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 bg-red-500 opacity-60 rounded-sm" /> Stavba (KN)</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-blue-600" /> Parcela (KN)</span>
                 <span className="ml-auto">Vir: GURS DOF · KN</span>
               </div>
             </div>
