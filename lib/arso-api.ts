@@ -7,7 +7,7 @@ export async function getPoplavnaNevarnost(lat: number, lng: number): Promise<Po
   try {
     // ARSO poplavna karta — ArcGIS REST
     const url = `https://gis.arso.gov.si/arcgis/rest/services/poplave/Poplavna_nevarnost/MapServer/identify?geometry=${lng},${lat}&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=2&mapExtent=${lng-0.001},${lat-0.001},${lng+0.001},${lat+0.001}&imageDisplay=800,600,96&returnGeometry=false&f=json`;
-    const res = await fetch(url, { next: { revalidate: 86400 } });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return { stopnja: "ni", opis: "Lokacija ni v evidentirani poplavni coni." };
     const data = await res.json();
     const results = data?.results ?? [];
@@ -64,7 +64,7 @@ function fallbackCona(lat: number, lng: number): SeizmicniPodatki {
 export async function getSeizmicnaCona(lat: number, lng: number): Promise<SeizmicniPodatki> {
   try {
     const url = `https://gis.arso.gov.si/arcgis/rest/services/potres/potresna_nevarnost/MapServer/0/query?geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json`;
-    const res = await fetch(url, { next: { revalidate: 86400 } });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return fallbackCona(lat, lng);
 
     const data = await res.json();
