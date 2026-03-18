@@ -430,6 +430,21 @@ export function PropertyCard({
             <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
           </div>
 
+          {/* 4b. Stroški ogrevanja — takoj pod EIZ */}
+          {!(isMultiUnit && !(!!activePart || requestedDel != null)) &&
+           energetskaIzkaznica?.potrebnaTopota != null &&
+           energetskaIzkaznica?.kondicionirana != null && (
+            <div className="px-5 py-6 border-b border-gray-100">
+              <EnergetskiIzracunSection
+                energetskaIzkaznica={energetskaIzkaznica}
+                unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
+                isMultiUnit={isMultiUnit}
+                hasSelectedUnit={!!activePart || requestedDel != null}
+                unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
+              />
+            </div>
+          )}
+
           {/* 5. Predlagani ukrepi — zložljivo, privzeto ODPRTO */}
           {stavba && (() => {
             const hasUnit = !!(activePart || requestedDel != null);
@@ -464,20 +479,7 @@ export function PropertyCard({
             );
           })()}
 
-          {/* 6. Stroški ogrevanja — samo če imamo EIZ podatke */}
-          {!(isMultiUnit && !(!!activePart || requestedDel != null)) &&
-           energetskaIzkaznica?.potrebnaTopota != null &&
-           energetskaIzkaznica?.kondicionirana != null && (
-            <div className="px-5 py-6 border-b border-gray-100">
-              <EnergetskiIzracunSection
-                energetskaIzkaznica={energetskaIzkaznica}
-                unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
-                isMultiUnit={isMultiUnit}
-                hasSelectedUnit={!!activePart || requestedDel != null}
-                unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
-              />
-            </div>
-          )}
+          {/* 6. Zavarovanje — placeholder, prestavljen spodaj */}
 
           {/* 7. Zavarovanje nepremičnine — zložljivo, privzeto ZAPRTO */}
           <CollapsibleSection title="Zavarovanje nepremičnine" vir="ARSO · Eurocode 8" defaultOpen={false}>
