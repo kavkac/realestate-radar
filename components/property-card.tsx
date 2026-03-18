@@ -369,6 +369,9 @@ export function PropertyCard({
                 delez={delezSkupnih}
                 lat={lat}
                 lng={lng}
+                isMultiUnit={isMultiUnit}
+                hasSelectedUnit={!!activePart || requestedDel != null}
+                unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
               />
             );
           })()}
@@ -1136,7 +1139,7 @@ function predlagajUkrepe(
   return ukrepi;
 }
 
-function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng }: { ukrepi: Ukrep[]; delez: string | null; lat?: number | null; lng?: number | null }) {
+function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSelectedUnit, unitLabel }: { ukrepi: Ukrep[]; delez: string | null; lat?: number | null; lng?: number | null; isMultiUnit?: boolean; hasSelectedUnit?: boolean; unitLabel?: string | null }) {
   const varstvo = jeVVarstveniConi(lat, lng);
   if (ukrepi.length === 0) return null;
 
@@ -1148,7 +1151,14 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng }: { ukrepi: Ukrep[];
 
   return (
     <section className="mt-4 pt-4 border-t border-gray-100">
-      <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Predlagani energetski ukrepi</p>
+      <div className="flex items-baseline gap-2 mb-3">
+        <p className="text-xs text-gray-400 uppercase tracking-wide">Predlagani energetski ukrepi</p>
+        {isMultiUnit && (
+          <span className="text-xs text-gray-400">
+            — {hasSelectedUnit && unitLabel ? `za ${unitLabel}` : "za celoten objekt"}
+          </span>
+        )}
+      </div>
       {varstvo.varuje && (
         <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded px-3 py-2 mb-3">
           <span className="text-purple-600 text-xs mt-0.5">🏛</span>
