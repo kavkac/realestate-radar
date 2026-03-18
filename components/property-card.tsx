@@ -1110,7 +1110,7 @@ function predlagajUkrepe(
         : `Okna niso bila obnovljena. Energijsko varčna okna zmanjšajo toplotne izgube za 15-25%.`;
     ukrepi.push({
       naziv: "Zamenjava oken in balkonskih vrat",
-      nivo: "skupno" as const,  // okna so relevantna za ves objekt
+      nivo: "enota" as const,  // okna = individualna odločitev lastnika enote
       opis: opisOkna,
       strosekMin: stMin,
       strosekMax: stMax,
