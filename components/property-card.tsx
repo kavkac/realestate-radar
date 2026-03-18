@@ -931,6 +931,159 @@ const zaupanjeLabel = {
   nizko: "Nizko zaupanje",
 } as const;
 
+// --- Energetski ukrepi ---
+
+interface Ukrep {
+  naziv: string;
+  nivo: "stanovanje" | "skupno";
+  opis: string;
+  strosekMin: number;
+  strosekMax: number;
+  osnova: string;
+  prioriteta: "visoka" | "srednja" | "nizka";
+}
+
+function predlagajUkrepe(
+  stavba: PropertyCardProps["stavba"],
+  part: PropertyCardProps["deliStavbe"][number] | null | undefined,
+  delez: string | null,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _ocena: any
+): Ukrep[] {
+  const ukrepi: Ukrep[] = [];
+  const zdaj = new Date().getFullYear();
+
+  const delezNum = delez ? (() => {
+    const [s, i] = delez.split("/").map(Number);
+    return i ? s / i : 1;
+  })() : null;
+
+  const povrsina = part?.uporabnaPovrsina ?? part?.povrsina ?? null;
+
+  // 1. OKNA
+  const letaOken = part?.letoObnoveOken;
+  const starOken = letaOken ? zdaj - letaOken : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
+  if (starOken > 20) {
+    const stMin = povrsina ? Math.round(povrsina * 0.15 * 450) : 2500;
+    const stMax = povrsina ? Math.round(povrsina * 0.15 * 650) : 4000;
+    ukrepi.push({
+      naziv: "Zamenjava oken in balkonskih vrat",
+      nivo: "stanovanje",
+      opis: letaOken
+        ? `Okna so bila nazadnje obnovljena ${letaOken} (${zdaj - letaOken} let). Energijsko varčna okna (Uw ≤ 0,9 W/m²K) zmanjšajo toplotne izgube za 15-25%.`
+        : `Okna niso bila obnovljena. Energijsko varčna okna zmanjšajo toplotne izgube za 15-25%.`,
+      strosekMin: stMin,
+      strosekMax: stMax,
+      osnova: `Ocena: ~15% stanovanjske površine (${povrsina ? Math.round(povrsina * 0.15) + ' m²' : 'neznano'}) × 450–650 €/m²`,
+      prioriteta: starOken > 40 ? "visoka" : "srednja",
+    });
+  }
+
+  // 2. INSTALACIJE
+  const letaInst = part?.letoObnoveInstalacij;
+  const starInst = letaInst ? zdaj - letaInst : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
+  if (starInst > 25) {
+    ukrepi.push({
+      naziv: "Posodobitev ogrevalnega sistema",
+      nivo: "stanovanje",
+      opis: letaInst
+        ? `Instalacije so bile nazadnje obnovljene ${letaInst}. Sodobna toplotna črpalka ali kondenzacijski kotel zmanjša porabo energije za ogrevanje za 30-50%.`
+        : `Ogrevalni sistem ni bil obnovljen. Posodobitev bistveno zmanjša stroške ogrevanja.`,
+      strosekMin: 6000,
+      strosekMax: 14000,
+      osnova: "Toplotna črpalka zrak-voda: 8.000–12.000 €; kondenzacijski kotel: 3.500–6.000 €",
+      prioriteta: starInst > 40 ? "visoka" : "srednja",
+    });
+  }
+
+  // 3. FASADA
+  const letaFasade = stavba?.letoObnove?.fasade;
+  const starFasade = letaFasade ? zdaj - letaFasade : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
+  if (starFasade > 25) {
+    const visinaMerov = stavba?.visina && stavba.visina > 0 ? stavba.visina : 12;
+    const ocenjenaPovFasade = povrsina ? Math.round(Math.sqrt(povrsina) * 4 * visinaMerov) : 400;
+    const skupniMin = Math.round(ocenjenaPovFasade * 80);
+    const skupniMax = Math.round(ocenjenaPovFasade * 130);
+    const delezMin = delezNum ? Math.round(skupniMin * delezNum) : null;
+    const delezMax = delezNum ? Math.round(skupniMax * delezNum) : null;
+    ukrepi.push({
+      naziv: "Toplotna izolacija fasade (ETICS sistem)",
+      nivo: "skupno",
+      opis: `Celostna obnova fasade z mineralnimi ploščami (λ ≤ 0,035 W/mK, debelina ≥ 15 cm). ${letaFasade ? `Fasada je bila nazadnje obnovljena ${letaFasade}. ` : ""}Ukrep zmanjša potrebo po ogrevanju za 20-40%.`,
+      strosekMin: skupniMin,
+      strosekMax: skupniMax,
+      osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × 80–130 €/m²${delezMin != null ? `\nVaš delež (${delez}): ${delezMin.toLocaleString('sl-SI')}–${delezMax!.toLocaleString('sl-SI')} €` : ""}`,
+      prioriteta: starFasade > 40 ? "visoka" : "srednja",
+    });
+  }
+
+  // 4. STREHA
+  const letaStrehe = stavba?.letoObnove?.strehe;
+  const starStrehe = letaStrehe ? zdaj - letaStrehe : (stavba?.letoIzgradnje ? zdaj - stavba.letoIzgradnje : 999);
+  if (starStrehe > 30) {
+    ukrepi.push({
+      naziv: "Toplotna izolacija strehe / podstrešja",
+      nivo: "skupno",
+      opis: `Izolacija podstrešja ali strešne konstrukcije (mineralna volna ≥ 30 cm). ${letaStrehe ? `Streha je bila nazadnje obnovljena ${letaStrehe}. ` : ""}Ukrep zmanjša toplotne izgube skozi streho za 30-50%.`,
+      strosekMin: 15000,
+      strosekMax: 40000,
+      osnova: `Glede na velikost stavbe: 15.000–40.000 €${delezNum != null ? `\nVaš delež (${delez}): ${Math.round(15000 * delezNum).toLocaleString('sl-SI')}–${Math.round(40000 * delezNum).toLocaleString('sl-SI')} €` : ""}`,
+      prioriteta: starStrehe > 40 ? "visoka" : "nizka",
+    });
+  }
+
+  return ukrepi;
+}
+
+function EnergetskiUkrepiSection({ ukrepi, delez }: { ukrepi: Ukrep[]; delez: string | null }) {
+  if (ukrepi.length === 0) return null;
+
+  const prioritetaColor: Record<Ukrep["prioriteta"], string> = {
+    visoka: "text-red-600",
+    srednja: "text-amber-600",
+    nizka: "text-gray-400",
+  };
+
+  return (
+    <section className="mt-4 pt-4 border-t border-gray-100">
+      <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Predlagani energetski ukrepi</p>
+      <div className="space-y-4">
+        {ukrepi.map((u, i) => (
+          <div key={i} className="border border-gray-100 rounded p-3">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <p className="text-sm font-medium text-gray-800">{u.naziv}</p>
+              <span className={`text-xs flex-shrink-0 ${prioritetaColor[u.prioriteta]}`}>
+                {u.prioriteta === "visoka" ? "↑ prednostno" : u.prioriteta === "srednja" ? "priporočeno" : "opcijsko"}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mb-2">{u.opis}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs text-gray-400">
+                  {u.nivo === "skupno" ? "Skupni strošek" : "Ocena stroška"}:
+                </span>
+                <span className="text-sm font-medium text-gray-800 ml-1">
+                  {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
+                </span>
+              </div>
+              {u.nivo === "skupno" && delez && (
+                <span className="text-xs text-gray-400">delež {delez}</span>
+              )}
+            </div>
+            {u.osnova.includes("\n") && (
+              <p className="text-xs text-[#2d6a4f] mt-1 font-medium">
+                {u.osnova.split("\n")[1]}
+              </p>
+            )}
+            <p className="text-xs text-gray-300 mt-1">{u.osnova.split("\n")[0]}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-gray-300 mt-3">Stroški so okvirne ocene na podlagi ZRMK/IZS referenčnih cen 2024. Niso uradna ponudba.</p>
+    </section>
+  );
+}
+
 function EnergyCertificateSection({ data, stavba, part }: {
   data: EnergyData | null;
   stavba: PropertyCardProps["stavba"];
@@ -982,6 +1135,10 @@ function EnergyCertificateSection({ data, stavba, part }: {
             </ul>
           </div>
         )}
+        <EnergetskiUkrepiSection
+          ukrepi={predlagajUkrepe(stavba, part, part?.lastnistvo?.[0]?.delez ?? null, ocena)}
+          delez={part?.lastnistvo?.[0]?.delez ?? null}
+        />
       </section>
     );
   }
