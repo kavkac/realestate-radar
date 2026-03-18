@@ -315,7 +315,7 @@ export function PropertyCard({
 
           {/* 1. Ključni podatki — vedno odprto */}
           <div className="px-5 py-6 border-b border-gray-100">
-            <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} />
+            <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} energetskaIzkaznica={energetskaIzkaznica} />
           </div>
 
           {/* 2. O stavbi — zložljivo, privzeto ZAPRTO */}
@@ -768,7 +768,11 @@ function PropertySummary({ stavba, deliStavbe: _deliStavbe, energetskaIzkaznica 
   );
 }
 
-function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["stavba"]; deliStavbe: PropertyCardProps["deliStavbe"] }) {
+function KljucniPodatki({ stavba, deliStavbe, energetskaIzkaznica }: {
+  stavba: PropertyCardProps["stavba"];
+  deliStavbe: PropertyCardProps["deliStavbe"];
+  energetskaIzkaznica?: PropertyCardProps["energetskaIzkaznica"];
+}) {
   // Površina: bruto iz stavbe, fallback = vsota enot
   const povrsina = stavba.povrsina ?? (
     deliStavbe.length > 0
@@ -776,25 +780,47 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
       : null
   );
 
-  const stats: { label: string; value: string }[] = [];
+  const razred = energetskaIzkaznica?.razred ?? null;
+  const imaPlin = stavba.prikljucki?.plin || stavba.gasInfrastructure?.confidence === "high" || false;
+
+  type Stat = { label: string; value: React.ReactNode };
+  const stats: Stat[] = [];
   if (stavba.letoIzgradnje) stats.push({ label: "Leto izgradnje", value: String(stavba.letoIzgradnje) });
   if (stavba.steviloEtaz) stats.push({ label: "Etaže", value: String(stavba.steviloEtaz) });
   if (povrsina) stats.push({ label: "Površina", value: `${fmtDec(povrsina)} m²` });
+  if (razred) {
+    const color = ENERGY_COLORS[razred] ?? "bg-gray-100 text-gray-800";
+    stats.push({
+      label: "Energetski razred",
+      value: <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${color}`}>{razred}</span>,
+    });
+  }
+  if (stavba.tip) stats.push({ label: "Tip stavbe", value: stavba.tip });
+  if (stavba.konstrukcija) stats.push({ label: "Konstrukcija", value: stavba.konstrukcija });
+  if (stavba.steviloStanovanj && stavba.steviloStanovanj > 1) stats.push({ label: "Stanovanj", value: String(stavba.steviloStanovanj) });
 
   if (stats.length === 0) return null;
+
+  const hasPrikljucki = stavba.prikljucki.elektrika || stavba.prikljucki.vodovod || imaPlin;
 
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Ključni podatki</Label>
-      <div className="grid grid-cols-2 sm:grid-cols-3 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden divide-y sm:divide-y-0 divide-gray-100">
-        {stats.map((s, i) => (
-          <div key={s.label} className={`px-4 py-5 text-center ${i > 0 ? "sm:border-l sm:border-gray-100" : ""} ${i === stats.length - 1 && stats.length % 2 !== 0 ? "col-span-2 sm:col-span-1" : ""}`}>
-            <p className="text-4xl font-bold text-gray-900 tabular-nums whitespace-nowrap">{s.value}</p>
-            <p className="text-xs text-gray-400 mt-1.5 uppercase tracking-wide">{s.label}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+        {stats.map((s) => (
+          <div key={s.label}>
+            <p className="text-xs text-gray-400 uppercase tracking-wide">{s.label}</p>
+            <p className="text-base font-semibold text-gray-800 tabular-nums">{s.value}</p>
           </div>
         ))}
       </div>
-      {/* ConditionScoreBar skrita — algoritmična ocena zaenkrat ni prikazana */}
+      {hasPrikljucki && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm text-gray-600">
+          <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
+          <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
+          <span><Check on={imaPlin} /> Plin</span>
+        </div>
+      )}
     </section>
   );
 }
