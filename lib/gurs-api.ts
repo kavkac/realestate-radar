@@ -260,6 +260,13 @@ function buildWfsUrl(
   return `${base}?${params.toString()}`;
 }
 
+export class GursServiceUnavailableError extends Error {
+  constructor(message = "GURS kataster trenutno ni dostopen") {
+    super(message);
+    this.name = "GursServiceUnavailableError";
+  }
+}
+
 async function fetchWfs(url: string): Promise<WfsResponse | null> {
   try {
     const cached = getCached(url);
@@ -272,9 +279,17 @@ async function fetchWfs(url: string): Promise<WfsResponse | null> {
     });
     if (!res.ok) return null;
     const text = await res.text();
+    // GURS sometimes returns HTTP 200 with XML ExceptionReport on backend errors
+    if (text.trim().startsWith("<?xml") || text.includes("ExceptionReport")) {
+      if (text.includes("IOException") || text.includes("ORA-") || text.includes("RuntimeException")) {
+        throw new GursServiceUnavailableError();
+      }
+      return null;
+    }
     setCached(url, text);
     return JSON.parse(text) as WfsResponse;
-  } catch {
+  } catch (err) {
+    if (err instanceof GursServiceUnavailableError) throw err;
     return null;
   }
 }

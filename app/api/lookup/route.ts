@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE } from "@/lib/gurs-api";
+import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE, GursServiceUnavailableError } from "@/lib/gurs-api";
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
@@ -137,7 +137,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { address, delStavbe } = LookupSchema.parse(body);
 
-    const result = await lookupByAddress(address);
+    let result;
+    try {
+      result = await lookupByAddress(address);
+    } catch (err) {
+      if (err instanceof GursServiceUnavailableError) {
+        return NextResponse.json(
+          { success: false, error: "Kataster GURS je trenutno nedosegljiv. Poskusite znova čez nekaj minut." },
+          { status: 503 },
+        );
+      }
+      throw err;
+    }
     if (!result) {
       return NextResponse.json(
         { success: false, error: "Naslov ni bil najden v evidenci GURS" },
