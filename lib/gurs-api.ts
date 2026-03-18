@@ -1,5 +1,19 @@
 import { getCached, setCached } from "./wfs-cache";
 
+/** Ray-casting point-in-polygon (WGS84 coords [lng, lat]) */
+function pointInPolygon(point: [number, number], ring: number[][]): boolean {
+  const [px, py] = point;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 const BASE_RPE = "https://storitve.eprostor.gov.si/ows-pub-wfs/wfs";
 const BASE_KN = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn/wfs";
 const BASE_KN_JV = "https://ipi.eprostor.gov.si/wfs-si-gurs-kn/wfs";
@@ -564,27 +578,25 @@ export async function getParcele(
     parceleData = await fetchWfs(fallbackUrl);
   }
 
-  // Fallback 2: prostorska poizvedba po koordinatah stavbe
+  // Fallback 2: BBOX + point-in-polygon filter (INTERSECTS v GURS WFS ne deluje z EPSG:4326)
   if ((!parceleData || parceleData.features.length === 0) && lat != null && lng != null) {
-    // Majhen BBOX (~20m) okoli točke stavbe v EPSG:4326
-    const d = 0.0002;
+    const d = 0.001; // ~100m BBOX
     const bboxUrl = buildWfsUrl(
       BASE_KN,
       "SI.GURS.KN:PARCELE_H",
       `KO_ID=${koId} AND BBOX(GEOM,${lng - d},${lat - d},${lng + d},${lat + d},'EPSG:4326')`,
     ) + "&SRSNAME=EPSG:4326";
-    parceleData = await fetchWfs(bboxUrl).catch(() => null);
-  }
-
-  // Fallback 3: BBOX brez KO_ID filtra
-  if ((!parceleData || parceleData.features.length === 0) && lat != null && lng != null) {
-    const d = 0.0002;
-    const bboxUrl2 = buildWfsUrl(
-      BASE_KN,
-      "SI.GURS.KN:PARCELE_H",
-      `BBOX(GEOM,${lng - d},${lat - d},${lng + d},${lat + d},'EPSG:4326')`,
-    ) + "&SRSNAME=EPSG:4326";
-    parceleData = await fetchWfs(bboxUrl2).catch(() => null);
+    const bboxData = await fetchWfs(bboxUrl).catch(() => null);
+    if (bboxData && bboxData.features.length > 0) {
+      // Point-in-polygon: obdrži samo parcelo ki vsebuje točko stavbe
+      const containing = bboxData.features.filter((f) => {
+        const geom = f.geometry as { type: string; coordinates: number[][][] } | null;
+        if (!geom || geom.type !== "Polygon") return false;
+        return pointInPolygon([lng, lat], geom.coordinates[0]);
+      });
+      // Če najdemo vsebujočo parcelo, vzamemo jo; sicer vzamemo vse iz BBOX (fallback)
+      parceleData = { ...bboxData, features: containing.length > 0 ? containing : bboxData.features.slice(0, 1) };
+    }
   }
 
   if (!parceleData || parceleData.features.length === 0) return [];
