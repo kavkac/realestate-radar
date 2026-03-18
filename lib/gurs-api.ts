@@ -862,24 +862,19 @@ export async function getOwnership(
 
 const BASE_KGI = "https://ipi.eprostor.gov.si/wfs-si-gurs-kgi/wfs";
 
+export type GasConfidence = "high" | "medium" | "low" | "none";
+
 /**
- * Check if gas infrastructure (pipeline) exists within 100m of a location.
- * Uses ZK GJI WFS layer LINIJE_ZEMELJSKI_PLIN_G.
- * @param lat WGS84 latitude
- * @param lng WGS84 longitude
- * @returns true if gas line found within ~100m radius, false otherwise
+ * Preveri plinsko infrastrukturo v bližini z razdaljo in confidence nivojem.
+ * Prag: <20m = visoka (verjetno priključen), 20-80m = srednja (v bližini), >80m = none
  */
 export async function checkGasInfrastructure(
   lat: number,
   lng: number,
-): Promise<boolean> {
-  // ~100m in degrees: 0.0009 lat, 0.0013 lng (at Slovenia's latitude)
-  const latBuf = 0.0009;
-  const lngBuf = 0.0013;
-  const minLng = lng - lngBuf;
-  const minLat = lat - latBuf;
-  const maxLng = lng + lngBuf;
-  const maxLat = lat + latBuf;
+): Promise<{ found: boolean; distanceM: number | null; confidence: GasConfidence }> {
+  // Iščemo v ~200m BBOX, da dobimo vse plinovode v okolici
+  const latBuf = 0.0018; // ~200m
+  const lngBuf = 0.0025;
 
   const params = new URLSearchParams({
     SERVICE: "WFS",
@@ -887,18 +882,46 @@ export async function checkGasInfrastructure(
     REQUEST: "GetFeature",
     TYPENAMES: "SI.GURS.KGI:LINIJE_ZEMELJSKI_PLIN_G",
     OUTPUTFORMAT: "application/json",
-    COUNT: "1",
-    CQL_FILTER: `BBOX(GEOM,${minLng},${minLat},${maxLng},${maxLat},'EPSG:4326')`,
+    COUNT: "10",
+    SRSNAME: "EPSG:4326",
+    CQL_FILTER: `BBOX(GEOM,${lng - lngBuf},${lat - latBuf},${lng + lngBuf},${lat + latBuf},'EPSG:4326')`,
   });
 
   try {
     const url = `${BASE_KGI}?${params.toString()}`;
     const res = await fetch(url, { next: { revalidate: 86400 } });
-    if (!res.ok) return false;
+    if (!res.ok) return { found: false, distanceM: null, confidence: "none" };
     const data = await res.json();
-    return (data?.totalFeatures ?? 0) > 0;
+    if (!data?.features?.length) return { found: false, distanceM: null, confidence: "none" };
+
+    // Izračunaj minimalno razdaljo do kateregakoli segmenta plinovoda
+    let minDistM = Infinity;
+    for (const f of data.features) {
+      const geom = f.geometry as { type: string; coordinates: number[][] | number[][][] } | null;
+      if (!geom) continue;
+      const lines: number[][][] = geom.type === "LineString"
+        ? [geom.coordinates as number[][]]
+        : geom.type === "MultiLineString" ? geom.coordinates as number[][][] : [];
+      for (const line of lines) {
+        for (const [pLng, pLat] of line) {
+          // Haversine approx (m) za kratke razdalje
+          const dLat = (pLat - lat) * 111320;
+          const dLng = (pLng - lng) * 111320 * Math.cos(lat * Math.PI / 180);
+          const d = Math.sqrt(dLat * dLat + dLng * dLng);
+          if (d < minDistM) minDistM = d;
+        }
+      }
+    }
+
+    const distanceM = Math.round(minDistM);
+    let confidence: GasConfidence;
+    if (distanceM < 20) confidence = "high";
+    else if (distanceM < 80) confidence = "medium";
+    else confidence = "low";
+
+    return { found: true, distanceM, confidence };
   } catch {
-    return false;
+    return { found: false, distanceM: null, confidence: "none" };
   }
 }
 

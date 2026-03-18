@@ -126,7 +126,7 @@ interface PropertyCardProps {
       vodovod: boolean;
       kanalizacija: boolean;
     };
-    gasInfrastructure?: boolean | null;
+    gasInfrastructure?: { found: boolean; distanceM: number | null; confidence: string } | null;
     visina?: number | null;
     tipPolozaja?: "samostojna" | "vogalna" | "vmesna vrstna" | null;
     orientacija?: "S" | "SV" | "V" | "JV" | "J" | "JZ" | "Z" | "SZ" | null;
@@ -839,13 +839,14 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
-        {stavba.prikljucki.plin ? (
-          <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">KN · GURS</span></span>
-        ) : stavba.gasInfrastructure ? (
-          <span className="text-gray-400">~ Plin v bližini <span className="text-xs">ZK GJI · GURS</span></span>
-        ) : (
-          <span><Check on={false} /> Plin</span>
-        )}
+        {(() => {
+          const g = stavba.gasInfrastructure;
+          if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">KN · GURS</span></span>;
+          if (g?.confidence === "high") return <span><Check on={true} /> Plin <span className="ml-1 text-xs text-gray-400">ZK GJI ~{g.distanceM}m</span></span>;
+          if (g?.confidence === "medium") return <span className="text-gray-500">~ Plin v bližini <span className="text-xs text-gray-400">ZK GJI ~{g.distanceM}m</span></span>;
+          if (g?.confidence === "low") return <span className="text-gray-400">~ Plin v okolici <span className="text-xs">ZK GJI ~{g.distanceM}m</span></span>;
+          return <span><Check on={false} /> Plin</span>;
+        })()}
         <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
         <span><Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija</span>
       </div>
@@ -963,7 +964,7 @@ function oceniEnergetskiRazred(stavba: {
   letoObnove: { fasade: number | null; strehe: number | null };
   konstrukcija: string | null;
   prikljucki: { plin: boolean; vodovod: boolean; elektrika: boolean; kanalizacija: boolean };
-  gasInfrastructure?: boolean | null;
+  gasInfrastructure?: { found: boolean; distanceM: number | null; confidence: string } | null;
   steviloEtaz?: number | null;
   visina?: number | null;
   tipPolozaja?: "samostojna" | "vogalna" | "vmesna vrstna" | null;
@@ -1085,7 +1086,7 @@ function oceniEnergetskiRazred(stavba: {
   }
 
   // Fix 1: Uporabi ZK GJI gasInfrastructure (zanesljiv) pred prikljucki.plin (nezanesljiv)
-  const imaPlin = stavba.gasInfrastructure ?? (stavba.prikljucki?.plin ?? false);
+  const imaPlin = stavba.prikljucki?.plin || stavba.gasInfrastructure?.confidence === "high" || false;
   if (!imaPlin) {
     adj += 5;
     dejavnikiPrilagoditve.push(`Brez plinskega priključka - verjetno električno ogrevanje`);
@@ -2429,7 +2430,7 @@ function ZavarovanjeSection({
   const povrsina = unitArea ?? stavba.povrsina ?? 80;
 
   // Ogrevanje iz GURS plin podatka — readonly, brez dropdowna
-  const imaPlinZavar = stavba.gasInfrastructure ?? stavba.prikljucki?.plin ?? false;
+  const imaPlinZavar = stavba.prikljucki?.plin || stavba.gasInfrastructure?.confidence === "high" || false;
   const ogrevanje = imaPlinZavar ? "Centralno (plin)" : "Električno / drugo";
 
   const vsiTipi: ZavarovalniskiTip[] = [

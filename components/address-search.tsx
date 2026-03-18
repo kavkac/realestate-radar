@@ -34,7 +34,7 @@ interface LookupResult {
       vodovod: boolean;
       kanalizacija: boolean;
     };
-    gasInfrastructure?: boolean | null;
+    gasInfrastructure?: { found: boolean; distanceM: number | null; confidence: string } | null;
   };
   deliStavbe?: {
     stDela: number;
