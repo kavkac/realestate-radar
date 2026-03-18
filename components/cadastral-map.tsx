@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { MapContainer, TileLayer, WMSTileLayer, CircleMarker, GeoJSON, useMap } from "react-leaflet";
+import React, { useEffect, useRef } from "react";
+import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap } from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 interface ParcelaGeom {
@@ -19,16 +20,25 @@ interface CadastralMapProps {
   parcelGeoms?: ParcelaGeom[] | null;
 }
 
-function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
+/** Zoom to fit building polygon; fallback to lat/lng */
+function FitBounds({ obrisGeom, lat, lng }: { obrisGeom: CadastralMapProps["obrisGeom"]; lat: number; lng: number }) {
   const map = useMap();
+  const fitted = useRef(false);
   useEffect(() => {
-    map.setView([lat, lng], map.getZoom());
-  }, [lat, lng, map]);
+    if (fitted.current) return;
+    if (obrisGeom?.coordinates?.[0]?.length) {
+      const latlngs = obrisGeom.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]);
+      const bounds = L.latLngBounds(latlngs);
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
+      fitted.current = true;
+    } else {
+      map.setView([lat, lng], 18);
+    }
+  }, [obrisGeom, lat, lng, map]);
   return null;
 }
 
 export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms }: CadastralMapProps) {
-  // Collect valid parcel geometries
   const validParcele = (parcelGeoms ?? []).filter((p) => p.geometry != null);
 
   return (
@@ -83,38 +93,36 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
         zIndex={3}
       />
 
-      {/* Highlighted parcel boundaries (uradne meje parcel iz GURS WFS) */}
+      {/* Parcel boundaries — modra pikčasta kontura */}
       {validParcele.map((p, i) => (
         <GeoJSON
           key={`parcela-${i}`}
           data={p.geometry as unknown as GeoJSON.Geometry}
           style={{
-            color: "#1a56a0",
-            weight: 2,
+            color: "#1d4ed8",
+            weight: 2.5,
             fillColor: "#3b82f6",
-            fillOpacity: 0.12,
-            dashArray: "4 3",
+            fillOpacity: 0.08,
+            dashArray: "6 4",
           }}
         />
       ))}
 
-      {/* Building footprint (tloris stavbe) */}
+      {/* Building footprint — krepka rdeča kontura, zapolnjena */}
       {obrisGeom && (
         <GeoJSON
           key={JSON.stringify(obrisGeom.coordinates[0][0])}
           data={obrisGeom as GeoJSON.Polygon}
-          style={{ color: "#2d6a4f", weight: 2.5, fillColor: "#2d6a4f", fillOpacity: 0.2 }}
+          style={{
+            color: "#dc2626",
+            weight: 3,
+            fillColor: "#ef4444",
+            fillOpacity: 0.25,
+          }}
         />
       )}
 
-      {/* Location marker */}
-      <CircleMarker
-        center={[lat, lng]}
-        radius={5}
-        pathOptions={{ color: "#2d6a4f", fillColor: "#2d6a4f", fillOpacity: 1, weight: 2 }}
-      />
-
-      <RecenterMap lat={lat} lng={lng} />
+      <FitBounds obrisGeom={obrisGeom} lat={lat} lng={lng} />
     </MapContainer>
   );
 }
