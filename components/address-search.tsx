@@ -548,8 +548,8 @@ export function AddressSearch() {
                   onClick={() => handleSwitchTab(tab.id)}
                   className={`group relative flex items-center gap-1.5 rounded-t-md px-3 py-2 text-sm whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
                     isActive
-                      ? "bg-white border border-gray-200 border-b-white font-medium text-gray-900 z-10 -mb-px"
-                      : "bg-gray-50 border border-gray-200 border-b-gray-200 text-gray-500 hover:bg-white hover:text-gray-700"
+                      ? "bg-white border border-gray-200 border-b-0 rounded-t-md font-medium text-gray-900 z-10 -mb-px relative"
+                      : "bg-gray-100 border border-gray-200 border-b-0 rounded-t-md text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
                   }`}
                 >
                   <span className="truncate">{truncateAddress(tab.naslov || "Iskanje\u2026")}</span>
@@ -582,7 +582,7 @@ export function AddressSearch() {
                   title="Dodaj nepremičnino"
                   aria-label="Dodaj novo nepremičnino"
                 >
-                  + Dodaj
+                  + Primerjaj
                 </button>
               </div>
             )}
