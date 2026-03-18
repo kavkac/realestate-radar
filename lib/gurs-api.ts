@@ -95,6 +95,68 @@ export const VRSTA_PROSTORA: Record<number, string> = {
 
 export type TipPolozajaStavbe = "samostojna" | "vogalna" | "vmesna vrstna" | null;
 
+// --- Geometry helpers ---
+
+interface StavbaGeometrija {
+  kompaktnost: number | null;
+  orientacija: "S" | "SV" | "V" | "JV" | "J" | "JZ" | "Z" | "SZ" | null;
+}
+
+function izracunajGeometrijo(obrisGeom: any): StavbaGeometrija {
+  if (!obrisGeom || obrisGeom.type !== "Polygon") return { kompaktnost: null, orientacija: null };
+
+  const coords = obrisGeom.coordinates[0] as [number, number][];
+  if (!coords || coords.length < 4) return { kompaktnost: null, orientacija: null };
+
+  // Površina (Shoelace formula)
+  let povrsina = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    povrsina += coords[i][0] * coords[i + 1][1];
+    povrsina -= coords[i + 1][0] * coords[i][1];
+  }
+  povrsina = Math.abs(povrsina) / 2;
+
+  // Obseg
+  let obseg = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const dx = coords[i + 1][0] - coords[i][0];
+    const dy = coords[i + 1][1] - coords[i][1];
+    obseg += Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Kompaktnost: obseg² / (4π × površina) — 1.0 = krog, kvadrat ≈ 1.27
+  const kompaktnost = povrsina > 0 ? (obseg * obseg) / (4 * Math.PI * povrsina) : null;
+
+  // Orientacija: najdaljša stranica določa smer fasade
+  let maxDolzina = 0;
+  let kotGlavneFasade = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const dx = coords[i + 1][0] - coords[i][0];
+    const dy = coords[i + 1][1] - coords[i][1];
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d > maxDolzina) {
+      maxDolzina = d;
+      kotGlavneFasade = Math.atan2(dy, dx) * 180 / Math.PI;
+    }
+  }
+
+  // Fasada je pravokotna na najdaljšo stranico
+  const kotFasade = (kotGlavneFasade + 90) % 360;
+  const norm = ((kotFasade % 360) + 360) % 360;
+
+  let orientacija: StavbaGeometrija["orientacija"];
+  if (norm < 22.5 || norm >= 337.5) orientacija = "S";
+  else if (norm < 67.5) orientacija = "SV";
+  else if (norm < 112.5) orientacija = "V";
+  else if (norm < 157.5) orientacija = "JV";
+  else if (norm < 202.5) orientacija = "J";
+  else if (norm < 247.5) orientacija = "JZ";
+  else if (norm < 292.5) orientacija = "Z";
+  else orientacija = "SZ";
+
+  return { kompaktnost, orientacija };
+}
+
 export interface StavbaData {
   koId: number;
   stStavbe: number;
@@ -114,6 +176,8 @@ export interface StavbaData {
   datumSys: string | null;
   visina: number | null; // VISINA_H2 - VISINA_H3
   tipPolozaja: TipPolozajaStavbe;
+  kompaktnost: number | null;
+  orientacija: "S" | "SV" | "V" | "JV" | "J" | "JZ" | "Z" | "SZ" | null;
 }
 
 export interface ProstorData {
@@ -274,6 +338,7 @@ export async function getBuilding(
     datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
     visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
     tipPolozaja: null,
+    ...izracunajGeometrijo(p.OBRIS_GEOM),
   };
 }
 
@@ -430,6 +495,8 @@ export async function getBuildingsByParcel(
       datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
       visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
       tipPolozaja: null,
+      kompaktnost: null,
+      orientacija: null,
     };
   });
 }

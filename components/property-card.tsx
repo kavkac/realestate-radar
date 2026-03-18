@@ -93,6 +93,8 @@ interface PropertyCardProps {
     gasInfrastructure?: boolean | null;
     visina?: number | null;
     tipPolozaja?: "samostojna" | "vogalna" | "vmesna vrstna" | null;
+    orientacija?: "S" | "SV" | "V" | "JV" | "J" | "JZ" | "Z" | "SZ" | null;
+    kompaktnost?: number | null;
   };
   deliStavbe: DelStavbe[];
   energetskaIzkaznica: EnergyData | null;
@@ -617,6 +619,9 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         {stavba.tipPolozaja && (
           <Field label="Tip položaja" value={stavba.tipPolozaja.charAt(0).toUpperCase() + stavba.tipPolozaja.slice(1)} />
         )}
+        {stavba.orientacija && (
+          <Field label="Orientacija fasade" value={stavba.orientacija} />
+        )}
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
@@ -739,6 +744,8 @@ function oceniEnergetskiRazred(stavba: {
   steviloEtaz?: number | null;
   visina?: number | null;
   tipPolozaja?: "samostojna" | "vogalna" | "vmesna vrstna" | null;
+  kompaktnost?: number | null;
+  orientacija?: "S" | "SV" | "V" | "JV" | "J" | "JZ" | "Z" | "SZ" | null;
 }, part?: {
   letoObnoveOken: number | null;
   letoObnoveInstalacij: number | null;
@@ -852,6 +859,24 @@ function oceniEnergetskiRazred(stavba: {
   if (!stavba.prikljucki.plin && stavba.prikljucki.elektrika) {
     score += 5;
     dejavniki.push(`Brez plinskega priključka — verjetno električno ogrevanje`);
+  }
+
+  // Kompaktnost (1.27 = kvadrat, višje = manj kompaktno, slabše)
+  const k = stavba.kompaktnost;
+  if (k != null) {
+    if (k < 1.4) { score -= 4; dejavniki.push(`Kompaktna oblika stavbe — manjše toplotne izgube`); }
+    else if (k > 2.0) { score += 5; dejavniki.push(`Podolgovata oblika stavbe — večje toplotne izgube`); }
+    else if (k > 1.7) { score += 2; dejavniki.push(`Nekoliko podolgovata oblika stavbe`); }
+  }
+
+  // Orientacija
+  const or = stavba.orientacija;
+  if (or === "J" || or === "JZ" || or === "JV") {
+    score -= 3;
+    dejavniki.push(`${or} orientacija — pasivni solarni prispevek`);
+  } else if (or === "S" || or === "SV" || or === "SZ") {
+    score += 3;
+    dejavniki.push(`${or} orientacija — manj solarnih dobitkov`);
   }
 
   const stDejavnikov = [letaFasade, letaStrehe, letaOken, letaInstalacij].filter(Boolean).length;
