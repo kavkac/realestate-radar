@@ -2052,9 +2052,10 @@ function MaintenanceSection({
     urgency: string;
     borderColor: string;
     pillClass: string;
+    jeOcena: boolean;
   }[] = [];
 
-  const noDataItems: string[] = [];
+
 
   for (const m of MAINTENANCE_ITEMS) {
     let letoObnove: number | null = null;
@@ -2068,12 +2069,10 @@ function MaintenanceSection({
       letoObnove = part?.letoObnoveOken ?? null;
     }
 
-    if (!letoObnove) {
-      noDataItems.push(m.name);
-      continue;
-    }
-
-    const age = currentYear - letoObnove;
+    // Ko ni podatka o obnovi, privzamemo leto izgradnje — komponenta je stara kolikor stavba
+    const jeOcena = !letoObnove;
+    const effLetoObnove = letoObnove ?? baseYear;
+    const age = currentYear - effLetoObnove;
     if (age >= m.lifespan) {
       items.push({
         name: m.name,
@@ -2082,6 +2081,7 @@ function MaintenanceSection({
         urgency: "Nujno",
         borderColor: "border-l-red-500",
         pillClass: "bg-red-50 text-red-700",
+        jeOcena,
       });
     } else if (age >= m.lifespan * 0.85) {
       items.push({
@@ -2091,6 +2091,7 @@ function MaintenanceSection({
         urgency: "Priporočeno",
         borderColor: "border-l-amber-400",
         pillClass: "bg-amber-50 text-amber-700",
+        jeOcena,
       });
     } else if (age >= m.lifespan * 0.7) {
       items.push({
@@ -2100,6 +2101,18 @@ function MaintenanceSection({
         urgency: "Planirati",
         borderColor: "border-l-green-400",
         pillClass: "bg-green-50 text-green-700",
+        jeOcena,
+      });
+    } else if (jeOcena) {
+      // Ni podatka in ni urgentno — prikaži z nizko prioriteto
+      items.push({
+        name: m.name,
+        age,
+        lifespan: m.lifespan,
+        urgency: "V redu",
+        borderColor: "border-l-gray-200",
+        pillClass: "bg-gray-50 text-gray-500",
+        jeOcena,
       });
     }
   }
@@ -2107,7 +2120,7 @@ function MaintenanceSection({
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Kdaj je potrebno vzdrževanje</Label>
-      {items.length === 0 && noDataItems.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-sm text-gray-400 italic">
           Ni nujnih vzdrževalnih posegov
         </p>
@@ -2121,7 +2134,7 @@ function MaintenanceSection({
               <div className="text-gray-700 min-w-0">
                 <span className="font-medium">{item.name}</span>
                 <span className="ml-2 text-xs text-gray-400">
-                  ({item.age}/{item.lifespan} let)
+                  ({item.age}/{item.lifespan} let{item.jeOcena ? ", ocena" : ""})
                 </span>
               </div>
               <span
@@ -2131,15 +2144,7 @@ function MaintenanceSection({
               </span>
             </div>
           ))}
-          {noDataItems.map((name) => (
-            <div
-              key={name}
-              className="flex items-center justify-between rounded border border-gray-100 border-l-4 border-l-gray-300 bg-white px-4 py-3 text-sm"
-            >
-              <span className="text-gray-500">{name}</span>
-              <span className="text-xs text-gray-400 italic">Ni podatka o zadnji obnovi</span>
-            </div>
-          ))}
+
         </div>
       )}
     </section>
