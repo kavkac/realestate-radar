@@ -343,13 +343,16 @@ export function PropertyCard({
           {/* L3: Stanje */}
           <MaintenanceSection stavba={stavba} part={currentPart} />
           <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
-          <EnergetskiIzracunSection
-            energetskaIzkaznica={energetskaIzkaznica}
-            unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
-            isMultiUnit={isMultiUnit}
-            hasSelectedUnit={!!activePart || requestedDel != null}
-            unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
-          />
+          {/* Bug 1: skrij EIZ sekcijo za večstanovanjski objekt ko ni enota izbrana */}
+          {!(isMultiUnit && !(!!activePart || requestedDel != null)) && (
+            <EnergetskiIzracunSection
+              energetskaIzkaznica={energetskaIzkaznica}
+              unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
+              isMultiUnit={isMultiUnit}
+              hasSelectedUnit={!!activePart || requestedDel != null}
+              unitLabel={currentPart ? `Del ${currentPart.stDela}` : null}
+            />
+          )}
 
           {stavba && (() => {
             const hasUnit = !!(activePart || requestedDel != null);
@@ -975,6 +978,8 @@ interface Ukrep {
   opis: string;
   strosekMin: number;
   strosekMax: number;
+  skupniStrosekMin?: number; // za deljene ukrepe: skupni strošek objekta
+  skupniStrosekMax?: number;
   osnova: string;
   prioriteta: "visoka" | "srednja" | "nizka";
   dobaPovrnitveMin: number;
@@ -1103,9 +1108,11 @@ function predlagajUkrepe(
     const skupniMin = Math.round(ocenjenaPovFasade * fasadaCenaMin);
     const skupniMax = Math.round(ocenjenaPovFasade * fasadaCenaMax);
     const stSrednji = Math.round((skupniMin + skupniMax) / 2);
-    const roi = izracunajROI("fasada", stSrednji, povrsina);
     const delezMin = delezNum ? Math.round(skupniMin * delezNum) : null;
     const delezMax = delezNum ? Math.round(skupniMax * delezNum) : null;
+    // Bug 3 fix: ROI temelji na deležu stroška, ne skupnem
+    const delezStrosekSrednji = delezNum ? Math.round(stSrednji * delezNum) : stSrednji;
+    const roi = izracunajROI("fasada", delezStrosekSrednji, povrsina);
     const opisFasada = varstvo.varuje
       ? `POZOR — Stavba se nahaja v varstvenem območju kulturne dediščine (${varstvo.naziv}). Obnova fasade zahteva predhodno soglasje ZVKDS. Dovoljeni so samo materiali, ki ohranjajo historični izgled (apnena malta, tradicionalne barve). Kontaktirajte Zavod za varstvo kulturne dediščine: zvkds@zvkds.si`
       : `Celostna obnova fasade z mineralnimi ploščami (λ ≤ 0,035 W/mK, debelina ≥ 15 cm). ${letaFasade ? `Fasada je bila nazadnje obnovljena ${letaFasade}. ` : ""}Ukrep zmanjša potrebo po ogrevanju za 20-40%.`;
@@ -1113,9 +1120,12 @@ function predlagajUkrepe(
       naziv: varstvo.varuje ? "Obnova fasade po ZVKDS smernicah" : "Toplotna izolacija fasade (ETICS sistem)",
       nivo: "skupno",
       opis: opisFasada,
-      strosekMin: skupniMin,
-      strosekMax: skupniMax,
-      osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × ${fasadaCenaMin}–${fasadaCenaMax} €/m²${varstvo.varuje ? " (apnena malta, ZVKDS materiali)" : ""}${delezMin != null ? `\nVaš delež (${delez}): ${delezMin.toLocaleString('sl-SI')}–${delezMax!.toLocaleString('sl-SI')} €` : ""}`,
+      // Bug 4 fix: ko je enota izbrana, strosekMin/Max = vaš delež; skupni strošek objekta shranimo ločeno
+      strosekMin: delezMin ?? skupniMin,
+      strosekMax: delezMax ?? skupniMax,
+      skupniStrosekMin: skupniMin,
+      skupniStrosekMax: skupniMax,
+      osnova: `Ocenjena površina fasade: ~${ocenjenaPovFasade} m² × ${fasadaCenaMin}–${fasadaCenaMax} €/m²${varstvo.varuje ? " (apnena malta, ZVKDS materiali)" : ""}`,
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
@@ -1130,14 +1140,21 @@ function predlagajUkrepe(
     const stMin = 15000;
     const stMax = 40000;
     const stSrednji = Math.round((stMin + stMax) / 2);
-    const roi = izracunajROI("streha", stSrednji, povrsina);
+    const strehaDelezMin = delezNum ? Math.round(stMin * delezNum) : null;
+    const strehaDelezMax = delezNum ? Math.round(stMax * delezNum) : null;
+    // Bug 3 fix: ROI temelji na deležu stroška, ne skupnem
+    const strehaDelezSrednji = delezNum ? Math.round(stSrednji * delezNum) : stSrednji;
+    const roi = izracunajROI("streha", strehaDelezSrednji, povrsina);
     ukrepi.push({
       naziv: "Toplotna izolacija strehe / podstrešja",
       nivo: "skupno",
       opis: `Izolacija podstrešja ali strešne konstrukcije (mineralna volna ≥ 30 cm). ${letaStrehe ? `Streha je bila nazadnje obnovljena ${letaStrehe}. ` : ""}Ukrep zmanjša toplotne izgube skozi streho za 30-50%.`,
-      strosekMin: stMin,
-      strosekMax: stMax,
-      osnova: `Glede na velikost stavbe: 15.000–40.000 €${delezNum != null ? `\nVaš delež (${delez}): ${Math.round(15000 * delezNum).toLocaleString('sl-SI')}–${Math.round(40000 * delezNum).toLocaleString('sl-SI')} €` : ""}`,
+      // Bug 4 fix: ko je enota izbrana, strosekMin/Max = vaš delež; skupni shranimo ločeno
+      strosekMin: strehaDelezMin ?? stMin,
+      strosekMax: strehaDelezMax ?? stMax,
+      skupniStrosekMin: stMin,
+      skupniStrosekMax: stMax,
+      osnova: `Glede na velikost stavbe: 15.000–40.000 €`,
       prioriteta: roi.min <= 10 ? "visoka" : roi.min <= 20 ? "srednja" : "nizka",
       dobaPovrnitveMin: roi.min,
       dobaPovrnitveMax: roi.max,
@@ -1197,27 +1214,46 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
             </div>
             <p className="text-xs text-gray-500 mb-2">{u.opis}</p>
             <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs text-gray-400">
-                  {u.nivo === "skupno" ? "Skupni strošek" : "Ocena stroška"}:
-                </span>
-                <span className="text-sm font-medium text-gray-800 ml-1">
-                  {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
-                </span>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
-                </p>
+              <div className="flex-1">
+                {/* Bug 4: za skupne ukrepe ko je enota izbrana — pokaži hierarhijo */}
+                {u.nivo === "skupno" && hasSelectedUnit && delez && u.skupniStrosekMin != null ? (
+                  <div className="space-y-1">
+                    <div>
+                      <span className="text-xs text-gray-400">Skupni strošek objekta:</span>
+                      <span className="text-xs text-gray-400 ml-1">
+                        {u.skupniStrosekMin.toLocaleString("sl-SI")}–{u.skupniStrosekMax!.toLocaleString("sl-SI")} €
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Vaš delež ({delez}):</span>
+                      <span className="text-sm font-semibold text-gray-800 ml-1">
+                        {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Doba povrnitve (vaš delež): ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-xs text-gray-400">
+                      {u.nivo === "skupno" ? "Skupni strošek" : "Ocena stroška"}:
+                    </span>
+                    <span className="text-sm font-medium text-gray-800 ml-1">
+                      {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
+                    </span>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
+                    </p>
+                  </div>
+                )}
               </div>
-              {u.nivo === "skupno" && delez && (
+              {/* Bug 2: skrij "delež" ko ni enota izbrana */}
+              {u.nivo === "skupno" && delez && hasSelectedUnit && (
                 <span className="text-xs text-gray-400">delež {delez}</span>
               )}
             </div>
-            {u.osnova.includes("\n") && (
-              <p className="text-xs text-[#2d6a4f] mt-1 font-medium">
-                {u.osnova.split("\n")[1]}
-              </p>
-            )}
-            <p className="text-xs text-gray-300 mt-1">{u.osnova.split("\n")[0]}</p>
+            <p className="text-xs text-gray-300 mt-1">{u.osnova}</p>
           </div>
         ))}
       </div>
