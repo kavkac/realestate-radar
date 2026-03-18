@@ -189,7 +189,7 @@ function CollapsibleSection({
   return (
     <div className="border-b border-gray-100">
       <button
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-3 sm:px-5 py-4 text-left hover:bg-gray-50 transition-colors"
         onClick={() => setOpen(!open)}
       >
         <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ function CollapsibleSection({
         </span>
       </button>
       {open && (
-        <div className="px-5 pt-4 pb-5">
+        <div className="px-3 sm:px-5 pt-4 pb-5">
           <div>{children}</div>
         </div>
       )}
@@ -314,8 +314,35 @@ export function PropertyCard({
         <div className="w-full lg:flex-1 min-w-0 space-y-0">
 
           {/* 1. Ključni podatki — vedno odprto */}
-          <div className="px-5 py-6 border-b border-gray-100">
+          <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
             <KljucniPodatki stavba={stavba} deliStavbe={deliStavbe} energetskaIzkaznica={energetskaIzkaznica} />
+          </div>
+
+          {/* Mobile-only: karta + street view takoj za ključnimi podatki */}
+          <div className="lg:hidden space-y-3 py-3">
+            {lat && lng && (
+              <div className="rounded-lg border border-gray-200 overflow-hidden mx-3">
+                <CadastralMap
+                  key={`map-mob-${lat}-${lng}-${enolicniId.koId}-${enolicniId.stStavbe}`}
+                  lat={lat} lng={lng} naslov={naslov}
+                  koId={enolicniId.koId} stStavbe={enolicniId.stStavbe}
+                  obrisGeom={stavba?.obrisGeom ?? null}
+                  parcelGeoms={parcele ?? null}
+                />
+                <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex gap-4 text-[10px] text-gray-400">
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 bg-red-500 opacity-60 rounded-sm" /> Stavba (KN)</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-blue-600" /> Parcela (KN)</span>
+                  <span className="ml-auto">Vir: GURS DOF · KN</span>
+                </div>
+              </div>
+            )}
+            {lat && lng && (
+              <div className="rounded-lg border border-gray-200 bg-white overflow-hidden mx-3">
+                <div className="px-4 py-3">
+                  <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 2. O stavbi — zložljivo, privzeto ZAPRTO */}
@@ -325,7 +352,7 @@ export function PropertyCard({
 
           {/* Stanovanja in prostori (multi-unit selector) */}
           {isMultiUnit && !activePart && (
-            <div className="px-5 py-6 border-b border-gray-100">
+            <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
               <section>
                 <Label vir="Kataster nepremičnin · GURS">Stanovanja in prostori ({deliStavbe.length})</Label>
                 <p className="text-sm text-gray-400 mb-3 flex items-center gap-1">
@@ -387,7 +414,7 @@ export function PropertyCard({
           )}
 
           {isMultiUnit && activePart && (
-            <div className="px-5 py-6 border-b border-gray-100">
+            <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
               <section>
                 <div className="flex items-center gap-2 text-sm mb-4 pb-3 border-b border-gray-100">
                   <button
@@ -406,7 +433,7 @@ export function PropertyCard({
           )}
 
           {!isMultiUnit && filteredParts.length > 0 && (
-            <div className="px-5 py-6 border-b border-gray-100">
+            <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
               <section>
                 <Label vir="Kataster nepremičnin · GURS">
                   {filteredParts.length === 1
@@ -421,12 +448,12 @@ export function PropertyCard({
           )}
 
           {/* 3. Stanje — vedno odprto */}
-          <div className="px-5 py-6 border-b border-gray-100">
+          <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
             <MaintenanceSection stavba={stavba} part={currentPart} />
           </div>
 
           {/* 4. Energetsko stanje — vedno odprto */}
-          <div className="px-5 py-6 border-b border-gray-100">
+          <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
             <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
           </div>
 
@@ -434,7 +461,7 @@ export function PropertyCard({
           {!(isMultiUnit && !(!!activePart || requestedDel != null)) &&
            energetskaIzkaznica?.potrebnaTopota != null &&
            energetskaIzkaznica?.kondicionirana != null && (
-            <div className="px-5 py-6 border-b border-gray-100">
+            <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
               <EnergetskiIzracunSection
                 energetskaIzkaznica={energetskaIzkaznica}
                 unitArea={currentPart?.uporabnaPovrsina ?? currentPart?.povrsina ?? null}
@@ -503,7 +530,7 @@ export function PropertyCard({
           {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
           {/* 9. Storitve — vedno odprto */}
-          <div className="px-5 py-6 border-b border-gray-100">
+          <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
             <ServicesSection />
           </div>
 
@@ -525,11 +552,11 @@ export function PropertyCard({
         </div>
 
         {/* ── DESNI SIDEBAR — referenčni podatki ── */}
-        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-3 lg:sticky lg:top-4 p-4 lg:pl-0 lg:pr-4 lg:pt-4">
+        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-3 lg:sticky lg:top-4 px-3 py-3 lg:px-0 lg:pr-4 lg:pt-4">
 
-          {/* 1. Katastrski načrt z uradnimi mejami parcel (GURS WFS) */}
+          {/* 1. Katastrski načrt — hidden on mobile (shown inline above) */}
           {lat && lng && (
-            <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="hidden lg:block rounded-lg border border-gray-200 overflow-hidden">
               <CadastralMap
                 key={`map-${lat}-${lng}-${enolicniId.koId}-${enolicniId.stStavbe}`}
                 lat={lat} lng={lng} naslov={naslov}
@@ -545,9 +572,9 @@ export function PropertyCard({
             </div>
           )}
 
-          {/* Street View */}
+          {/* Street View — hidden on mobile (shown inline above) */}
           {lat && lng && (
-            <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <div className="hidden lg:block rounded-lg border border-gray-200 bg-white overflow-hidden">
               <div className="px-4 py-3">
                 <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
               </div>
@@ -1722,7 +1749,8 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
       <p className="text-xs text-gray-500 mb-3">{fmtLastniki(all.length)}</p>
-      <div className="space-y-1">
+      <div className="overflow-x-auto">
+      <div className="space-y-1 min-w-[280px]">
         <div className="grid grid-cols-3 gap-2 pb-1 border-b border-gray-100 text-xs uppercase tracking-wide text-gray-400 font-medium">
           <span>Enota</span>
           <span>Tip lastnika</span>
@@ -1735,6 +1763,7 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
             <span className="text-right tabular-nums">{r.delez}</span>
           </div>
         ))}
+      </div>
       </div>
       {jePokritih && (
         <div className="relative">
