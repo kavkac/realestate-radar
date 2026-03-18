@@ -202,8 +202,8 @@ function CollapsibleSection({
         </span>
       </button>
       {open && (
-        <div className="px-5 pb-5 bg-gray-50/40 border-l-[3px] border-[#2d6a4f]/20 ml-5 mr-5 mb-4 rounded-sm">
-          <div className="pt-4">{children}</div>
+        <div className="px-5 pt-4 pb-5">
+          <div>{children}</div>
         </div>
       )}
     </div>
@@ -1497,7 +1497,7 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
     : "";
 
   return (
-    <section className="mt-4 pt-4 border-t border-gray-100 space-y-6">
+    <section className="space-y-4">
       {varstvoInfo.varuje && (
         <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded px-3 py-2">
           <span className="text-purple-600 text-xs mt-0.5">🏛</span>
@@ -1518,7 +1518,7 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
       {vzdrzevalni.length > 0 && (
         <div>
           <div className="border-b border-gray-100 pb-1 mb-3">
-            <h4 className="border-l-[3px] border-[#2d6a4f]/50 pl-2 text-sm font-semibold text-gray-700">
+            <h4 className="text-sm font-semibold text-gray-600">
               Vzdrževanje
               {isMultiUnit && (
                 <span className="text-xs text-gray-400 font-normal ml-1">{multiUnitSuffix}</span>
@@ -1543,7 +1543,7 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
       {energetski.length > 0 && (
         <div>
           <div className="border-b border-gray-100 pb-1 mb-3">
-            <h4 className="border-l-[3px] border-[#2d6a4f]/50 pl-2 text-sm font-semibold text-gray-700">
+            <h4 className="text-sm font-semibold text-gray-600">
               Energetski ukrepi
               {isMultiUnit && (
                 <span className="text-xs text-gray-400 font-normal ml-1">{multiUnitSuffix}</span>
