@@ -878,7 +878,7 @@ function PartDetail({ part }: { part: DelStavbe }) {
               </tr>
             </thead>
             <tbody>
-              {part.prostori.map((r, i) => (
+              {part.prostori.filter(r => r.povrsina == null || r.povrsina > 0).map((r, i) => (
                 <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
                   <td className="py-2 pr-4 text-gray-700">{r.vrsta}</td>
                   <td className="py-2 text-right tabular-nums text-gray-700">
