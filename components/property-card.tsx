@@ -261,10 +261,10 @@ export function PropertyCard({
                   <button
                     key={d.stDela}
                     onClick={() => setSelectedDel(d.stDela)}
-                    className={`rounded-md border px-4 py-3 text-left hover:bg-gray-50 cursor-pointer transition-all ${
+                    className={`rounded-md text-left cursor-pointer transition-all ${
                       selectedDel === d.stDela
-                        ? "bg-green-50 border-[#2d6a4f]"
-                        : "bg-white border-gray-100"
+                        ? "bg-green-50 border border-gray-200 border-l-4 border-l-[#2d6a4f] pl-3 py-3 pr-4"
+                        : "bg-white border border-gray-100 px-4 py-3 hover:bg-gray-50 hover:border-gray-300 hover:shadow-sm"
                     }`}
                   >
                     {/* Header row: unit number left, type label right */}
@@ -437,8 +437,8 @@ export function PropertyCard({
       </div>
 
       {/* CC 4.0 attribution footer */}
-      <div className="text-[10px] text-gray-400 px-6 py-3 border-t border-gray-100">
-        Podatki: Geodetska uprava Republike Slovenije (GURS) &middot; Ministrstvo za okolje in prostor (MOP) &middot; Vir: Kataster nepremičnin, Register energetskih izkaznic &middot; Licenca: CC BY 4.0
+      <div className="text-[10px] text-gray-300 px-6 py-3 border-t border-gray-100 text-center">
+        Podatki: GURS (Kataster nepremičnin, Zemljiška knjiga, ETN) &middot; MOP (Register energetskih izkaznic) &middot; Licenca: CC BY 4.0
       </div>
 
       {/* Lead capture - low-key, bottom of card */}
@@ -507,12 +507,12 @@ function LeadCaptureSection({ naslov }: { naslov: string }) {
 
 function Label({ children, vir }: { children: React.ReactNode; vir?: string }) {
   return (
-    <div className="mb-3">
-      <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 border-l-4 border-gray-800 pl-3">
+    <div className="border-b border-gray-100 pb-1 mb-3">
+      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
         {children}
       </h4>
       {vir && (
-        <p className="text-[10px] text-gray-400 font-normal pl-[19px] mt-0.5">Vir: {vir}</p>
+        <p className="text-xs text-gray-400 italic mt-0.5">Vir: {vir}</p>
       )}
     </div>
   );
@@ -537,7 +537,7 @@ function Field({
   return (
     <div>
       <span className="text-xs text-gray-400">{label}</span>
-      <p className="text-sm text-gray-700">{value}</p>
+      <p className="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">{value}</p>
     </div>
   );
 }
@@ -633,8 +633,8 @@ function KljucniPodatki({ stavba, deliStavbe }: { stavba: PropertyCardProps["sta
       <div className="grid grid-cols-2 sm:grid-cols-3 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden divide-y sm:divide-y-0 divide-gray-100">
         {stats.map((s, i) => (
           <div key={s.label} className={`px-4 py-5 text-center ${i > 0 ? "sm:border-l sm:border-gray-100" : ""} ${i === stats.length - 1 && stats.length % 2 !== 0 ? "col-span-2 sm:col-span-1" : ""}`}>
-            <p className="text-[11px] text-gray-400 mb-2 uppercase tracking-wider">{s.label}</p>
-            <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
+            <p className="text-4xl font-bold text-gray-900 tabular-nums whitespace-nowrap">{s.value}</p>
+            <p className="text-xs text-gray-400 mt-1.5 uppercase tracking-wide">{s.label}</p>
           </div>
         ))}
       </div>
@@ -732,42 +732,41 @@ function PartDetail({ part }: { part: DelStavbe }) {
 
 function EnergyMeter({ razred }: { razred: string }) {
   const classes = [
-    { label: "A1", color: "#1a9f3f", width: "45%" },
-    { label: "A2", color: "#4caf50", width: "52%" },
-    { label: "B1", color: "#8bc34a", width: "59%" },
-    { label: "B2", color: "#cddc39", width: "66%" },
-    { label: "C",  color: "#ffeb3b", width: "73%" },
-    { label: "D",  color: "#ffc107", width: "80%" },
-    { label: "E",  color: "#ff9800", width: "87%" },
-    { label: "F",  color: "#f44336", width: "94%" },
-    { label: "G",  color: "#b71c1c", width: "100%" },
+    { label: "A1", color: "#1a9f3f", lightBg: "#e6f5ec", width: "45%" },
+    { label: "A2", color: "#4caf50", lightBg: "#edf7ee", width: "52%" },
+    { label: "B1", color: "#8bc34a", lightBg: "#f3f9e8", width: "59%" },
+    { label: "B2", color: "#cddc39", lightBg: "#f9fce5", width: "66%" },
+    { label: "C",  color: "#f0b429", lightBg: "#fdf7e3", width: "73%" },
+    { label: "D",  color: "#ffc107", lightBg: "#fff8e1", width: "80%" },
+    { label: "E",  color: "#ff9800", lightBg: "#fff3e0", width: "87%" },
+    { label: "F",  color: "#f44336", lightBg: "#fdecea", width: "94%" },
+    { label: "G",  color: "#b71c1c", lightBg: "#f9e0df", width: "100%" },
   ];
 
   return (
-    <div className="flex flex-col gap-[2px] my-3 max-w-[280px]">
+    <div className="flex flex-col gap-[3px] my-3 max-w-[280px]">
       {classes.map((c) => {
         const isActive = c.label === razred;
         return (
           <div key={c.label} className="flex items-center gap-2">
+            {isActive && (
+              <span className="text-xs font-bold text-gray-600 w-3 flex-shrink-0">→</span>
+            )}
             <div
-              className="flex items-center justify-end pr-2 text-white font-bold text-xs"
+              className="flex items-center justify-end pr-2 text-xs font-bold"
               style={{
                 width: c.width,
-                backgroundColor: c.color,
-                height: isActive ? "26px" : "18px",
+                marginLeft: isActive ? 0 : "20px",
+                backgroundColor: isActive ? c.color : c.lightBg,
+                color: isActive ? "#ffffff" : "transparent",
+                height: isActive ? "26px" : "16px",
                 clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%)",
-                opacity: isActive ? 1 : 0.45,
+                boxShadow: isActive ? `0 1px 6px ${c.color}55` : "none",
                 transition: "all 0.15s",
               }}
             >
-              {c.label}
+              {isActive ? c.label : ""}
             </div>
-            {isActive && (
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-bold" style={{ color: c.color }}>◀</span>
-                <span className="text-sm font-bold text-gray-800">{c.label}</span>
-              </div>
-            )}
           </div>
         );
       })}
@@ -1172,25 +1171,126 @@ function predlagajUkrepe(
   return ukrepi;
 }
 
+function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: string | null; hasSelectedUnit: boolean | undefined; isLast: boolean }) {
+  const [osnOdprta, setOsnOdprta] = React.useState(false);
+
+  const borderColor = u.prioriteta === "visoka" ? "#ef4444" : u.prioriteta === "srednja" ? "#f59e0b" : "#d1d5db";
+  const prioritetaLabel = u.prioriteta === "visoka" ? "prednostno" : u.prioriteta === "srednja" ? "priporočeno" : "opcijsko";
+  const prioritetaTextColor = u.prioriteta === "visoka" ? "text-red-500" : u.prioriteta === "srednja" ? "text-amber-500" : "text-gray-400";
+
+  const showDelez = u.nivo === "skupno" && hasSelectedUnit && delez && u.skupniStrosekMin != null;
+
+  return (
+    <div
+      className={`rounded-md border border-gray-100 bg-white overflow-hidden${isLast ? "" : " mb-3"}`}
+      style={{ borderLeftWidth: "4px", borderLeftColor: borderColor }}
+    >
+      <div className="p-3">
+        {/* Row 1: Title + priority label */}
+        <div className="flex items-start justify-between gap-3 mb-1.5">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-800 leading-snug">{u.naziv}</p>
+            {u.varstvoCene && (
+              <p className="text-xs text-purple-600 mt-0.5">🏛 Cene prilagojene za varstvo kulturne dediščine</p>
+            )}
+          </div>
+          <span className={`text-[11px] font-medium flex-shrink-0 mt-0.5 ${prioritetaTextColor}`}>
+            {prioritetaLabel}
+          </span>
+        </div>
+
+        {/* Row 2: description */}
+        <p className="text-xs text-gray-500 mb-3 leading-relaxed">{u.opis}</p>
+
+        {/* Row 3: cost + ROI + value increase — two-column layout */}
+        <div className="flex items-start justify-between gap-4">
+          {/* Left: description/name (empty here — already in row 1) */}
+          <div className="flex-1 min-w-0" />
+
+          {/* Right: financial summary */}
+          <div className="text-right flex-shrink-0">
+            {showDelez ? (
+              <div className="space-y-0.5">
+                <p className="text-[11px] text-gray-400">
+                  Skupaj: {u.skupniStrosekMin!.toLocaleString("sl-SI")}–{u.skupniStrosekMax!.toLocaleString("sl-SI")} €
+                </p>
+                <p className="text-sm font-bold text-gray-800">
+                  Vaš delež ({delez}): {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
+                </p>
+                {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
+                  <p className="text-[11px] text-purple-700">Preverite subvencije (EkoSklad, EU)</p>
+                ) : u.dobaPovrnitveMin > 50 ? (
+                  <p className="text-[11px] text-gray-400">ROI: &gt; 50 let</p>
+                ) : (
+                  <p className="text-[11px] text-gray-400">ROI: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let</p>
+                )}
+                {u.vrednostDvig && (
+                  <p className="text-[11px] text-green-700">+{u.vrednostDvig}% vrednost</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                <p className="text-[11px] text-gray-400">
+                  {u.nivo === "skupno" ? "Skupni strošek" : "Ocena stroška"}
+                </p>
+                <p className="text-sm font-bold text-gray-800">
+                  {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
+                </p>
+                {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
+                  <p className="text-[11px] text-purple-700">Preverite subvencije (EkoSklad, EU)</p>
+                ) : u.dobaPovrnitveMin > 50 ? (
+                  <p className="text-[11px] text-gray-400">ROI: &gt; 50 let</p>
+                ) : (
+                  <p className="text-[11px] text-gray-400">ROI: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let</p>
+                )}
+                {u.vrednostDvig && (
+                  <p className="text-[11px] text-green-700">+{u.vrednostDvig}% vrednost</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Methodology collapse */}
+        <div className="mt-2 pt-2 border-t border-gray-50">
+          <button
+            onClick={() => setOsnOdprta(!osnOdprta)}
+            className="text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {osnOdprta ? "▲ Skrij metodologijo" : "▼ Metodologija"}
+          </button>
+          {osnOdprta && (
+            <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{u.osnova}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSelectedUnit, unitLabel, varstvo }: { ukrepi: Ukrep[]; delez: string | null; lat?: number | null; lng?: number | null; isMultiUnit?: boolean; hasSelectedUnit?: boolean; unitLabel?: string | null; varstvo?: { varuje: boolean; naziv: string | null } }) {
   const varstvoInfo = varstvo ?? jeVVarstveniConi(lat, lng);
   if (ukrepi.length === 0) return null;
 
-  const prioritetaColor: Record<Ukrep["prioriteta"], string> = {
-    visoka: "text-red-600",
-    srednja: "text-amber-600",
-    nizka: "text-gray-400",
-  };
+  const vidniUkrepi = ukrepi.filter(u => {
+    if (!isMultiUnit) return true;
+    if (u.nivo === "skupno") return true;
+    if (u.nivo === "enota") return !!hasSelectedUnit;
+    if (u.nivo === "stavba") return !hasSelectedUnit;
+    return true;
+  });
 
   return (
     <section className="mt-4 pt-4 border-t border-gray-100">
-      <div className="flex items-baseline gap-2 mb-3">
-        <p className="text-xs text-gray-400 uppercase tracking-wide">Predlagani energetski ukrepi</p>
-        {isMultiUnit && (
-          <span className="text-xs text-gray-400">
-            — {hasSelectedUnit && unitLabel ? `za ${unitLabel}` : "za celoten objekt"}
-          </span>
-        )}
+      <div className="border-b border-gray-100 pb-1 mb-3">
+        <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
+          Predlagani energetski ukrepi
+          {isMultiUnit && (
+            <span className="text-gray-400 font-normal ml-1 normal-case tracking-normal">
+              — {hasSelectedUnit && unitLabel ? `za ${unitLabel}` : "za celoten objekt"}
+            </span>
+          )}
+        </h4>
       </div>
       {varstvoInfo.varuje && (
         <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded px-3 py-2 mb-3">
@@ -1198,98 +1298,28 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
           <div>
             <p className="text-xs font-medium text-purple-800">Varstvo kulturne dediščine</p>
             <p className="text-xs text-purple-700">{varstvoInfo.naziv} — Za vsak poseg v zunanjost stavbe je potrebno predhodno soglasje Zavoda za varstvo kulturne dediščine Slovenije (ZVKDS).</p>
-      <p className="text-xs text-purple-700 mt-1">
-        📞 <a href="tel:+38614244200" className="underline">01 424 42 00</a>
-        {" · "}✉️ <a href="mailto:gp.zvkds@gov.si" className="underline">gp.zvkds@gov.si</a>
-        {" · "}🌐 <a href="https://www.zvkds.si" target="_blank" rel="noopener noreferrer" className="underline">zvkds.si</a>
-      </p>
+            <p className="text-xs text-purple-700 mt-1">
+              Tel: <a href="tel:+38614244200" className="underline">01 424 42 00</a>
+              {" · "}
+              <a href="mailto:gp.zvkds@gov.si" className="underline">gp.zvkds@gov.si</a>
+              {" · "}
+              <a href="https://www.zvkds.si" target="_blank" rel="noopener noreferrer" className="underline">zvkds.si</a>
+            </p>
           </div>
         </div>
       )}
-      <div className="space-y-4">
-        {ukrepi.filter(u => {
-          if (!isMultiUnit) return true; // enostanovanjska: vse
-          if (u.nivo === "skupno") return true; // fasada/streha: vedno
-          if (u.nivo === "enota") return !!hasSelectedUnit; // okna: samo ob izbrani enoti
-          if (u.nivo === "stavba") return !hasSelectedUnit; // ogrevanje: samo cela stavba
-          return true;
-        }).map((u, i) => (
-          <div key={i} className="border border-gray-100 rounded p-3">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <div>
-                <p className="text-sm font-medium text-gray-800">{u.naziv}</p>
-                {u.varstvoCene && (
-                  <p className="text-xs text-purple-600 mt-0.5">🏛 Cene prilagojene za varstvo kulturne dediščine</p>
-                )}
-              </div>
-              <span className={`text-xs flex-shrink-0 mt-0.5 ${prioritetaColor[u.prioriteta]}`}>
-                {u.prioriteta === "visoka" ? "↑ prednostno" : u.prioriteta === "srednja" ? "priporočeno" : "opcijsko"}
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mb-2">{u.opis}</p>
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                {/* Bug 4: za skupne ukrepe ko je enota izbrana — pokaži hierarhijo */}
-                {u.nivo === "skupno" && hasSelectedUnit && delez && u.skupniStrosekMin != null ? (
-                  <div className="space-y-1">
-                    <div>
-                      <span className="text-xs text-gray-400">Skupni strošek objekta:</span>
-                      <span className="text-xs text-gray-400 ml-1">
-                        {u.skupniStrosekMin.toLocaleString("sl-SI")}–{u.skupniStrosekMax!.toLocaleString("sl-SI")} €
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-500">Vaš delež ({delez}):</span>
-                      <span className="text-sm font-semibold text-gray-800 ml-1">
-                        {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
-                      </span>
-                    </div>
-                    {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
-                      <p className="text-xs text-purple-700">Vzdrževalna obveznost — preverite subvencije (EkoSklad, EU skladi)</p>
-                    ) : u.dobaPovrnitveMin > 50 ? (
-                      <p className="text-xs text-gray-500">Doba povrnitve (vaš delež): &gt; 50 let — priporočljivo preveriti razpoložljive subvencije</p>
-                    ) : (
-                      <p className="text-xs text-gray-400">
-                        Doba povrnitve (vaš delež): ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
-                      </p>
-                    )}
-                    {u.vrednostDvig && (
-                      <p className="text-xs text-green-700 mt-1">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <span className="text-xs text-gray-400">
-                      {u.nivo === "skupno" ? "Skupni strošek" : "Ocena stroška"}:
-                    </span>
-                    <span className="text-sm font-medium text-gray-800 ml-1">
-                      {u.strosekMin.toLocaleString("sl-SI")}–{u.strosekMax.toLocaleString("sl-SI")} €
-                    </span>
-                    {u.dobaPovrnitveMin > 50 && u.varstvoCene ? (
-                      <p className="text-xs text-purple-700">Vzdrževalna obveznost — preverite subvencije (EkoSklad, EU skladi)</p>
-                    ) : u.dobaPovrnitveMin > 50 ? (
-                      <p className="text-xs text-gray-500">Doba povrnitve: &gt; 50 let — priporočljivo preveriti razpoložljive subvencije</p>
-                    ) : (
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Doba povrnitve: ~{u.dobaPovrnitveMin}–{u.dobaPovrnitveMax} let
-                      </p>
-                    )}
-                    {u.vrednostDvig && (
-                      <p className="text-xs text-green-700 mt-1">Ocenjeni vpliv na vrednost: +{u.vrednostDvig}% (po izvedbi)</p>
-                    )}
-                  </div>
-                )}
-              </div>
-              {/* Bug 2: skrij "delež" ko ni enota izbrana */}
-              {u.nivo === "skupno" && delez && hasSelectedUnit && (
-                <span className="text-xs text-gray-400">delež {delez}</span>
-              )}
-            </div>
-            <p className="text-xs text-gray-300 mt-1">{u.osnova}</p>
-          </div>
+      <div>
+        {vidniUkrepi.map((u, i) => (
+          <UkrepKartica
+            key={i}
+            u={u}
+            delez={delez}
+            hasSelectedUnit={hasSelectedUnit}
+            isLast={i === vidniUkrepi.length - 1}
+          />
         ))}
       </div>
-      <p className="text-xs text-gray-300 mt-3">Stroški so okvirne ocene na podlagi ZRMK/IZS referenčnih cen 2024. Niso uradna ponudba.</p>
+      <p className="text-[11px] text-gray-300 mt-3">Stroški so okvirne ocene na podlagi ZRMK/IZS referenčnih cen 2024. Niso uradna ponudba.</p>
     </section>
   );
 }
@@ -1314,11 +1344,11 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
     const zc = zaupanjeColor[ocena.zaupanje];
     return (
       <section>
-        <div className="mb-3">
-          <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 border-l-4 border-gray-800 pl-3">
+        <div className="border-b border-gray-100 pb-1 mb-3">
+          <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
             Energetsko stanje
           </h4>
-          <div className="flex items-center gap-2 mt-0.5 pl-[19px]">
+          <div className="flex items-center gap-2 mt-0.5">
             <span className="text-[10px] text-gray-400">Vir: Ocena · multi-faktorski algoritem</span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${
               ocena.zaupanje === 'visoko' ? 'bg-green-50 text-green-700' :

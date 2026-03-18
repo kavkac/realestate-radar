@@ -548,8 +548,8 @@ export function AddressSearch() {
                   onClick={() => handleSwitchTab(tab.id)}
                   className={`group relative flex items-center gap-1.5 rounded-t-md px-3 text-sm whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
                     isActive
-                      ? "py-2.5 border-t-2 border-t-[#2d6a4f] border-l border-r border-gray-200 border-b-0 bg-white font-medium text-gray-800 relative z-10 -mb-px"
-                      : "py-1.5 border border-gray-200 bg-gray-100 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                      ? "py-1.5 border-b-2 border-b-[#2d6a4f] border-t-0 border-l-0 border-r-0 bg-transparent font-medium text-gray-800 relative z-10"
+                      : "py-1.5 border-0 bg-transparent text-gray-500 hover:text-gray-700"
                   }`}
                 >
                   <span className="truncate">{truncateAddress(tab.naslov || "Iskanje\u2026")}</span>
