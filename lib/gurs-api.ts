@@ -632,18 +632,26 @@ export async function getParcele(
     const bboxData = await fetchWfs(bboxUrl).catch(() => null);
     if (bboxData && bboxData.features.length > 0) {
       const buildingRing = obrisGeom?.coordinates?.[0];
-      const filtered = bboxData.features.filter((f) => {
+      // Oceni vsako parcelo: koliko točk tlorisa stavbe leži v njej
+      const scored = bboxData.features.map((f) => {
         const geom = f.geometry as { type: string; coordinates: number[][][] } | null;
-        if (!geom || geom.type !== "Polygon") return false;
+        if (!geom || geom.type !== "Polygon") return { f, score: 0 };
         const parcelRing = geom.coordinates[0];
-        // Če imamo tloris stavbe: pokaži vse parcele ki se stikajo z njim
         if (buildingRing && buildingRing.length > 0) {
-          return polygonsIntersect(buildingRing, parcelRing);
+          // Število točk tlorisa ki so v parceli (min 1 za upoštevanje)
+          const hits = buildingRing.filter(pt => pointInPolygon(pt as [number, number], parcelRing)).length;
+          return { f, score: hits };
         }
-        // Fallback: točka stavbe mora biti v parceli
-        return pointInPolygon([lng, lat], parcelRing);
+        // Fallback brez tlorisa
+        return { f, score: pointInPolygon([lng, lat], parcelRing) ? buildingRing?.length ?? 1 : 0 };
       });
-      parceleData = { ...bboxData, features: filtered.length > 0 ? filtered : bboxData.features.slice(0, 1) };
+      // Samo parcele z vsaj 1 točko tlorisa; sortirano po score descending; max 3
+      const relevant = scored
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map(x => x.f);
+      parceleData = { ...bboxData, features: relevant.length > 0 ? relevant : bboxData.features.slice(0, 1) };
     }
   }
 
