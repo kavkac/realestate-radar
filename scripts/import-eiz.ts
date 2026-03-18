@@ -8,11 +8,17 @@ const MONTHS = [
   "jul", "avg", "sep", "okt", "nov", "dec",
 ];
 
-function getEizUrl(): string {
+async function getEizUrl(): Promise<string> {
   const now = new Date();
-  const month = MONTHS[now.getMonth()];
-  const year = String(now.getFullYear()).slice(-2);
-  return `https://www.energetika-portal.si/fileadmin/dokumenti/podrocja/energetika/energetske_izkaznice/ei_javni_register_${month}${year}.csv`;
+  for (let offset = 0; offset <= 2; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const month = MONTHS[d.getMonth()];
+    const year = String(d.getFullYear()).slice(-2);
+    const url = `https://www.energetika-portal.si/fileadmin/dokumenti/podrocja/energetika/energetske_izkaznice/ei_javni_register_${month}${year}.csv`;
+    const res = await fetch(url, { method: "HEAD" });
+    if (res.ok) return url;
+  }
+  throw new Error("EIZ CSV not found for last 3 months");
 }
 
 function parseFloat_(val: string): number | null {
@@ -65,7 +71,11 @@ async function downloadCsv(url: string): Promise<string> {
 }
 
 async function main() {
-  const url = process.env.EIZ_CSV_URL || getEizUrl();
+  const isDryRun = process.argv.includes("--dry-run") || process.argv.includes("--test");
+  const testLimit = isDryRun ? 100 : Infinity;
+  if (isDryRun) console.log("Running in DRY-RUN / TEST mode (first 100 rows, no DB writes)");
+
+  const url = process.env.EIZ_CSV_URL || await getEizUrl();
   console.log(`EIZ Import started`);
   console.log(`URL: ${url}`);
 
@@ -86,6 +96,7 @@ async function main() {
   let errors = 0;
 
   for (const row of dataRows) {
+    if (upserted + skipped + errors >= testLimit) break;
     try {
       const certificateId = row[0]?.trim();
       if (!certificateId) {
@@ -107,9 +118,26 @@ async function main() {
         continue;
       }
 
-      const energyClass = row[6]?.trim();
+      // Column mapping (0-indexed, pipe-separated):
+      // 6: Tip izkaznice → type
+      // 7: Potrebna toplota → heatingNeed
+      // 8: Dovedena energija → deliveredEnergy
+      // 9: Celotna energija → totalEnergy
+      // 10: Dovedena električna → electricEnergy
+      // 11: Primarna energija → primaryEnergy
+      // 12: Emisije CO2 → co2Emissions
+      // 13: Kondicionirana površina → conditionedArea
+      // 14: Energijski razred → energyClass
+      const type = row[6]?.trim() || null;
+      const energyClass = row[14]?.trim();
       if (!energyClass) {
         skipped++;
+        continue;
+      }
+
+      if (isDryRun) {
+        console.log(`[DRY-RUN] ${certificateId} | type=${type} | energyClass=${energyClass} | area=${row[13]?.trim()}`);
+        upserted++;
         continue;
       }
 
@@ -122,14 +150,14 @@ async function main() {
           issueDate,
           validUntil,
           energyClass,
-          type: row[7]?.trim() || null,
-          heatingNeed: parseFloat_(row[8]),
-          deliveredEnergy: parseFloat_(row[9]),
-          totalEnergy: parseFloat_(row[10]),
-          electricEnergy: parseFloat_(row[11]),
-          primaryEnergy: parseFloat_(row[12]),
-          co2Emissions: parseFloat_(row[13]),
-          conditionedArea: parseFloat_(row[14]),
+          type,
+          heatingNeed: parseFloat_(row[7]),
+          deliveredEnergy: parseFloat_(row[8]),
+          totalEnergy: parseFloat_(row[9]),
+          electricEnergy: parseFloat_(row[10]),
+          primaryEnergy: parseFloat_(row[11]),
+          co2Emissions: parseFloat_(row[12]),
+          conditionedArea: parseFloat_(row[13]),
         },
         create: {
           certificateId,
@@ -139,14 +167,14 @@ async function main() {
           issueDate,
           validUntil,
           energyClass,
-          type: row[7]?.trim() || null,
-          heatingNeed: parseFloat_(row[8]),
-          deliveredEnergy: parseFloat_(row[9]),
-          totalEnergy: parseFloat_(row[10]),
-          electricEnergy: parseFloat_(row[11]),
-          primaryEnergy: parseFloat_(row[12]),
-          co2Emissions: parseFloat_(row[13]),
-          conditionedArea: parseFloat_(row[14]),
+          type,
+          heatingNeed: parseFloat_(row[7]),
+          deliveredEnergy: parseFloat_(row[8]),
+          totalEnergy: parseFloat_(row[9]),
+          electricEnergy: parseFloat_(row[10]),
+          primaryEnergy: parseFloat_(row[11]),
+          co2Emissions: parseFloat_(row[12]),
+          conditionedArea: parseFloat_(row[13]),
         },
       });
 
