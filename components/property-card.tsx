@@ -1217,11 +1217,22 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
     const zc = zaupanjeColor[ocena.zaupanje];
     return (
       <section>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <Label vir="Ocena · multi-faktorski algoritem">Energetsko stanje</Label>
+        <div className="mb-3">
+          <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500 border-l-4 border-gray-800 pl-3">
+            Energetsko stanje
+          </h4>
+          <div className="flex items-center gap-2 mt-0.5 pl-[19px]">
+            <span className="text-[10px] text-gray-400">Vir: Ocena · multi-faktorski algoritem</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${
+              ocena.zaupanje === 'visoko' ? 'bg-green-50 text-green-700' :
+              ocena.zaupanje === 'srednje' ? 'bg-amber-50 text-amber-700' :
+              'bg-gray-100 text-gray-500'
+            }`}>
+              {ocena.zaupanje === 'visoko' ? '● Visoko zaupanje' :
+               ocena.zaupanje === 'srednje' ? '◐ Srednje zaupanje' :
+               '○ Nizko zaupanje'}
+            </span>
           </div>
-          <span className="text-xs text-gray-400 mt-1 ml-2 shrink-0">{zaupanjeLabel[ocena.zaupanje]}</span>
         </div>
         <div className={`flex items-start gap-2 ${zc.bg} border ${zc.border} rounded px-3 py-2 mb-3`}>
           <span className={`${zc.text} text-xs mt-0.5`}>{zc.icon}</span>
@@ -1231,7 +1242,11 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
         <div className="mb-3">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Osnova · PURES 2010 / EN ISO 52000</p>
           <p className="text-sm text-gray-600">{ocena.dejavnikiBaza[0]}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Razred po standardu: <span className="font-medium">{ocena.razredBazni}</span></p>
+          <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
+            <span>Razred po standardu (PURES 2010): <strong className="text-gray-800">{ocena.razredBazni}</strong></span>
+            <span className="text-gray-300">→</span>
+            <span>Ocenjeni razred z algoritmom: <strong className="text-gray-800">{ocena.razred}</strong></span>
+          </div>
         </div>
         {/* EnergyMeter prikaže končni razred */}
         <EnergyMeter razred={ocena.razred} />
