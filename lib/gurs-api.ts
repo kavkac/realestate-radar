@@ -93,6 +93,8 @@ export const VRSTA_PROSTORA: Record<number, string> = {
 
 // --- Types ---
 
+export type TipPolozajaStavbe = "samostojna" | "vogalna" | "vmesna vrstna" | null;
+
 export interface StavbaData {
   koId: number;
   stStavbe: number;
@@ -111,6 +113,7 @@ export interface StavbaData {
   tipStavbe: string | null;
   datumSys: string | null;
   visina: number | null; // VISINA_H2 - VISINA_H3
+  tipPolozaja: TipPolozajaStavbe;
 }
 
 export interface ProstorData {
@@ -720,5 +723,49 @@ export async function checkGasInfrastructure(
     return (data?.totalFeatures ?? 0) > 0;
   } catch {
     return false;
+  }
+}
+
+export async function getTipPolozajaStavbe(
+  eidStavba: string,
+  koId: number,
+): Promise<TipPolozajaStavbe> {
+  try {
+    // Najprej pridobi bounding box te stavbe
+    const stavbaUrl = buildWfsUrl(
+      BASE_KN,
+      "SI.GURS.KN:STAVBE_H",
+      `EID_STAVBA='${eidStavba}' AND STATUS_VELJAVNOSTI='V'`,
+    );
+    const stavbaData = await fetchWfs(stavbaUrl);
+    if (!stavbaData?.features?.[0]) return null;
+
+    const geom = stavbaData.features[0].properties?.OBRIS_GEOM as any;
+    if (!geom || geom.type !== "Polygon") return null;
+
+    // Izračunaj BBOX z 1.5m bufferjem
+    const coords = geom.coordinates[0] as [number, number][];
+    const xs = coords.map((c) => c[0]);
+    const ys = coords.map((c) => c[1]);
+    const buf = 1.5;
+    const minX = Math.min(...xs) - buf;
+    const maxX = Math.max(...xs) + buf;
+    const minY = Math.min(...ys) - buf;
+    const maxY = Math.max(...ys) + buf;
+
+    // Poišči sosednje stavbe v BBOX (ista KO)
+    const sosediUrl = buildWfsUrl(
+      BASE_KN,
+      "SI.GURS.KN:STAVBE_H",
+      `BBOX(OBRIS_GEOM,${minX},${minY},${maxX},${maxY},'EPSG:3794') AND KO_ID=${koId} AND STATUS_VELJAVNOSTI='V' AND EID_STAVBA<>'${eidStavba}'`,
+    );
+    const sosediData = await fetchWfs(sosediUrl);
+    const steviloSosedov = sosediData?.features?.length ?? 0;
+
+    if (steviloSosedov === 0) return "samostojna";
+    if (steviloSosedov === 1) return "vogalna";
+    return "vmesna vrstna";
+  } catch {
+    return null;
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, VRSTA_DEJANSKE_RABE } from "@/lib/gurs-api";
+import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE } from "@/lib/gurs-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
 import { prisma } from "@/lib/prisma";
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
         : null;
 
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, and KN namembnost in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, tipPolozaja, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
       getParcele(stavba.koId, stavba.stStavbe),
       getRenVrednost(stavba.koId, stavba.stStavbe),
       getEtnAnaliza(stavba.koId, useableArea).catch(() => null),
+      getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
@@ -246,6 +247,7 @@ export async function POST(request: NextRequest) {
         },
         gasInfrastructure,
         visina: stavba.visina,
+        tipPolozaja: tipPolozaja ?? null,
       },
       deliStavbe: deliStavbe.map((d, i) => ({
         stDela: d.stDelaStavbe,

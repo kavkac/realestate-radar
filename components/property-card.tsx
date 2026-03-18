@@ -92,6 +92,7 @@ interface PropertyCardProps {
     };
     gasInfrastructure?: boolean | null;
     visina?: number | null;
+    tipPolozaja?: "samostojna" | "vogalna" | "vmesna vrstna" | null;
   };
   deliStavbe: DelStavbe[];
   energetskaIzkaznica: EnergyData | null;
@@ -143,7 +144,8 @@ export function PropertyCard({
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
   const [showAllUnits, setShowAllUnits] = useState(false);
-  const VISIBLE_DEFAULT = 6; // 2 vrstici × 3 stolpci (sm:grid-cols-3)
+  const VISIBLE_DEFAULT = 6; // 2 polni vrstici × 3 stolpci
+  const FADE_ROW = 3; // 3. vrsta vidna a fadirana
 
   const sortedParts = [...deliStavbe].sort((a, b) => a.stDela - b.stDela);
   const filteredParts =
@@ -251,8 +253,9 @@ export function PropertyCard({
               <p className="text-sm text-gray-400 mb-3 flex items-center gap-1">
                 <span>↓</span> Izberite enoto za podroben pregled
               </p>
+              <div className="relative">
               <div className="grid gap-2 sm:grid-cols-2">
-                {(showAllUnits ? sortedParts : sortedParts.slice(0, VISIBLE_DEFAULT)).map((d) => (
+                {(showAllUnits ? sortedParts : sortedParts.slice(0, VISIBLE_DEFAULT + FADE_ROW)).map((d) => (
                   <button
                     key={d.stDela}
                     onClick={() => setSelectedDel(d.stDela)}
@@ -290,6 +293,10 @@ export function PropertyCard({
                     )}
                   </button>
                 ))}
+              </div>
+              {!showAllUnits && sortedParts.length > VISIBLE_DEFAULT && (
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+              )}
               </div>
               {deliStavbe.length > VISIBLE_DEFAULT && (
                 <button
@@ -607,6 +614,9 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         {stavba.datumSys && (
           <Field label="Stanje registra" value={fmtDate(stavba.datumSys)} />
         )}
+        {stavba.tipPolozaja && (
+          <Field label="Tip položaja" value={stavba.tipPolozaja.charAt(0).toUpperCase() + stavba.tipPolozaja.slice(1)} />
+        )}
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
@@ -728,6 +738,7 @@ function oceniEnergetskiRazred(stavba: {
   prikljucki: { plin: boolean; vodovod: boolean; elektrika: boolean; kanalizacija: boolean };
   steviloEtaz?: number | null;
   visina?: number | null;
+  tipPolozaja?: "samostojna" | "vogalna" | "vmesna vrstna" | null;
 }, part?: {
   letoObnoveOken: number | null;
   letoObnoveInstalacij: number | null;
@@ -811,6 +822,19 @@ function oceniEnergetskiRazred(stavba: {
       score += 2;
       dejavniki.push(`Nizka stavba (${visina.toFixed(0)} m) — neugodna oblika`);
     }
+  }
+
+  // Tip položaja — izpostavljenost zunanjim stenam
+  const tip = stavba.tipPolozaja;
+  if (tip === "vmesna vrstna") {
+    score -= 8;
+    dejavniki.push(`Vmesna vrstna stavba — 2 izpostavljeni fasadi, manj toplotnih izgub`);
+  } else if (tip === "vogalna") {
+    score -= 4;
+    dejavniki.push(`Vogalna stavba — 3 izpostavljene fasade`);
+  } else if (tip === "samostojna") {
+    score += 5;
+    dejavniki.push(`Samostojna stavba — 4 izpostavljene fasade, večje toplotne izgube`);
   }
 
   const konstr = stavba.konstrukcija?.toLowerCase() ?? "";
@@ -1013,6 +1037,11 @@ function fmtLastniki(n: number): string {
 
 function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps["deliStavbe"] }) {
   const all = deliStavbe.flatMap(d => (d.lastnistvo ?? []).map(l => ({ ...l, enota: d.stDela })));
+  const MAX_VISIBLE_LASTNIKI = 4;
+  const [showAllLastniki, setShowAllLastniki] = useState(false);
+  const vidniLastniki = showAllLastniki ? all : all.slice(0, MAX_VISIBLE_LASTNIKI);
+  const jePokritih = all.length > MAX_VISIBLE_LASTNIKI;
+
   if (all.length === 0) return (
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
@@ -1034,7 +1063,7 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {all.map((r, i) => (
+            {vidniLastniki.map((r, i) => (
               <tr key={i} className="text-gray-700">
                 <td className="py-2 pr-4 text-gray-500">{r.enota}</td>
                 <td className="py-2 pr-4">{r.tipOsebe}</td>
@@ -1045,12 +1074,29 @@ function LastnistvoMultiSection({ deliStavbe }: { deliStavbe: PropertyCardProps[
           </tbody>
         </table>
       </div>
+      {jePokritih && (
+        <div className="relative">
+          {!showAllLastniki && (
+            <div className="absolute bottom-8 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+          )}
+          <button
+            onClick={() => setShowAllLastniki(!showAllLastniki)}
+            className="w-full mt-1 py-1.5 text-xs text-[#2d6a4f] hover:underline"
+          >
+            {showAllLastniki ? "Skrij ↑" : `Prikaži vse lastnike (${all.length}) ↓`}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
 
 function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
+  const MAX_VISIBLE_LASTNIKI = 4;
+  const [showAllLastniki, setShowAllLastniki] = useState(false);
   if (!data || data.length === 0) return null;
+  const vidniLastniki = showAllLastniki ? data : data.slice(0, MAX_VISIBLE_LASTNIKI);
+  const jePokritih = data.length > MAX_VISIBLE_LASTNIKI;
   return (
     <section>
       <Label vir="Zemljiška knjiga · GURS">Lastništvo</Label>
@@ -1066,7 +1112,7 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
             </tr>
           </thead>
           <tbody>
-            {data.map((r, i) => (
+            {vidniLastniki.map((r, i) => (
               <tr key={i} className="border-b border-gray-50 last:border-0 odd:bg-gray-50">
                 <td className="py-2 pr-4 text-gray-700">
                   {r.tipOsebe}
@@ -1082,6 +1128,19 @@ function LastnistvoSection({ data }: { data?: LastnistvoRecord[] }) {
           </tbody>
         </table>
       </div>
+      {jePokritih && (
+        <div className="relative">
+          {!showAllLastniki && (
+            <div className="absolute bottom-8 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+          )}
+          <button
+            onClick={() => setShowAllLastniki(!showAllLastniki)}
+            className="w-full mt-1 py-1.5 text-xs text-[#2d6a4f] hover:underline"
+          >
+            {showAllLastniki ? "Skrij ↑" : `Prikaži vse lastnike (${data.length}) ↓`}
+          </button>
+        </div>
+      )}
       <p className="text-xs text-gray-400 mt-2">Vir: GURS zemljiška knjiga. Imena fizičnih oseb niso prikazana (GDPR).</p>
     </section>
   );
