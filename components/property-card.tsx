@@ -139,6 +139,8 @@ export function PropertyCard({
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
+  const [showAllUnits, setShowAllUnits] = useState(false);
+  const VISIBLE_DEFAULT = 6; // 2 vrstici × 3 stolpci (sm:grid-cols-3)
 
   const filteredParts =
     requestedDel != null
@@ -246,7 +248,7 @@ export function PropertyCard({
                 <span>↓</span> Izberite enoto za podroben pregled
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {deliStavbe.map((d) => (
+                {(showAllUnits ? deliStavbe : deliStavbe.slice(0, VISIBLE_DEFAULT)).map((d) => (
                   <button
                     key={d.stDela}
                     onClick={() => setSelectedDel(d.stDela)}
@@ -285,6 +287,16 @@ export function PropertyCard({
                   </button>
                 ))}
               </div>
+              {deliStavbe.length > VISIBLE_DEFAULT && (
+                <button
+                  onClick={() => setShowAllUnits(!showAllUnits)}
+                  className="w-full mt-2 py-2 text-sm text-[#2d6a4f] hover:underline"
+                >
+                  {showAllUnits
+                    ? "Skrij ↑"
+                    : `Prikaži vse enote (${deliStavbe.length}) ↓`}
+                </button>
+              )}
             </section>
           )}
 
