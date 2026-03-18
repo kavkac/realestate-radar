@@ -479,8 +479,8 @@ export function AddressSearch() {
               pattern="[0-9]*"
               value={delStavbe}
               onChange={(e) => setDelStavbe(e.target.value.replace(/\D/g, ""))}
-              placeholder="Št. dela stavbe (neobvezno)"
-              className="sm:w-32 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield]"
+              placeholder="Enota (neobv.)"
+              className="sm:w-36 rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield]"
               disabled={isLoading}
             />
             <button
@@ -539,17 +539,17 @@ export function AddressSearch() {
       {/* Tab bar + card wrapper — no gap between tabs and card */}
       {tabs.length > 0 && (
         <div>
-          <div className="relative bg-gray-50 border-b border-gray-200 px-4 pt-3 pb-0 flex items-end gap-1 overflow-x-auto scrollbar-none">
+          <div className="flex items-end gap-1 px-4 pt-3 bg-white border-b border-gray-200 overflow-x-auto scrollbar-none">
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId && !addingNew;
               return (
                 <button
                   key={tab.id}
                   onClick={() => handleSwitchTab(tab.id)}
-                  className={`group relative flex items-center gap-1.5 rounded-t-md px-3 text-sm whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
+                  className={`group relative flex items-center gap-1.5 rounded-t-md px-3 py-2 text-sm whitespace-nowrap transition-colors min-w-[120px] max-w-[220px] ${
                     isActive
-                      ? "py-1.5 border-b-2 border-b-[#2d6a4f] border-t-0 border-l-0 border-r-0 bg-transparent font-medium text-gray-800 relative z-10"
-                      : "py-1.5 border-0 bg-transparent text-gray-500 hover:text-gray-700"
+                      ? "bg-white border border-gray-200 border-b-white font-medium text-gray-900 z-10 -mb-px"
+                      : "bg-gray-50 border border-gray-200 border-b-gray-200 text-gray-500 hover:bg-white hover:text-gray-700"
                   }`}
                 >
                   <span className="truncate">{truncateAddress(tab.naslov || "Iskanje\u2026")}</span>
@@ -582,7 +582,7 @@ export function AddressSearch() {
                   title="Dodaj nepremičnino"
                   aria-label="Dodaj novo nepremičnino"
                 >
-                  + Nov
+                  + Dodaj
                 </button>
               </div>
             )}
