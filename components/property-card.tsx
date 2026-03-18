@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
-import type { SeizmicniPodatki } from "@/lib/arso-api";
+import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
 
 const CadastralMap = dynamic(() => import("./cadastral-map"), { ssr: false });
 
@@ -115,6 +115,7 @@ interface PropertyCardProps {
   requestedDel?: number;
   onClearDel?: () => void;
   seizmicniPodatki?: SeizmicniPodatki | null;
+  poplavnaNevarnost?: PoplavnaNevarnost | null;
 }
 
 const ENERGY_COLORS: Record<string, string> = {
@@ -153,6 +154,7 @@ export function PropertyCard({
   requestedDel,
   onClearDel,
   seizmicniPodatki,
+  poplavnaNevarnost,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
@@ -421,6 +423,7 @@ export function PropertyCard({
             stavba={stavba}
             seizmicniPodatki={seizmicniPodatki ?? null}
             etaze={stavba.steviloEtaz}
+            poplavnaNevarnost={poplavnaNevarnost ?? null}
           />
 
           {/* L6: Storitve */}
@@ -2209,10 +2212,12 @@ function ZavarovanjeSection({
   stavba,
   seizmicniPodatki,
   etaze,
+  poplavnaNevarnost,
 }: {
   stavba: PropertyCardProps["stavba"];
   seizmicniPodatki: SeizmicniPodatki | null | undefined;
   etaze?: number | null;
+  poplavnaNevarnost?: PoplavnaNevarnost | null;
 }) {
   const konstr = (stavba.konstrukcija ?? "").toLowerCase();
   const jeMasivna = konstr.includes("masivna") || konstr.includes("opeka") || konstr.includes("beton");
@@ -2320,6 +2325,7 @@ function ZavarovanjeSection({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
+              {/* Požarno — vedno prikazano */}
               <tr className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3">
                   <p className="text-gray-700 font-medium">Požarno in splošno</p>
@@ -2328,22 +2334,30 @@ function ZavarovanjeSection({
                 <td className="px-5 py-3 text-right tabular-nums text-gray-700">{priporocenaVsota.toLocaleString("sl-SI")} €</td>
                 <td className="px-5 py-3 text-right tabular-nums text-gray-700">{pozarnaMin.toLocaleString("sl-SI")} € – {pozarnaMax.toLocaleString("sl-SI")} €</td>
               </tr>
-              <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3">
-                  <p className="text-gray-500 italic">Poplavno tveganje</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Podatki ARSO poplav v integraciji — prihaja v naslednji verziji.</p>
-                </td>
-                <td className="px-5 py-3 text-right text-gray-300 text-xs">—</td>
-                <td className="px-5 py-3 text-right text-gray-300 text-xs">—</td>
-              </tr>
-              <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-3">
-                  <p className="text-gray-700 font-medium">Odgovornost</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Standardna vsota za stavbe s skupnimi deli. Stopnja: 0,006–0,012 %/leto.</p>
-                </td>
-                <td className="px-5 py-3 text-right tabular-nums text-gray-700">500.000 €</td>
-                <td className="px-5 py-3 text-right tabular-nums text-gray-700">30 € – 60 €</td>
-              </tr>
+              {/* Poplavno — samo če je relevantno */}
+              {poplavnaNevarnost && poplavnaNevarnost.stopnja !== "ni" && (
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3">
+                    <p className="font-medium text-sm">Poplavno zavarovanje</p>
+                    <p className="text-xs text-gray-400">{poplavnaNevarnost.opis} Stopnja: 0,08–0,20% (glede na cono).</p>
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">{priporocenaVsota.toLocaleString('sl-SI')} €</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">
+                    {Math.round(priporocenaVsota * 0.0008).toLocaleString('sl-SI')} € – {Math.round(priporocenaVsota * 0.002).toLocaleString('sl-SI')} €
+                  </td>
+                </tr>
+              )}
+              {/* Odgovornost lastnika — samo za večstanovanjske */}
+              {stavba.steviloStanovanj != null && stavba.steviloStanovanj > 1 && (
+                <tr className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3">
+                    <p className="text-gray-700 font-medium">Odgovornost</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Standardna vsota za stavbe s skupnimi deli. Stopnja: 0,006–0,012 %/leto.</p>
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">500.000 €</td>
+                  <td className="px-5 py-3 text-right tabular-nums text-gray-700">30 € – 60 €</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

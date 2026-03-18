@@ -1,3 +1,33 @@
+export interface PoplavnaNevarnost {
+  stopnja: "ni" | "nizka" | "srednja" | "visoka";
+  opis: string;
+}
+
+export async function getPoplavnaNevarnost(lat: number, lng: number): Promise<PoplavnaNevarnost> {
+  try {
+    // ARSO poplavna karta — ArcGIS REST
+    const url = `https://gis.arso.gov.si/arcgis/rest/services/poplave/Poplavna_nevarnost/MapServer/identify?geometry=${lng},${lat}&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=2&mapExtent=${lng-0.001},${lat-0.001},${lng+0.001},${lat+0.001}&imageDisplay=800,600,96&returnGeometry=false&f=json`;
+    const res = await fetch(url, { next: { revalidate: 86400 } });
+    if (!res.ok) return { stopnja: "ni", opis: "Lokacija ni v evidentirani poplavni coni." };
+    const data = await res.json();
+    const results = data?.results ?? [];
+    if (results.length === 0) return { stopnja: "ni", opis: "Lokacija ni v evidentirani poplavni coni." };
+
+    // ARSO vrne atribut RAZRED ali NEVARNOST
+    const attrs = results[0]?.attributes ?? {};
+    const razred = attrs.RAZRED ?? attrs.NEVARNOST ?? attrs.razred ?? null;
+
+    if (!razred) return { stopnja: "ni", opis: "Lokacija ni v evidentirani poplavni coni." };
+
+    const razredStr = String(razred).toLowerCase();
+    if (razredStr.includes("visok") || razredStr === "3") return { stopnja: "visoka", opis: "Visoka poplavna nevarnost (pogosto poplavljeno območje)." };
+    if (razredStr.includes("srednj") || razredStr === "2") return { stopnja: "srednja", opis: "Srednja poplavna nevarnost (občasno poplavljeno)." };
+    return { stopnja: "nizka", opis: "Nizka poplavna nevarnost (redko poplavljeno)." };
+  } catch {
+    return { stopnja: "ni", opis: "Lokacija ni v evidentirani poplavni coni." };
+  }
+}
+
 export interface SeizmicniPodatki {
   pga: number;       // Peak Ground Acceleration (g)
   cona: string;      // "I" | "II" | "III" | "IV"

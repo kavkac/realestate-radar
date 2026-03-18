@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE } from "@/lib/gurs-api";
-import { getSeizmicnaCona } from "@/lib/arso-api";
+import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
 import { prisma } from "@/lib/prisma";
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
         : null;
 
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, and KN namembnost in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, tipPolozaja, seizmicniPodatki, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -184,6 +184,7 @@ export async function POST(request: NextRequest) {
       getEtnAnaliza(stavba.koId, useableArea).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
+      lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
@@ -283,6 +284,7 @@ export async function POST(request: NextRequest) {
       renVrednost,
       etnAnaliza,
       seizmicniPodatki,
+      poplavnaNevarnost,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
