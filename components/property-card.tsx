@@ -242,25 +242,25 @@ export function PropertyCard({
           {isMultiUnit && !activePart && (
             <section>
               <Label vir="Kataster nepremičnin · GURS">Stanovanja in prostori ({deliStavbe.length})</Label>
-              <p className="text-sm text-gray-500 mb-3">
-                Izberite enoto za podroben pregled.
+              <p className="text-sm text-gray-400 mb-3 flex items-center gap-1">
+                <span>↓</span> Izberite enoto za podroben pregled
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {deliStavbe.map((d) => (
                   <button
                     key={d.stDela}
                     onClick={() => setSelectedDel(d.stDela)}
-                    className={`rounded-md border bg-white px-4 py-3 text-left hover:border-[#2d6a4f] hover:shadow-sm transition-all ${
+                    className={`rounded-md border px-4 py-3 text-left hover:bg-gray-50 cursor-pointer transition-all ${
                       selectedDel === d.stDela
-                        ? "border-[#2d6a4f] ring-1 ring-[#2d6a4f]"
-                        : "border-gray-200"
+                        ? "bg-green-50 border-[#2d6a4f]"
+                        : "bg-white border-gray-100"
                     }`}
                   >
                     {/* Header row: unit number left, type label right */}
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-sm text-gray-800">Enota {d.stDela}</span>
                       {d.vrsta && (
-                        <span className="text-xs text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 shrink-0">
+                        <span className="text-xs text-gray-400 shrink-0">
                           {d.vrsta}
                         </span>
                       )}
@@ -270,13 +270,13 @@ export function PropertyCard({
                       <div className="flex gap-6 mt-2">
                         {d.povrsina != null && (
                           <div>
-                            <div className="text-base font-semibold text-gray-900 tabular-nums">{fmtDec(d.povrsina)} m²</div>
+                            <div className="text-base font-medium text-gray-800 tabular-nums">{fmtDec(d.povrsina)} m²</div>
                             <div className="text-xs text-gray-400">skupna površina</div>
                           </div>
                         )}
                         {d.uporabnaPovrsina != null && (
                           <div>
-                            <div className="text-base font-semibold text-gray-700 tabular-nums">{fmtDec(d.uporabnaPovrsina)} m²</div>
+                            <div className="text-base font-medium text-gray-800 tabular-nums">{fmtDec(d.uporabnaPovrsina)} m²</div>
                             <div className="text-xs text-gray-400">uporabna površina</div>
                           </div>
                         )}
@@ -294,15 +294,14 @@ export function PropertyCard({
 
           {isMultiUnit && activePart && (
             <section>
-              <div className="flex items-center justify-between mb-4">
-                <Label>Enota {activePart.stDela}</Label>
-                <button
-                  onClick={() => setSelectedDel(null)}
-                  className="text-sm text-[#2d6a4f] hover:underline"
-                >
-                  &larr; Nazaj na seznam
+              <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 pb-3 border-b border-gray-100">
+                <button onClick={() => setSelectedDel(null)} className="hover:text-[#2d6a4f] transition-colors">
+                  Vse enote ({deliStavbe.length})
                 </button>
+                <span className="text-gray-300">/</span>
+                <span className="text-gray-800 font-medium">Enota {activePart.stDela}</span>
               </div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">Enota {activePart.stDela}</h4>
               <PartDetail part={activePart} />
             </section>
           )}
@@ -477,8 +476,8 @@ function Field({
   if (value == null) return null;
   return (
     <div>
-      <span className="text-xs font-medium tracking-wider text-gray-500 uppercase">{label}</span>
-      <p className="text-sm text-gray-900">{value}</p>
+      <span className="text-xs text-gray-400">{label}</span>
+      <p className="text-sm text-gray-700">{value}</p>
     </div>
   );
 }
