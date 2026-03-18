@@ -273,6 +273,7 @@ export async function getBuilding(
     tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
     datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
     visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
+    tipPolozaja: null,
   };
 }
 
@@ -428,6 +429,7 @@ export async function getBuildingsByParcel(
       tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
       datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
       visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
+      tipPolozaja: null,
     };
   });
 }
