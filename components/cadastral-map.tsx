@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker } from "react-leaflet";
+import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap, CircleMarker } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -67,6 +67,18 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
             zIndex={1}
           />
         )}
+
+        {/* GURS KN WMS — tlorisi vseh stavb + meje parcel (rastersko) */}
+        <WMSTileLayer
+          url="https://ipi.eprostor.gov.si/wms-si-gurs-kn/wms"
+          layers="SI.GURS.KN:STAVBE_H,SI.GURS.KN:PARCELE_H"
+          format="image/png"
+          transparent={true}
+          opacity={0.6}
+          // @ts-expect-error react-leaflet v4 WMS typing
+          srs="EPSG:3857"
+          zIndex={2}
+        />
 
         {/* Parcelna meja — modra tanka črtkana */}
         {validParcele.map((p, i) => (

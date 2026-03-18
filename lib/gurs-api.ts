@@ -353,11 +353,13 @@ export async function getHouseNumberId(
 }
 
 export async function getBuildingEid(hsMid: number): Promise<string | null> {
-  const url = buildWfsUrl(
-    BASE_KN,
-    "SI.GURS.KN:HISNE_STEVILKE_H",
-    `ST_HS=${hsMid}`,
-  );
+  // Najprej veljavna tablica (STATUS_VELJAVNOSTI='V'), nato brez filtra kot fallback
+  const urlV = buildWfsUrl(BASE_KN, "SI.GURS.KN:HISNE_STEVILKE_H", `ST_HS=${hsMid} AND STATUS_VELJAVNOSTI='V'`);
+  const dataV = await fetchWfs(urlV);
+  if (dataV && dataV.features.length > 0) {
+    return String(dataV.features[0].properties.EID_STAVBA);
+  }
+  const url = buildWfsUrl(BASE_KN, "SI.GURS.KN:HISNE_STEVILKE_H", `ST_HS=${hsMid}`);
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return null;
   return String(data.features[0].properties.EID_STAVBA);
