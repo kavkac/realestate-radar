@@ -469,7 +469,7 @@ export function PropertyCard({
           )}
 
           {/* 7. Zavarovanje nepremičnine — zložljivo, privzeto ZAPRTO */}
-          <CollapsibleSection title="Zavarovanje nepremičnine" defaultOpen={false}>
+          <CollapsibleSection title="Zavarovanje nepremičnine" vir="ARSO · Eurocode 8" defaultOpen={false}>
             <ZavarovanjeSection
               naslov={naslov}
               stavba={stavba}
