@@ -974,7 +974,7 @@ const zaupanjeLabel = {
 
 interface Ukrep {
   naziv: string;
-  nivo: "stanovanje" | "skupno";
+  nivo: "enota" | "skupno" | "stavba"; // enota=individualno, skupno=skupni deli, stavba=cela stavba (ne per-unit)
   opis: string;
   strosekMin: number;
   strosekMax: number;
@@ -1062,7 +1062,7 @@ function predlagajUkrepe(
         : `Okna niso bila obnovljena. Energijsko varčna okna zmanjšajo toplotne izgube za 15-25%.`;
     ukrepi.push({
       naziv: "Zamenjava oken in balkonskih vrat",
-      nivo: "stanovanje",
+      nivo: "enota",
       opis: opisOkna,
       strosekMin: stMin,
       strosekMax: stMax,
@@ -1086,7 +1086,7 @@ function predlagajUkrepe(
     const roi = izracunajROI("ogrevanje", stSrednji, povrsina);
     ukrepi.push({
       naziv: "Posodobitev ogrevalnega sistema",
-      nivo: "skupno",
+      nivo: "stavba",
       opis: letaInst
         ? `Instalacije so bile nazadnje obnovljene ${letaInst}. Sodobna toplotna črpalka ali kondenzacijski kotel zmanjša porabo energije za ogrevanje za 30-50%.`
         : `Ogrevalni sistem ni bil obnovljen. Posodobitev bistveno zmanjša stroške ogrevanja.`,
@@ -1202,7 +1202,13 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
         </div>
       )}
       <div className="space-y-4">
-        {ukrepi.filter(u => !isMultiUnit || hasSelectedUnit || u.nivo === "skupno").map((u, i) => (
+        {ukrepi.filter(u => {
+          if (!isMultiUnit) return true; // enostanovanjska: vse
+          if (u.nivo === "skupno") return true; // fasada/streha: vedno
+          if (u.nivo === "enota") return !!hasSelectedUnit; // okna: samo ob izbrani enoti
+          if (u.nivo === "stavba") return !hasSelectedUnit; // ogrevanje: samo cela stavba
+          return true;
+        }).map((u, i) => (
           <div key={i} className="border border-gray-100 rounded p-3">
             <div className="flex items-start justify-between gap-2 mb-1">
               <div>
