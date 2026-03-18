@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
@@ -2187,7 +2187,29 @@ function CollapsibleValueSection({ children }: { children: React.ReactNode }) {
 
 function StreetViewEmbed({ lat, lng, naslov }: { lat: number | null | undefined; lng: number | null | undefined; naslov: string }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const [available, setAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!lat || !lng || !apiKey) { setAvailable(false); return; }
+    // Metadata API — brezplačen, preveri ali Street View pokriva to lokacijo
+    fetch(`https://maps.googleapis.com/maps/api/streetview/metadata?location=${lat},${lng}&source=outdoor&radius=50&key=${apiKey}`)
+      .then(r => r.json())
+      .then(d => setAvailable(d.status === "OK"))
+      .catch(() => setAvailable(false));
+  }, [lat, lng, apiKey]);
+
   if (!lat || !lng || !apiKey) return null;
+
+  if (available === null) return (
+    <div className="print:hidden h-[200px] rounded-lg bg-gray-50 flex items-center justify-center text-xs text-gray-400">Nalagam Street View…</div>
+  );
+
+  if (!available) return (
+    <div className="print:hidden rounded-lg bg-gray-50 border border-gray-100 py-4 px-3 text-center">
+      <p className="text-xs text-gray-400">Street View pogled za ta objekt ni na voljo.</p>
+    </div>
+  );
+
   const url = `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${lat},${lng}&fov=80&pitch=5&source=outdoor`;
   return (
     <div className="print:hidden">

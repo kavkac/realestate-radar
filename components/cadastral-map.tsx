@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -82,7 +82,7 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
         ))}
 
         {/* Tloris stavbe */}
-        {obrisGeom && (
+        {obrisGeom ? (
           <GeoJSON
             key={`obris-${JSON.stringify(obrisGeom.coordinates[0][0])}-${satellite}`}
             data={obrisGeom as GeoJSON.Polygon}
@@ -92,6 +92,9 @@ export default function CadastralMap({ lat, lng, naslov, obrisGeom, parcelGeoms 
                 : { color: "#dc2626", weight: 2, fillColor: "#ef4444", fillOpacity: 0.35 }
             }
           />
+        ) : (
+          /* Fallback marker ko ni tlorisa (podeželske stavbe brez OBRIS_GEOM) */
+          <CircleMarker center={[lat, lng]} radius={8} pathOptions={{ color: "#dc2626", fillColor: "#ef4444", fillOpacity: 0.8, weight: 2 }} />
         )}
 
         <FitBounds obrisGeom={obrisGeom} lat={lat} lng={lng} />
