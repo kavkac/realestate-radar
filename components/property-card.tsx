@@ -514,20 +514,22 @@ export function PropertyCard({
         {/* ── DESNI SIDEBAR — referenčni podatki ── */}
         <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 space-y-3 lg:sticky lg:top-4 p-4 lg:pl-0 lg:pr-4 lg:pt-4">
 
-          {/* 1. Katastrski načrt — fiksna višina 240px */}
+          {/* 1. Katastrski načrt z uradnimi mejami parcel (GURS WFS) */}
           {lat && lng && (
-            <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ height: "240px" }}>
-              <CadastralMap lat={lat} lng={lng} naslov={naslov} koId={enolicniId.koId} stStavbe={enolicniId.stStavbe} obrisGeom={stavba?.obrisGeom ?? null} />
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <CadastralMap
+                lat={lat} lng={lng} naslov={naslov}
+                koId={enolicniId.koId} stStavbe={enolicniId.stStavbe}
+                obrisGeom={stavba?.obrisGeom ?? null}
+                parcelGeoms={parcele ?? null}
+              />
+              <div className="px-3 py-1.5 bg-white border-t border-gray-100 flex gap-4 text-[10px] text-gray-400">
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-[#2d6a4f]" /> Stavba (GURS)</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 border-t-2 border-dashed border-[#1a56a0]" /> Parcela (GURS)</span>
+                <span className="ml-auto">Vir: Kataster nepremičnin · GURS</span>
+              </div>
             </div>
           )}
-
-          {/* Aerialmap + StreetView */}
-          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-            <div className="px-4 py-3 space-y-3">
-              <AerialMap lat={lat} lng={lng} naslov={naslov} showStreetView={false} />
-              <StreetViewEmbed lat={lat} lng={lng} naslov={naslov} />
-            </div>
-          </div>
 
           {/* 2. Ocenjena vrednost */}
           <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">

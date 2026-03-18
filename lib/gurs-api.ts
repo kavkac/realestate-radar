@@ -526,6 +526,7 @@ export interface ParcelaData {
   boniteta: number | null;
   katastrskiRazred: number | null;
   katastrskiDohodek: number | null;
+  geometry?: Record<string, unknown> | null;
 }
 
 export interface RenVrednostData {
@@ -584,6 +585,7 @@ export async function getParcele(
       boniteta: (fp.BONITETA_TALA as number) || null,
       katastrskiRazred: (fp.KATASTRSKI_RAZRED as number) || null,
       katastrskiDohodek: (fp.KATASTRSKI_DOHODEK as number) || null,
+      geometry: (f.geometry as Record<string, unknown>) ?? null,
     };
   });
 }
