@@ -245,6 +245,7 @@ export async function POST(request: NextRequest) {
           kanalizacija: stavba.kanalizacija,
         },
         gasInfrastructure,
+        visina: stavba.visina,
       },
       deliStavbe: deliStavbe.map((d, i) => ({
         stDela: d.stDelaStavbe,
@@ -257,6 +258,8 @@ export async function POST(request: NextRequest) {
         letoObnoveOken: d.letoObnoveOken,
         dvigalo: d.dvigalo,
         prostori: d.prostori,
+        etazaDelStavbe: d.etazaDelStavbe,
+        vrstaStanovanjaUradno: d.vrstaStanovanjaUradno,
         lastnistvo: ownershipResults[i] ?? [],
         vrednotenje: evResults[i]
           ? {

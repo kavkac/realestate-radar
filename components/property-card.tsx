@@ -29,6 +29,8 @@ interface DelStavbe {
   dvigalo: boolean;
   prostori: Prostor[];
   lastnistvo?: LastnistvoRecord[];
+  etazaDelStavbe?: number | null;
+  vrstaStanovanjaUradno?: string | null;
 }
 
 interface Parcela {
@@ -89,6 +91,7 @@ interface PropertyCardProps {
       kanalizacija: boolean;
     };
     gasInfrastructure?: boolean | null;
+    visina?: number | null;
   };
   deliStavbe: DelStavbe[];
   energetskaIzkaznica: EnergyData | null;
@@ -723,9 +726,12 @@ function oceniEnergetskiRazred(stavba: {
   letoObnove: { fasade: number | null; strehe: number | null };
   konstrukcija: string | null;
   prikljucki: { plin: boolean; vodovod: boolean; elektrika: boolean; kanalizacija: boolean };
+  steviloEtaz?: number | null;
+  visina?: number | null;
 }, part?: {
   letoObnoveOken: number | null;
   letoObnoveInstalacij: number | null;
+  etazaDelStavbe?: number | null;
 } | null): { razred: string; tocke: number; dejavniki: string[]; zaupanje: "visoko" | "srednje" | "nizko" } | null {
   if (!stavba.letoIzgradnje) return null;
 
@@ -777,6 +783,34 @@ function oceniEnergetskiRazred(stavba: {
   if (letaInstalacij) {
     const starost = zdaj - letaInstalacij;
     if (starost <= 10) { score -= 5; dejavniki.push(`Instalacije obnovljene ${letaInstalacij}`); }
+  }
+
+  // Etaža dela stavbe (pritličje ali zadnja etaža = slabše)
+  const etaza = part?.etazaDelStavbe;
+  const skupajEtaz = stavba.steviloEtaz ?? 1;
+  if (etaza != null) {
+    if (etaza === 1) {
+      score += 4;
+      dejavniki.push(`Pritlična enota — večje toplotne izgube skozi tla`);
+    } else if (etaza === skupajEtaz) {
+      score += 5;
+      dejavniki.push(`Enota v zadnji etaži — večje toplotne izgube skozi streho`);
+    } else {
+      score -= 2;
+      dejavniki.push(`Enota v srednji etaži — manjše toplotne izgube`);
+    }
+  }
+
+  // Višina stavbe
+  const visina = stavba.visina;
+  if (visina != null && visina > 0) {
+    if (visina > 20) {
+      score += 3;
+      dejavniki.push(`Visoka stavba (${visina.toFixed(0)} m) — večji A/V razmernik`);
+    } else if (visina < 7) {
+      score += 2;
+      dejavniki.push(`Nizka stavba (${visina.toFixed(0)} m) — neugodna oblika`);
+    }
   }
 
   const konstr = stavba.konstrukcija?.toLowerCase() ?? "";

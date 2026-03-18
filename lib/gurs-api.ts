@@ -110,6 +110,7 @@ export interface StavbaData {
   nosilnaKonstrukcija: string | null;
   tipStavbe: string | null;
   datumSys: string | null;
+  visina: number | null; // VISINA_H2 - VISINA_H3
 }
 
 export interface ProstorData {
@@ -127,6 +128,8 @@ export interface DelStavbeData {
   letoObnoveOken: number | null;
   dvigalo: boolean;
   prostori: ProstorData[];
+  etazaDelStavbe: number | null; // ETAZE_DELA_STAVBE
+  vrstaStanovanjaUradno: string | null; // VRSTE_STANOVANJ_NAZIV_SL
 }
 
 interface WfsFeature {
@@ -266,6 +269,7 @@ export async function getBuilding(
       NOSILNA_KONSTRUKCIJA[p.NOSILNA_KONSTRUKCIJA_ID as number] ?? null,
     tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
     datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
+    visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
   };
 }
 
@@ -313,6 +317,8 @@ export async function getBuildingParts(
       letoObnoveOken: (p.LETO_OBNOVE_OKEN as number) || null,
       dvigalo: wfsBool(p.DVIGALO),
       prostori: [] as ProstorData[],
+      etazaDelStavbe: p.ETAZE_DELA_STAVBE != null ? (p.ETAZE_DELA_STAVBE as number) : null,
+      vrstaStanovanjaUradno: p.VRSTE_STANOVANJ_NAZIV_SL != null ? String(p.VRSTE_STANOVANJ_NAZIV_SL) : null,
     };
   });
 
@@ -418,6 +424,7 @@ export async function getBuildingsByParcel(
         NOSILNA_KONSTRUKCIJA[p.NOSILNA_KONSTRUKCIJA_ID as number] ?? null,
       tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
       datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
+      visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
     };
   });
 }
