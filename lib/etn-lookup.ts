@@ -40,6 +40,150 @@ function median(values: number[]): number {
     : sorted[mid];
 }
 
+export interface EtnNajemAnaliza {
+  steviloPoslov: number;
+  medianaNajemnineM2: number; // €/m²/mesec
+  povprecnaNajemnineM2: number;
+  ocenjenaMesecnaNajemnina: number | null;
+  ocenjenaNajemninaMin: number | null;
+  ocenjenaNajemninaMax: number | null;
+  trendProcent: number | null;
+  trend: "rast" | "padec" | "stabilno" | null;
+  brutoDonosLetni: number | null;
+  imeKo: string | null;
+  letniPodatki: { leto: number; medianaNajemnineM2: number; steviloPoslov: number }[];
+}
+
+export async function getEtnNajemAnaliza(
+  koId: number,
+  area: number | null,
+  prodajnaVrednost?: number | null,
+): Promise<EtnNajemAnaliza | null> {
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 5);
+  const cutoffStr = cutoff.toISOString().split("T")[0];
+  const koStr = String(koId);
+
+  type Row = {
+    najemnina: string;
+    povrsina: string;
+    cas_najema: string;
+    leto: string;
+    ime_ko: string | null;
+  };
+
+  const rows = await prisma.$queryRawUnsafe<Row[]>(
+    `
+    SELECT
+      p."POGODBENA_NAJEMNINA" AS najemnina,
+      COALESCE(d."UPORABNA_POVRSINA_ODDANIH_PROSTOROV", d."POVRSINA_ODDANIH_PROSTOROV") AS povrsina,
+      p."CAS_NAJEMA" AS cas_najema,
+      COALESCE(p."LETO", EXTRACT(YEAR FROM TO_DATE(p."DATUM_SKLENITVE_POGODBE", 'DD.MM.YYYY'))::text) AS leto,
+      d."IME_KO" AS ime_ko
+    FROM etn_np_posli p
+    JOIN etn_np_delistavb d ON d."ID_POSLA" = p."ID_POSLA"
+    WHERE
+      d."SIFRA_KO" = $1
+      AND TO_DATE(p."DATUM_SKLENITVE_POGODBE", 'DD.MM.YYYY') >= $2::date
+      AND p."POGODBENA_NAJEMNINA" IS NOT NULL
+      AND p."POGODBENA_NAJEMNINA" <> ''
+      AND p."POGODBENA_NAJEMNINA" <> '0'
+      AND d."POVRSINA_ODDANIH_PROSTOROV" IS NOT NULL
+      AND d."POVRSINA_ODDANIH_PROSTOROV" <> ''
+      AND d."POVRSINA_ODDANIH_PROSTOROV" <> '0'
+      AND p."TRZNOST_POSLA" = '1'
+    ORDER BY TO_DATE(p."DATUM_SKLENITVE_POGODBE", 'DD.MM.YYYY') DESC
+    LIMIT 500
+    `,
+    koStr,
+    cutoffStr,
+  );
+
+  if (!rows || rows.length === 0) return null;
+
+  type Parsed = { najemninaM2Mesec: number; leto: number };
+  const parsed: Parsed[] = rows
+    .map((r) => {
+      const najemnina = parseFloat(r.najemnina);
+      const povrsina = parseFloat(r.povrsina);
+      if (!isFinite(najemnina) || !isFinite(povrsina) || povrsina <= 0) return null;
+      // Normalize to monthly: CAS_NAJEMA '2' = yearly
+      const mesecna = r.cas_najema === "2" ? najemnina / 12 : najemnina;
+      const najemninaM2Mesec = mesecna / povrsina;
+      const leto = parseInt(r.leto ?? "0");
+      return { najemninaM2Mesec, leto };
+    })
+    .filter((r): r is Parsed => r !== null && r.najemninaM2Mesec >= 2 && r.najemninaM2Mesec <= 30);
+
+  if (parsed.length === 0) return null;
+
+  const imeKo = rows[0]?.ime_ko ?? null;
+
+  const prices = parsed.map((r) => r.najemninaM2Mesec);
+  const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+  const med = median(prices);
+
+  // Per-year breakdown
+  const byYear = new Map<number, number[]>();
+  for (const r of parsed) {
+    if (!byYear.has(r.leto)) byYear.set(r.leto, []);
+    byYear.get(r.leto)!.push(r.najemninaM2Mesec);
+  }
+  const letniPodatki = Array.from(byYear.entries())
+    .map(([leto, vals]) => ({
+      leto,
+      medianaNajemnineM2: Math.round(median(vals) * 100) / 100,
+      steviloPoslov: vals.length,
+    }))
+    .sort((a, b) => a.leto - b.leto);
+
+  // Trend
+  const now = new Date();
+  const lastYear = now.getFullYear() - 1;
+  const yearBefore = now.getFullYear() - 2;
+  const zadnjeLetoData = letniPodatki.find((l) => l.leto === lastYear);
+  const predLetoData = letniPodatki.find((l) => l.leto === yearBefore);
+
+  let trend: EtnNajemAnaliza["trend"] = null;
+  let trendProcent: number | null = null;
+  if (zadnjeLetoData && predLetoData && predLetoData.medianaNajemnineM2 > 0) {
+    const diff = (zadnjeLetoData.medianaNajemnineM2 - predLetoData.medianaNajemnineM2) / predLetoData.medianaNajemnineM2;
+    trendProcent = Math.round(diff * 1000) / 10;
+    trend = diff > 0.02 ? "rast" : diff < -0.02 ? "padec" : "stabilno";
+  }
+
+  // Estimated monthly rent
+  let ocenjenaMesecnaNajemnina: number | null = null;
+  let ocenjenaNajemninaMin: number | null = null;
+  let ocenjenaNajemninaMax: number | null = null;
+  if (area && area > 0) {
+    const base = med * area;
+    ocenjenaMesecnaNajemnina = Math.round(base);
+    ocenjenaNajemninaMin = Math.round(base * 0.85);
+    ocenjenaNajemninaMax = Math.round(base * 1.15);
+  }
+
+  // Gross yield
+  let brutoDonosLetni: number | null = null;
+  if (ocenjenaMesecnaNajemnina && prodajnaVrednost && prodajnaVrednost > 0) {
+    brutoDonosLetni = Math.round((ocenjenaMesecnaNajemnina * 12 / prodajnaVrednost) * 1000) / 10;
+  }
+
+  return {
+    steviloPoslov: parsed.length,
+    medianaNajemnineM2: Math.round(med * 100) / 100,
+    povprecnaNajemnineM2: Math.round(avg * 100) / 100,
+    ocenjenaMesecnaNajemnina,
+    ocenjenaNajemninaMin,
+    ocenjenaNajemninaMax,
+    trendProcent,
+    trend,
+    brutoDonosLetni,
+    imeKo,
+    letniPodatki,
+  };
+}
+
 export async function getEtnAnaliza(
   koId: number,
   area: number | null,
@@ -57,20 +201,19 @@ export async function getEtnAnaliza(
     SELECT
       p.pogodbena_cena_odskodnina AS cena,
       COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe) AS povrsina,
-      COALESCE(p.leto, EXTRACT(YEAR FROM p.datum_sklenitve_pogodbe::date)::text) AS leto,
+      COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY'))::text) AS leto,
       d.ime_ko
     FROM etn_posli p
     JOIN etn_delistavb d ON d.id_posla = p.id_posla
     WHERE
       d.sifra_ko = $1
-      AND p.datum_sklenitve_pogodbe >= $2
+      AND TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') >= $2::date
       AND p.pogodbena_cena_odskodnina IS NOT NULL
-      AND p.pogodbena_cena_odskodnina <> ''
-      AND p.pogodbena_cena_odskodnina <> '0'
+      AND p.pogodbena_cena_odskodnina::text <> ''
+      AND p.pogodbena_cena_odskodnina::text <> '0'
       AND d.povrsina_dela_stavbe IS NOT NULL
-      AND d.povrsina_dela_stavbe <> ''
-      AND d.povrsina_dela_stavbe <> '0'
-      AND p.trznost_posla = '1'
+      AND d.povrsina_dela_stavbe::text <> ''
+      AND d.povrsina_dela_stavbe::text <> '0'
     ORDER BY p.datum_sklenitve_pogodbe DESC
     LIMIT 500
     `,
