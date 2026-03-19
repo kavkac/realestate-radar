@@ -1991,7 +1991,7 @@ function OcenaVrednostiSection({
             Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
           </p>
         </div>
-        {etnBlock}
+        {etnCenaBlock ?? etnBlock}
         {najemBlock}
       </section>
     );
