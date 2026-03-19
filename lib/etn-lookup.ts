@@ -223,9 +223,13 @@ export async function getEtnAnaliza(
       d.sifra_ko = $1
       AND TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') >= $2::date
       AND p.pogodbena_cena_odskodnina IS NOT NULL
-      AND p.pogodbena_cena_odskodnina > 0
+      AND p.pogodbena_cena_odskodnina <> ''
+      AND p.pogodbena_cena_odskodnina ~ '^[0-9]+(\.[0-9]+)?$'
+      AND p.pogodbena_cena_odskodnina::float > 0
       AND d.povrsina_dela_stavbe IS NOT NULL
-      AND d.povrsina_dela_stavbe > 0
+      AND d.povrsina_dela_stavbe <> ''
+      AND d.povrsina_dela_stavbe ~ '^[0-9]+(\.[0-9]+)?$'
+      AND d.povrsina_dela_stavbe::float > 0
       ${tipFilter}
     ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
     LIMIT 500
