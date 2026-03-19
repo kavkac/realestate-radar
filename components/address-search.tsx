@@ -81,12 +81,24 @@ interface LookupResult {
   etnAnaliza?: {
     steviloTransakcij: number;
     povprecnaCenaM2: number;
+    medianaCenaM2: number;
     minCenaM2: number;
     maxCenaM2: number;
     ocenjenaTrznaVrednost: number | null;
     trend: "rast" | "padec" | "stabilno" | null;
     zadnjeLeto: number | null;
     predLeto: number | null;
+    letniPodatki?: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
+  } | null;
+  osmData?: {
+    osmId?: number;
+    levels?: number;
+    heightM?: number;
+    roofShape?: string;
+    roofMaterial?: string;
+    wallMaterial?: string;
+    yearBuilt?: number;
+    name?: string;
   } | null;
 }
 
@@ -606,6 +618,7 @@ export function AddressSearch() {
               etnAnaliza={activeTab.data.etnAnaliza}
               lat={activeTab.data.lat}
               lng={activeTab.data.lng}
+              osmData={activeTab.data.osmData}
               requestedDel={activeTab.del}
               onClearDel={() => {
                 setTabs(tabs.map(t => t.id === activeTabId ? { ...t, del: undefined } : t));

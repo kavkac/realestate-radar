@@ -41,6 +41,7 @@ model Building {
   sewage                Boolean  @default(false)
   constructionType      String?
   buildingType          String?
+  osmData               Json?    @map("osm_data")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 

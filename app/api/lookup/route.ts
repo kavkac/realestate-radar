@@ -4,6 +4,7 @@ import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByN
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza } from "@/lib/etn-lookup";
+import { fetchOsmBuildingData } from "@/lib/osm-api";
 import { prisma } from "@/lib/prisma";
 
 const LookupSchema = z.object({
@@ -183,8 +184,14 @@ export async function POST(request: NextRequest) {
         ? await checkGasInfrastructure(lat, lng).catch(() => null)
         : null;
 
+    // OSM Overpass enrichment (non-blocking, parallel)
+    const osmDataPromise =
+      lat != null && lng != null
+        ? fetchOsmBuildingData(lat, lng).catch(() => null)
+        : Promise.resolve(null);
+
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, and KN namembnost in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -196,6 +203,7 @@ export async function POST(request: NextRequest) {
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
       lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
+      osmDataPromise,
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
@@ -212,6 +220,25 @@ export async function POST(request: NextRequest) {
       ),
       ...deliStavbe.map((d) => getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>)),
     ]);
+
+    // Fire-and-forget: store OSM data in building record
+    if (osmData) {
+      const eid = parseInt(stavba.eidStavba, 10);
+      if (!isNaN(eid)) {
+        prisma.building
+          .upsert({
+            where: { eidStavba: eid },
+            update: { osmData: JSON.parse(JSON.stringify(osmData)) },
+            create: {
+              eidStavba: eid,
+              koId: stavba.koId,
+              stStavbe: stavba.stStavbe,
+              osmData: JSON.parse(JSON.stringify(osmData)),
+            },
+          })
+          .catch(() => {});
+      }
+    }
 
     let energetskaIzkaznica = null;
     if (energyCertResult) {
@@ -296,6 +323,7 @@ export async function POST(request: NextRequest) {
       etnAnaliza,
       seizmicniPodatki,
       poplavnaNevarnost,
+      osmData: osmData ?? null,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

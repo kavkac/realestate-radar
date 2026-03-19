@@ -100,12 +100,25 @@ interface EnergyData {
 interface EtnAnaliza {
   steviloTransakcij: number;
   povprecnaCenaM2: number;
+  medianaCenaM2: number;
   minCenaM2: number;
   maxCenaM2: number;
   ocenjenaTrznaVrednost: number | null;
   trend: "rast" | "padec" | "stabilno" | null;
   zadnjeLeto: number | null;
   predLeto: number | null;
+  letniPodatki?: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
+}
+
+interface OsmBuildingData {
+  osmId?: number;
+  levels?: number;
+  heightM?: number;
+  roofShape?: string;
+  roofMaterial?: string;
+  wallMaterial?: string;
+  yearBuilt?: number;
+  name?: string;
 }
 
 interface PropertyCardProps {
@@ -144,6 +157,7 @@ interface PropertyCardProps {
   onClearDel?: () => void;
   seizmicniPodatki?: SeizmicniPodatki | null;
   poplavnaNevarnost?: PoplavnaNevarnost | null;
+  osmData?: OsmBuildingData | null;
 }
 
 const ENERGY_COLORS: Record<string, string> = {
@@ -225,6 +239,7 @@ export function PropertyCard({
   onClearDel,
   seizmicniPodatki,
   poplavnaNevarnost,
+  osmData,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
@@ -320,7 +335,7 @@ export function PropertyCard({
 
           {/* 2. O stavbi — zložljivo, privzeto ZAPRTO */}
           <CollapsibleSection title="O stavbi" vir="Kataster nepremičnin · GURS" defaultOpen={false}>
-            <BuildingSection stavba={stavba} />
+            <BuildingSection stavba={stavba} osmData={osmData} />
           </CollapsibleSection>
 
           {/* Stanovanja in prostori (multi-unit selector) */}
@@ -846,7 +861,10 @@ function ConditionScoreBar({ stavba }: { stavba: PropertyCardProps["stavba"] }) 
   );
 }
 
-function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
+function BuildingSection({ stavba, osmData }: { stavba: PropertyCardProps["stavba"]; osmData?: OsmBuildingData | null }) {
+  const roofShapeMap: Record<string, string> = { flat: "Ravna", gabled: "Dvokapna", hipped: "Štirikapna", pyramidal: "Piramidna", dome: "Kupola", skillion: "Enokapna", gambrel: "Mansardna", half_hipped: "Pol-štirikapna" };
+  const wallMaterialMap: Record<string, string> = { brick: "Opeka", concrete: "Beton", wood: "Les", stone: "Kamen", glass: "Steklo", metal: "Kovina", plaster: "Omet" };
+
   return (
     <section>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
@@ -863,6 +881,18 @@ function BuildingSection({ stavba }: { stavba: PropertyCardProps["stavba"] }) {
         )}
         {stavba.orientacija && (
           <Field label="Orientacija fasade" value={stavba.orientacija} />
+        )}
+        {osmData?.heightM != null && (
+          <Field label="Višina stavbe" value={`${osmData.heightM} m`} />
+        )}
+        {osmData?.roofShape && (
+          <Field label="Tip strehe" value={roofShapeMap[osmData.roofShape] ?? osmData.roofShape} />
+        )}
+        {osmData?.wallMaterial && (
+          <Field label="Material sten" value={wallMaterialMap[osmData.wallMaterial] ?? osmData.wallMaterial} />
+        )}
+        {osmData?.roofMaterial && (
+          <Field label="Material strehe" value={osmData.roofMaterial} />
         )}
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
@@ -1983,64 +2013,81 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
   if (!data) return null;
 
   const trendArrow =
-    data.trend === "rast"
-      ? "\u2191"
-      : data.trend === "padec"
-        ? "\u2193"
-        : data.trend === "stabilno"
-          ? "\u2192"
-          : null;
-
+    data.trend === "rast" ? "↑" : data.trend === "padec" ? "↓" : data.trend === "stabilno" ? "→" : null;
   const trendColor =
-    data.trend === "rast"
-      ? "text-green-700"
-      : data.trend === "padec"
-        ? "text-red-700"
-        : "text-gray-600";
+    data.trend === "rast" ? "text-green-700" : data.trend === "padec" ? "text-red-600" : "text-gray-500";
+  const trendLabel =
+    data.trend === "rast" ? "Rast" : data.trend === "padec" ? "Padec" : "Stabilno";
+
+  // Bar chart for yearly medians
+  const letni = data.letniPodatki ?? [];
+  const maxMediana = letni.length > 0 ? Math.max(...letni.map((l) => l.medianaCenaM2)) : 0;
 
   return (
     <section>
-      <Label vir="Evidenca trga nepremičnin · GURS">Prodajne cene v okolici</Label>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-        <Field
-          label="Povprečna cena/m²"
-          value={`${data.povprecnaCenaM2.toLocaleString("sl-SI")} \u20AC`}
-        />
-        <Field
-          label="Min cena/m²"
-          value={`${data.minCenaM2.toLocaleString("sl-SI")} \u20AC`}
-        />
-        <Field
-          label="Max cena/m²"
-          value={`${data.maxCenaM2.toLocaleString("sl-SI")} \u20AC`}
-        />
-        <Field label="Št. transakcij" value={data.steviloTransakcij.toLocaleString("sl-SI")} />
-        {data.ocenjenaTrznaVrednost != null && (
-          <Field
-            label="Ocenjena tržna vrednost"
-            value={`${data.ocenjenaTrznaVrednost.toLocaleString("sl-SI")} \u20AC`}
-          />
-        )}
-        {data.trend && (
-          <div>
-            <span className="text-gray-500 text-xs">Trend</span>
-            <p className={`font-medium ${trendColor}`}>
-              {trendArrow}{" "}
-              {data.trend === "rast"
-                ? "Rast"
-                : data.trend === "padec"
-                  ? "Padec"
-                  : "Stabilno"}
+      <Label vir="ETN GURS · zadnjih 5 let · samo tržni posli">Tržne cene v isti KO</Label>
+
+      {/* Hero: median price */}
+      <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mb-4">
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-gray-800">
+            {data.medianaCenaM2.toLocaleString("sl-SI")} €/m²
+          </span>
+          <span className="text-xs text-gray-500">mediana</span>
+          {data.trend && (
+            <span className={`text-sm font-semibold ml-auto ${trendColor}`}>
+              {trendArrow} {trendLabel}
               {data.zadnjeLeto != null && data.predLeto != null && (
-                <span className="text-xs text-gray-400 ml-1.5">
-                  ({data.predLeto.toLocaleString("sl-SI")} &rarr;{" "}
-                  {data.zadnjeLeto.toLocaleString("sl-SI")} \u20AC/m²)
+                <span className="text-xs font-normal text-gray-400 ml-1">
+                  ({data.predLeto.toLocaleString("sl-SI")} → {data.zadnjeLeto.toLocaleString("sl-SI")} €/m²)
                 </span>
               )}
-            </p>
-          </div>
+            </span>
+          )}
+        </div>
+        {data.ocenjenaTrznaVrednost != null && (
+          <p className="text-sm font-semibold text-gray-700 mt-1">
+            Ocenjena vrednost: <span className="text-gray-900">{data.ocenjenaTrznaVrednost.toLocaleString("sl-SI")} €</span>
+            <span className="font-normal text-xs text-gray-400 ml-1">(mediana × površina)</span>
+          </p>
         )}
+        <p className="text-xs text-gray-400 mt-1.5">
+          Ocena temelji na {data.steviloTransakcij} primerljivih prodajah v isti katastrski občini · ETN GURS · zadnjih 5 let
+        </p>
       </div>
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm mb-4">
+        <Field label="Povprečje" value={`${data.povprecnaCenaM2.toLocaleString("sl-SI")} €/m²`} />
+        <Field label="Min" value={`${data.minCenaM2.toLocaleString("sl-SI")} €/m²`} />
+        <Field label="Max" value={`${data.maxCenaM2.toLocaleString("sl-SI")} €/m²`} />
+      </div>
+
+      {/* Yearly trend mini bar chart */}
+      {letni.length >= 2 && (
+        <div>
+          <p className="text-xs text-gray-400 mb-1.5">Mediana cene/m² po letih</p>
+          <div className="flex items-end gap-1 h-14">
+            {letni.map((l) => {
+              const pct = maxMediana > 0 ? (l.medianaCenaM2 / maxMediana) * 100 : 50;
+              return (
+                <div key={l.leto} className="flex flex-col items-center flex-1 gap-0.5">
+                  <span className="text-[10px] text-gray-500 leading-none">
+                    {l.medianaCenaM2 >= 1000
+                      ? `${(l.medianaCenaM2 / 1000).toFixed(1)}k`
+                      : l.medianaCenaM2}
+                  </span>
+                  <div
+                    className="w-full rounded-t bg-blue-400"
+                    style={{ height: `${Math.max(pct, 8)}%`, maxHeight: "36px", minHeight: "4px" }}
+                  />
+                  <span className="text-[10px] text-gray-400 leading-none">{l.leto}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
