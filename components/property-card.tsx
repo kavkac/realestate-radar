@@ -115,6 +115,20 @@ interface EtnAnaliza {
   letniPodatki?: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
 }
 
+interface EtnNajemAnaliza {
+  steviloPoslov: number;
+  medianaNajemnineM2: number;
+  povprecnaNajemnineM2: number;
+  ocenjenaMesecnaNajemnina: number | null;
+  ocenjenaNajemninaMin: number | null;
+  ocenjenaNajemninaMax: number | null;
+  trendProcent: number | null;
+  trend: "rast" | "padec" | "stabilno" | null;
+  brutoDonosLetni: number | null;
+  imeKo: string | null;
+  letniPodatki?: { leto: number; medianaNajemnineM2: number; steviloPoslov: number }[];
+}
+
 interface OsmBuildingData {
   osmId?: number;
   levels?: number;
@@ -156,6 +170,7 @@ interface PropertyCardProps {
   parcele?: Parcela[];
   renVrednost?: RenVrednost | null;
   etnAnaliza?: EtnAnaliza | null;
+  etnNajemAnaliza?: EtnNajemAnaliza | null;
   lat?: number | null;
   lng?: number | null;
   requestedDel?: number;
@@ -238,6 +253,7 @@ export function PropertyCard({
   parcele,
   renVrednost,
   etnAnaliza,
+  etnNajemAnaliza,
   lat,
   lng,
   requestedDel,
@@ -520,6 +536,13 @@ export function PropertyCard({
             </CollapsibleSection>
           )}
 
+          {/* 8b. Najemni posli (ETN) */}
+          {etnNajemAnaliza && (
+            <CollapsibleSection title="Najemni posli" vir="ETN · GURS · najemni posli" defaultOpen={false}>
+              <NajemAnalyzaSection data={etnNajemAnaliza} />
+            </CollapsibleSection>
+          )}
+
           {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
           {/* 9. Storitve — vedno odprto */}
@@ -585,6 +608,7 @@ export function PropertyCard({
               deliStavbe={deliStavbe}
               hasSelectedUnit={!!(activePart || requestedDel != null)}
               etnAnaliza={etnAnaliza}
+              etnNajemAnaliza={etnNajemAnaliza}
             />
           </div>
 
@@ -1857,12 +1881,14 @@ function OcenaVrednostiSection({
   deliStavbe,
   hasSelectedUnit,
   etnAnaliza,
+  etnNajemAnaliza,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
   deliStavbe: PropertyCardProps["deliStavbe"];
   hasSelectedUnit: boolean;
   etnAnaliza?: EtnAnaliza | null;
+  etnNajemAnaliza?: EtnNajemAnaliza | null;
 }) {
   // ETN tržna primerjava — prikaži pod uradnimi vrednostmi
   const etnBlock = etnAnaliza?.ocenaVrednostiMin != null && etnAnaliza?.ocenaVrednostiMax != null ? (
@@ -1890,6 +1916,26 @@ function OcenaVrednostiSection({
     </div>
   ) : null;
 
+  // Najemnina blok — kratek povzetek v sidebarju
+  const najemBlock = etnNajemAnaliza?.ocenjenaNajemninaMin != null && etnNajemAnaliza?.ocenjenaNajemninaMax != null ? (
+    <div className="rounded-lg border border-purple-100 bg-purple-50 px-4 py-3 mt-3">
+      <p className="text-xs text-gray-500 mb-0.5">Ocenjena najemnina</p>
+      <p className="text-lg font-bold text-gray-800">
+        {etnNajemAnaliza.ocenjenaNajemninaMin!.toLocaleString("sl-SI")} – {etnNajemAnaliza.ocenjenaNajemninaMax!.toLocaleString("sl-SI")} €/mesec
+      </p>
+      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+        <span className="text-[10px] text-gray-400">
+          {etnNajemAnaliza.medianaNajemnineM2.toLocaleString("sl-SI", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} €/m²/mesec · {etnNajemAnaliza.steviloPoslov} najemnih poslov
+        </span>
+      </div>
+      {etnNajemAnaliza.brutoDonosLetni != null && (
+        <p className={`text-sm font-bold mt-1.5 ${etnNajemAnaliza.brutoDonosLetni >= 5 ? "text-green-700" : etnNajemAnaliza.brutoDonosLetni >= 3 ? "text-yellow-700" : "text-red-600"}`}>
+          {etnNajemAnaliza.brutoDonosLetni}% bruto donos letno
+        </p>
+      )}
+    </div>
+  ) : null;
+
   // Per-unit: izbrana enota z vrednotenjem
   if (hasSelectedUnit && currentPartVrednotenje?.posplosenaVrednost != null) {
     const posplosenaVrednost = currentPartVrednotenje.posplosenaVrednost!;
@@ -1911,6 +1957,7 @@ function OcenaVrednostiSection({
           </p>
         </div>
         {etnBlock}
+        {najemBlock}
       </section>
     );
   }
@@ -1942,16 +1989,18 @@ function OcenaVrednostiSection({
           </p>
         </div>
         {etnBlock}
+        {najemBlock}
       </section>
     );
   }
 
-  // Ni uradnih podatkov — prikaži vsaj ETN če obstaja
-  if (etnBlock) {
+  // Ni uradnih podatkov — prikaži vsaj ETN ali najem če obstaja
+  if (etnBlock || najemBlock) {
     return (
       <section>
         <Label vir="ETN GURS">Ocenjena vrednost</Label>
         {etnBlock}
+        {najemBlock}
       </section>
     );
   }
@@ -2144,6 +2193,97 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
                   </span>
                   <div
                     className="w-full rounded-t bg-blue-400"
+                    style={{ height: `${Math.max(pct, 8)}%`, maxHeight: "36px", minHeight: "4px" }}
+                  />
+                  <span className="text-[10px] text-gray-400 leading-none">{l.leto}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NajemAnalyzaSection({ data }: { data?: EtnNajemAnaliza | null }) {
+  if (!data) return null;
+
+  const trendArrow =
+    data.trend === "rast" ? "↑" : data.trend === "padec" ? "↓" : data.trend === "stabilno" ? "→" : null;
+  const trendColor =
+    data.trend === "rast" ? "text-green-700" : data.trend === "padec" ? "text-red-600" : "text-gray-500";
+
+  const koLabel = data.imeKo ?? "isti KO";
+
+  const letni = data.letniPodatki ?? [];
+  const maxMediana = letni.length > 0 ? Math.max(...letni.map((l) => l.medianaNajemnineM2)) : 0;
+
+  return (
+    <section>
+      <Label vir="ETN GURS · najemni posli · zadnjih 5 let">Najemna analiza</Label>
+
+      {/* Hero: estimated monthly rent range */}
+      {data.ocenjenaNajemninaMin != null && data.ocenjenaNajemninaMax != null && (
+        <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 mb-4">
+          <p className="text-xs text-gray-500 mb-1">Ocenjena mesečna najemnina</p>
+          <p className="text-2xl font-bold text-gray-800">
+            {data.ocenjenaNajemninaMin.toLocaleString("sl-SI")} – {data.ocenjenaNajemninaMax.toLocaleString("sl-SI")} €/mesec
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-xs text-gray-500">
+              mediana {data.medianaNajemnineM2.toLocaleString("sl-SI", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} €/m²/mesec × površina ± 15%
+            </span>
+          </div>
+          {data.brutoDonosLetni != null && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className={`text-sm font-bold ${data.brutoDonosLetni >= 5 ? "text-green-700" : data.brutoDonosLetni >= 3 ? "text-yellow-700" : "text-red-600"}`}>
+                {data.brutoDonosLetni}% bruto donos letno
+              </span>
+              <span className="text-[10px] text-gray-400">(letna najemnina / ocenjena prodajna vrednost)</span>
+            </div>
+          )}
+          <p className="text-xs text-gray-400 mt-1.5">
+            {data.steviloPoslov} najemnih poslov v KO {koLabel} · zadnjih 5 let
+          </p>
+        </div>
+      )}
+
+      {/* Median rent + trend */}
+      <div className="rounded-lg border border-purple-100 bg-purple-50/50 px-4 py-3 mb-4">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-xl font-bold text-gray-800">
+            {data.medianaNajemnineM2.toLocaleString("sl-SI", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} €/m²/mesec
+          </span>
+          <span className="text-xs text-gray-500">mediana</span>
+          {data.trend && (
+            <span className={`text-sm font-semibold ml-auto ${trendColor}`}>
+              {trendArrow}{" "}
+              {data.trendProcent != null && (
+                <>{data.trendProcent > 0 ? "+" : ""}{data.trendProcent}%</>
+              )}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+          <span>povp. {data.povprecnaNajemnineM2.toLocaleString("sl-SI", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} €/m²/mesec</span>
+        </div>
+      </div>
+
+      {/* Yearly trend mini bar chart */}
+      {letni.length >= 2 && (
+        <div>
+          <p className="text-xs text-gray-400 mb-1.5">Mediana najemnine/m²/mesec po letih</p>
+          <div className="flex items-end gap-1 h-14">
+            {letni.map((l) => {
+              const pct = maxMediana > 0 ? (l.medianaNajemnineM2 / maxMediana) * 100 : 50;
+              return (
+                <div key={l.leto} className="flex flex-col items-center flex-1 gap-0.5">
+                  <span className="text-[10px] text-gray-500 leading-none">
+                    {l.medianaNajemnineM2.toFixed(1)}
+                  </span>
+                  <div
+                    className="w-full rounded-t bg-purple-400"
                     style={{ height: `${Math.max(pct, 8)}%`, maxHeight: "36px", minHeight: "4px" }}
                   />
                   <span className="text-[10px] text-gray-400 leading-none">{l.leto}</span>

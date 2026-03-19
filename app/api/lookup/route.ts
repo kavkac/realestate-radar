@@ -3,7 +3,7 @@ import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE, GursServiceUnavailableError } from "@/lib/gurs-api";
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
-import { getEtnAnaliza } from "@/lib/etn-lookup";
+import { getEtnAnaliza, getEtnNajemAnaliza } from "@/lib/etn-lookup";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
 import { prisma } from "@/lib/prisma";
 
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
         : Promise.resolve(null);
 
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, and KN namembnost in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -200,6 +200,7 @@ export async function POST(request: NextRequest) {
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
       getEtnAnaliza(stavba.koId, useableArea, null).catch(() => null),
+      getEtnNajemAnaliza(stavba.koId, useableArea).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
       lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
@@ -265,6 +266,14 @@ export async function POST(request: NextRequest) {
       if (corrected) etnAnalizaFinal = corrected;
     }
 
+    // Re-run najemnina with prodajna vrednost for bruto donos calculation
+    let etnNajemAnalizaFinal = etnNajemAnaliza;
+    const prodajnaVrednost = etnAnalizaFinal?.ocenjenaTrznaVrednost ?? null;
+    if (etnNajemAnaliza && prodajnaVrednost && useableArea) {
+      const withDonos = await getEtnNajemAnaliza(stavba.koId, useableArea, prodajnaVrednost).catch(() => null);
+      if (withDonos) etnNajemAnalizaFinal = withDonos;
+    }
+
     return NextResponse.json({
       success: true,
       naslov: address,
@@ -328,6 +337,7 @@ export async function POST(request: NextRequest) {
       parcele,
       renVrednost,
       etnAnaliza: etnAnalizaFinal,
+      etnNajemAnaliza: etnNajemAnalizaFinal,
       seizmicniPodatki,
       poplavnaNevarnost,
       osmData: osmData ?? null,

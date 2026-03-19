@@ -90,6 +90,19 @@ interface LookupResult {
     predLeto: number | null;
     letniPodatki?: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
   } | null;
+  etnNajemAnaliza?: {
+    steviloPoslov: number;
+    medianaNajemnineM2: number;
+    povprecnaNajemnineM2: number;
+    ocenjenaMesecnaNajemnina: number | null;
+    ocenjenaNajemninaMin: number | null;
+    ocenjenaNajemninaMax: number | null;
+    trendProcent: number | null;
+    trend: "rast" | "padec" | "stabilno" | null;
+    brutoDonosLetni: number | null;
+    imeKo: string | null;
+    letniPodatki?: { leto: number; medianaNajemnineM2: number; steviloPoslov: number }[];
+  } | null;
   osmData?: {
     osmId?: number;
     levels?: number;
@@ -616,6 +629,7 @@ export function AddressSearch() {
               parcele={activeTab.data.parcele}
               renVrednost={activeTab.data.renVrednost}
               etnAnaliza={activeTab.data.etnAnaliza}
+              etnNajemAnaliza={activeTab.data.etnNajemAnaliza}
               lat={activeTab.data.lat}
               lng={activeTab.data.lng}
               osmData={activeTab.data.osmData}
