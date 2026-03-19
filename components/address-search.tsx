@@ -118,6 +118,17 @@ interface LookupResult {
   } | null;
   totalBuildingArea?: number | null;
   selectedUnitArea?: number | null;
+  seizmicniPodatki?: unknown | null;
+  poplavnaNevarnost?: unknown | null;
+  oglasneAnalize?: {
+    medianaCenaM2: number;
+    povprecnaCenaM2: number;
+    steviloOglasov: number;
+    razlikaEtnOglas: number | null;
+    zadnjiScrape: string | Date;
+    portal: string;
+    vir: "ko" | "obcina" | "regija";
+  } | null;
 }
 
 type SearchMode = "naslov" | "parcela";
@@ -640,6 +651,9 @@ export function AddressSearch() {
               lat={activeTab.data.lat}
               lng={activeTab.data.lng}
               osmData={activeTab.data.osmData}
+              oglasneAnalize={activeTab.data.oglasneAnalize}
+              seizmicniPodatki={activeTab.data.seizmicniPodatki as never}
+              poplavnaNevarnost={activeTab.data.poplavnaNevarnost as never}
               requestedDel={activeTab.del}
               onClearDel={() => {
                 setTabs(tabs.map(t => t.id === activeTabId ? { ...t, del: undefined } : t));

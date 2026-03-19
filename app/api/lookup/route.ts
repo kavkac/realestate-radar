@@ -4,6 +4,8 @@ import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByN
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza, getEtnNajemAnaliza } from "@/lib/etn-lookup";
+import { getOglasneAnalize } from "@/lib/listings-lookup";
+import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
 import { prisma } from "@/lib/prisma";
 
@@ -204,6 +206,9 @@ export async function POST(request: NextRequest) {
         ? fetchOsmBuildingData(lat, lng).catch(() => null)
         : Promise.resolve(null);
 
+    // Oglasne cene — vzporedno z ostalimi klici
+    const oglasneAnalizePromise = getOglasneAnalize(stavba.koId, null).catch(() => null);
+
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, and KN namembnost in parallel
     const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
@@ -285,6 +290,33 @@ export async function POST(request: NextRequest) {
       if (corrected) etnAnalizaFinal = corrected;
     }
 
+    // Oglasne analize — dopolni z ETN mediano za razliko
+    const oglasneAnalize = await oglasneAnalizePromise.then(r => {
+      // Dopolni z ETN mediano za izračun discount-a
+      if (r && etnAnalizaFinal?.medianaCenaM2) {
+        r.discountVsEtn = Math.round(
+          ((r.medianaCenaM2 - etnAnalizaFinal.medianaCenaM2) / etnAnalizaFinal.medianaCenaM2) * 1000
+        ) / 10;
+      }
+      return r;
+    }).catch(() => null);
+
+    // Property Context Engine — deterministični kontekst iz vseh virov
+    const propertyContext = buildPropertyContext({
+      lat,
+      lng,
+      letoIzgradnje: stavba.letoIzgradnje ?? null,
+      medianaCenaM2: etnAnalizaFinal?.medianaCenaM2 ?? null,
+      steviloTransakcij: etnAnalizaFinal?.steviloTransakcij ?? null,
+      virEtn: etnAnalizaFinal?.vir ?? null,
+      zaupanje: etnAnalizaFinal?.zaupanje ?? null,
+      oglasMedianaCenaM2: oglasneAnalize?.medianaCenaM2 ?? null,
+      oglasStevilo: oglasneAnalize?.steviloOglasov ?? null,
+      poplavnaNevarnost: poplavnaNevarnost?.stopnja === "visoka" || poplavnaNevarnost?.stopnja === "srednja",
+      seizmicnaCona: seizmicniPodatki?.cona ?? null,
+      kulturnoVarstvo: false, // TODO: iz GURS REN
+    });
+
     // Re-run najemnina with prodajna vrednost for bruto donos calculation
     let etnNajemAnalizaFinal = etnNajemAnaliza;
     const prodajnaVrednost = etnAnalizaFinal?.ocenjenaTrznaVrednost ?? null;
@@ -363,6 +395,8 @@ export async function POST(request: NextRequest) {
       seizmicniPodatki,
       poplavnaNevarnost,
       osmData: osmData ?? null,
+      oglasneAnalize: oglasneAnalize ?? null,
+      propertyContext,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

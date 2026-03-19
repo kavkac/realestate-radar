@@ -140,6 +140,17 @@ interface EtnNajemAnaliza {
   letniPodatki?: { leto: number; medianaNajemnineM2: number; steviloPoslov: number }[];
 }
 
+interface OglasneAnalize {
+  medianaCenaM2: number;
+  povprecnaCenaM2: number;
+  steviloOglasov: number;
+  /** % razlika: pozitivno = oglasi višji kot ETN transakcije (kupci plačajo manj) */
+  razlikaEtnOglas: number | null;
+  zadnjiScrape: string | Date;
+  portal: string;
+  vir: "ko" | "obcina" | "regija";
+}
+
 interface OsmBuildingData {
   osmId?: number;
   levels?: number;
@@ -194,6 +205,7 @@ interface PropertyCardProps {
   seizmicniPodatki?: SeizmicniPodatki | null;
   poplavnaNevarnost?: PoplavnaNevarnost | null;
   osmData?: OsmBuildingData | null;
+  oglasneAnalize?: OglasneAnalize | null;
 }
 
 const ENERGY_COLORS: Record<string, string> = {
@@ -279,6 +291,7 @@ export function PropertyCard({
   seizmicniPodatki,
   poplavnaNevarnost,
   osmData,
+  oglasneAnalize,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
@@ -631,6 +644,7 @@ export function PropertyCard({
               osmTrainStations={osmData?.trainStationsCount}
               osmTramStops={osmData?.tramStopsCount}
               osmWallMaterial={osmData?.wallMaterial}
+              oglasneAnalize={oglasneAnalize}
             />
           </div>
 
@@ -1920,6 +1934,7 @@ function OcenaVrednostiSection({
   osmTrainStations,
   osmTramStops,
   osmWallMaterial,
+  oglasneAnalize,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
@@ -1943,6 +1958,7 @@ function OcenaVrednostiSection({
   osmTrainStations?: number;
   osmTramStops?: number;
   osmWallMaterial?: string | null;
+  oglasneAnalize?: OglasneAnalize | null;
 }) {
   // Višina stropov
   const visinaStropov = izracunajVisinoStropov(
@@ -2032,6 +2048,46 @@ function OcenaVrednostiSection({
       {etnNajemAnaliza.brutoDonosLetni != null && (
         <p className={`text-sm font-bold mt-1.5 ${etnNajemAnaliza.brutoDonosLetni >= 5 ? "text-green-700" : etnNajemAnaliza.brutoDonosLetni >= 3 ? "text-yellow-700" : "text-red-600"}`}>
           {etnNajemAnaliza.brutoDonosLetni}% bruto donos letno
+        </p>
+      )}
+    </div>
+  ) : null;
+
+  // Oglasne cene blok
+  const oglasneAnalizBlock = oglasneAnalize && oglasneAnalize.steviloOglasov > 0 ? (
+    <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3 mt-3">
+      <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+        Oglasne cene <span className="text-[10px] text-gray-400">({oglasneAnalize.portal})</span>
+      </p>
+      <p className="text-lg font-bold text-gray-800">
+        {oglasneAnalize.medianaCenaM2.toLocaleString("sl-SI")} €/m²
+      </p>
+      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+        <span className="text-[10px] text-gray-400">
+          mediana · {oglasneAnalize.steviloOglasov} oglasov
+          {oglasneAnalize.vir !== "ko" && <span className="ml-1">(razširjeno iskanje)</span>}
+        </span>
+        {oglasneAnalize.razlikaEtnOglas != null && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+            oglasneAnalize.razlikaEtnOglas > 5
+              ? "bg-green-100 text-green-700"
+              : oglasneAnalize.razlikaEtnOglas < -5
+                ? "bg-red-100 text-red-700"
+                : "bg-gray-100 text-gray-600"
+          }`}
+            title={oglasneAnalize.razlikaEtnOglas > 0
+              ? "Oglasi so višji od realiziranih transakcij — pogajalski prostor navzgor"
+              : "Oglasi so nižji od realiziranih transakcij — redko, kaže na padanje trga"}
+          >
+            Razlika ETN/oglas: {oglasneAnalize.razlikaEtnOglas > 0 ? "+" : ""}{oglasneAnalize.razlikaEtnOglas.toFixed(1)}%
+          </span>
+        )}
+      </div>
+      {oglasneAnalize.razlikaEtnOglas != null && Math.abs(oglasneAnalize.razlikaEtnOglas) > 2 && (
+        <p className="text-[10px] text-gray-500 mt-1.5">
+          {oglasneAnalize.razlikaEtnOglas > 0
+            ? `Prodajalci oglasuejo ~${oglasneAnalize.razlikaEtnOglas.toFixed(1)}% nad dejanskimi transakcijami — tipičen pogajalski prostor.`
+            : `Oglasne cene so pod realiziranimi transakcijami — nenavadna situacija, preverite lokalne razmere.`}
         </p>
       )}
     </div>
@@ -2176,6 +2232,7 @@ function OcenaVrednostiSection({
         </div>
         {etnCenaBlock ?? etnBlock}
         {najemBlock}
+        {oglasneAnalizBlock}
       </section>
     );
   }
@@ -2208,6 +2265,7 @@ function OcenaVrednostiSection({
         </div>
         {etnBlock}
         {najemBlock}
+        {oglasneAnalizBlock}
       </section>
     );
   }
@@ -2215,12 +2273,13 @@ function OcenaVrednostiSection({
   // ETN cena/m² blok — prikaži vedno ko imamo ETN podatke (tudi brez izračunane vrednosti)
 
   // Ni uradnih podatkov — prikaži vsaj ETN ali najem če obstaja
-  if (etnCenaBlock || etnBlock || najemBlock) {
+  if (etnCenaBlock || etnBlock || najemBlock || oglasneAnalizBlock) {
     return (
       <section>
         <Label vir="ETN GURS · tržne transakcije">Ocenjena vrednost</Label>
         {etnCenaBlock ?? etnBlock}
         {najemBlock}
+        {oglasneAnalizBlock}
       </section>
     );
   }
