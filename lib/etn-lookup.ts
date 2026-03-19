@@ -250,6 +250,8 @@ export interface EtnAnaliza {
   predLeto: number | null;
   imeKo: string | null;
   letniPodatki: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
+  vir: 'proximity' | 'ko' | 'regija' | 'nacional';
+  zaupanje: 1 | 2 | 3 | 4 | 5;
 }
 
 function median(values: number[]): number {
@@ -259,6 +261,23 @@ function median(values: number[]): number {
   return sorted.length % 2 === 0
     ? (sorted[mid - 1] + sorted[mid]) / 2
     : sorted[mid];
+}
+
+/** Trimmed median: removes values outside [p10, p95] then computes median.
+ *  Falls back to plain median if trimmed.length < 8. */
+function trimmedMedian(values: number[], lo = 0.10, hi = 0.95): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const p10 = sorted[Math.floor(sorted.length * lo)];
+  const p95 = sorted[Math.floor(sorted.length * hi)];
+  const trimmed = sorted.filter(v => v >= p10 && v <= p95);
+  if (trimmed.length < 8) return median(sorted);
+  const mid = Math.floor(trimmed.length / 2);
+  return trimmed.length % 2 ? trimmed[mid] : (trimmed[mid - 1] + trimmed[mid]) / 2;
+}
+
+/** Use trimmed median for n≥15, plain median otherwise. */
+function smartMedian(values: number[]): number {
+  return values.length >= 15 ? trimmedMedian(values) : median(values);
 }
 
 export interface EtnNajemAnaliza {
@@ -427,6 +446,66 @@ function etnTipFilter(dejanskaRaba: string | null): string {
   return STANOVANJE;
 }
 
+// Cached result for ko_centroids existence check
+let _koCentroidsExists: boolean | null = null;
+async function checkKoCentroidsTable(): Promise<boolean> {
+  if (_koCentroidsExists !== null) return _koCentroidsExists;
+  try {
+    const result = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
+      `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ko_centroids') AS exists`,
+    );
+    _koCentroidsExists = result[0]?.exists ?? false;
+  } catch {
+    _koCentroidsExists = false;
+  }
+  return _koCentroidsExists!;
+}
+
+// Cached national median (computed once per process, refreshed on restart)
+let _nationalMedianCache: { value: number; timestamp: number } | null = null;
+const NATIONAL_MEDIAN_FALLBACK = 2500; // €/m², stanovanje SLO 2024 estimate
+const NATIONAL_CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
+
+async function getNationalMedian(cutoffStr: string, tipFilter: string): Promise<number> {
+  const now = Date.now();
+  if (_nationalMedianCache && now - _nationalMedianCache.timestamp < NATIONAL_CACHE_TTL_MS) {
+    return _nationalMedianCache.value;
+  }
+  try {
+    type Row = { cena: number; povrsina: number };
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT
+        p.pogodbena_cena_odskodnina::float AS cena,
+        d.povrsina_dela_stavbe::float AS povrsina
+      FROM etn_posli p
+      JOIN etn_delistavb d ON d.id_posla = p.id_posla
+      WHERE p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
+        AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
+        AND p.pogodbena_cena_odskodnina::float > 0
+        AND d.povrsina_dela_stavbe::float > 0
+        AND TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') >= $1::date
+        AND p.trznost_posla IN ('1','2','5')
+        AND p.vrsta_kupoprodajnega_posla = '1'
+        ${tipFilter}
+      ORDER BY RANDOM()
+      LIMIT 3000`,
+      cutoffStr,
+    );
+    const prices = rows
+      .map(r => Number(r.cena) / Number(r.povrsina))
+      .filter(v => isFinite(v) && v >= 500 && v <= 15000);
+    if (prices.length < 20) {
+      _nationalMedianCache = { value: NATIONAL_MEDIAN_FALLBACK, timestamp: now };
+      return NATIONAL_MEDIAN_FALLBACK;
+    }
+    const value = Math.round(smartMedian(prices));
+    _nationalMedianCache = { value, timestamp: now };
+    return value;
+  } catch {
+    return NATIONAL_MEDIAN_FALLBACK;
+  }
+}
+
 export async function getEtnAnaliza(
   koId: number,
   area: number | null,
@@ -442,18 +521,36 @@ export async function getEtnAnaliza(
   const koStr = String(koId);
 
   type Row = { cena: number; povrsina: number; leto: string; ime_ko: string | null };
+  type Parsed = { cenaM2: number; leto: number };
 
   const tipFilter = etnTipFilter(dejanskaRaba ?? null);
 
-  // Proximity query: koordinate WGS84 → D96/TM → ETN transakcije v 400m radiju
-  // Boljša natančnost kot KO mediana (MAPE 23% vs 24.8%)
-  let proximityRows: Row[] | null = null;
+  function parseRows(rows: Row[]): Parsed[] {
+    return rows
+      .map((r) => {
+        const cena = Number(r.cena);
+        const povrsina = Number(r.povrsina);
+        if (!isFinite(cena) || !isFinite(povrsina) || povrsina <= 0) return null;
+        const cenaM2 = cena / povrsina;
+        const leto = parseInt(r.leto ?? "0");
+        return { cenaM2, leto };
+      })
+      .filter((r): r is Parsed => r !== null && r.cenaM2 >= 500 && r.cenaM2 <= 15000);
+  }
+
+  // ── LEVEL 1: Proximity 400m (min 8 transakcij) → zaupanje 5 ──
+  let selectedRows: Row[] | null = null;
+  let selectedParsed: Parsed[] = [];
+  let vir: EtnAnaliza['vir'] = 'ko';
+  let zaupanje: EtnAnaliza['zaupanje'] = 4;
+  let imeKo: string | null = null;
+
   if (lat != null && lng != null) {
     try {
       const { wgs84ToD96 } = await import("./wgs84-to-d96");
       const { e, n } = wgs84ToD96(lat, lng);
       const radiusM = 400;
-      proximityRows = await prisma.$queryRawUnsafe<Row[]>(
+      const proximityRows = await prisma.$queryRawUnsafe<Row[]>(
         `SELECT
           p.pogodbena_cena_odskodnina::float AS cena,
           d.povrsina_dela_stavbe::float AS povrsina,
@@ -476,78 +573,171 @@ export async function getEtnAnaliza(
         LIMIT 200`,
         cutoffStr, e, n, radiusM * radiusM,
       );
+      const parsed = parseRows(proximityRows);
+      if (parsed.length >= 8) {
+        selectedRows = proximityRows;
+        selectedParsed = parsed;
+        vir = 'proximity';
+        zaupanje = 5;
+        imeKo = proximityRows[0]?.ime_ko ?? null;
+      }
     } catch {
-      proximityRows = null;
+      // fall through to next level
     }
   }
 
-  const useProximity = proximityRows != null && proximityRows.length >= 8;
+  // ── LEVEL 2: KO mediana (min 5 transakcij) → zaupanje 4 ──
+  if (selectedParsed.length < 5) {
+    const koRows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT
+        p.pogodbena_cena_odskodnina::float AS cena,
+        COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe)::float AS povrsina,
+        COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY'))::text) AS leto,
+        d.ime_ko
+      FROM etn_posli p
+      JOIN etn_delistavb d ON d.id_posla = p.id_posla
+      WHERE
+        d.sifra_ko = $1
+        AND TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') >= $2::date
+        AND p.pogodbena_cena_odskodnina IS NOT NULL
+        AND p.pogodbena_cena_odskodnina <> ''
+        AND p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
+        AND p.pogodbena_cena_odskodnina::float > 0
+        AND d.povrsina_dela_stavbe IS NOT NULL
+        AND d.povrsina_dela_stavbe <> ''
+        AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
+        AND d.povrsina_dela_stavbe::float > 0
+        AND p.trznost_posla IN ('1','2','5')
+        AND p.vrsta_kupoprodajnega_posla = '1'
+        ${tipFilter}
+      ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
+      LIMIT 500`,
+      koStr, cutoffStr,
+    );
+    const parsed = parseRows(koRows);
+    if (parsed.length >= 5) {
+      selectedRows = koRows;
+      selectedParsed = parsed;
+      vir = 'ko';
+      zaupanje = 4;
+      imeKo = koRows[0]?.ime_ko ?? null;
+    }
+  }
 
-  const rows = useProximity ? proximityRows! : await prisma.$queryRawUnsafe<Row[]>(
-    `
-    SELECT
-      p.pogodbena_cena_odskodnina::float AS cena,
-      COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe)::float AS povrsina,
-      COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY'))::text) AS leto,
-      d.ime_ko
-    FROM etn_posli p
-    JOIN etn_delistavb d ON d.id_posla = p.id_posla
-    WHERE
-      d.sifra_ko = $1
-      AND TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') >= $2::date
-      AND p.pogodbena_cena_odskodnina IS NOT NULL
-      AND p.pogodbena_cena_odskodnina <> ''
-      AND p.pogodbena_cena_odskodnina ~ '^[0-9]+(\.[0-9]+)?$'
-      AND p.pogodbena_cena_odskodnina::float > 0
-      AND d.povrsina_dela_stavbe IS NOT NULL
-      AND d.povrsina_dela_stavbe <> ''
-      AND d.povrsina_dela_stavbe ~ '^[0-9]+(\.[0-9]+)?$'
-      AND d.povrsina_dela_stavbe::float > 0
-      AND p.trznost_posla IN ('1','2','5')
-      AND p.vrsta_kupoprodajnega_posla = '1'
-      ${tipFilter}
-    ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
-    LIMIT 500
-    `,
-    koStr,
-    cutoffStr,
-  );
+  // ── LEVEL 3: Regijska mediana 15km na KO centroidih (min 20 skupaj) → zaupanje 3 ──
+  if (selectedParsed.length < 5 && lat != null && lng != null) {
+    const hasCentroids = await checkKoCentroidsTable();
+    if (hasCentroids) {
+      try {
+        const { wgs84ToD96 } = await import("./wgs84-to-d96");
+        const { e, n } = wgs84ToD96(lat, lng);
+        const radiusM = 15000;
+        const regijskeRows = await prisma.$queryRawUnsafe<Row[]>(
+          `SELECT
+            p.pogodbena_cena_odskodnina::float AS cena,
+            COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe)::float AS povrsina,
+            COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
+            d.ime_ko
+          FROM etn_posli p
+          JOIN etn_delistavb d ON d.id_posla = p.id_posla
+          JOIN ko_centroids kc ON kc.ko_sifko = d.sifra_ko
+          WHERE p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
+            AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
+            AND p.pogodbena_cena_odskodnina::float > 0
+            AND d.povrsina_dela_stavbe::float > 0
+            AND TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') >= $1::date
+            AND p.trznost_posla IN ('1','2','5')
+            AND p.vrsta_kupoprodajnega_posla = '1'
+            AND (kc.e_centroid - $2)^2 + (kc.n_centroid - $3)^2 <= $4
+            ${tipFilter}
+          ORDER BY TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') DESC
+          LIMIT 500`,
+          cutoffStr, e, n, radiusM * radiusM,
+        );
+        const parsed = parseRows(regijskeRows);
+        if (parsed.length >= 20) {
+          selectedRows = regijskeRows;
+          selectedParsed = parsed;
+          vir = 'regija';
+          zaupanje = 3;
+          imeKo = null; // regijsko, ne specifična KO
+        }
+      } catch {
+        // fall through
+      }
+    }
+  }
 
-  if (!rows || rows.length === 0) return null;
+  // ── LEVEL 4: Nacionalna mediana → zaupanje 2 ──
+  // If we still have no data, compute national median and return minimal EtnAnaliza
+  if (selectedParsed.length === 0) {
+    const nationalMedian = await getNationalMedian(cutoffStr, tipFilter);
 
-  // Parse + filter outliers
-  type Parsed = { cenaM2: number; leto: number };
-  const parsed: Parsed[] = rows
-    .map((r) => {
-      const cena = Number(r.cena);
-      const povrsina = Number(r.povrsina);
-      if (!isFinite(cena) || !isFinite(povrsina) || povrsina <= 0) return null;
-      const cenaM2 = cena / povrsina;
-      const leto = parseInt(r.leto ?? "0");
-      return { cenaM2, leto };
-    })
-    .filter((r): r is Parsed => r !== null && r.cenaM2 >= 500 && r.cenaM2 <= 15000);
+    // Energetska korekcija
+    let energetskaKorekcija: EtnAnaliza["energetskaKorekcija"] = null;
+    let energyFactor = 1;
+    if (energyClass) {
+      const normalized = energyClass.toUpperCase().replace(/\s/g, "");
+      const correction = ENERGY_CORRECTION[normalized];
+      if (correction !== undefined) {
+        energyFactor = 1 + correction;
+        energetskaKorekcija = { razred: normalized, faktor: correction };
+      }
+    }
+    const lokacijskiPremium = lat != null && lng != null
+      ? izracunajLokacijskiPremium(lat, lng, osmAmenitiesCount)
+      : null;
+    const lokacijskiFaktor = lokacijskiPremium?.skupniFaktor ?? 1;
+    const povrsinaKor = area ? povrsinskaKorekcija(area) : 0;
+    const medKalibrirana = nationalMedian * (1 + povrsinaKor);
+    let ocenjenaTrznaVrednost: number | null = null;
+    let ocenaVrednostiMin: number | null = null;
+    let ocenaVrednostiMax: number | null = null;
+    if (area && area > 0) {
+      const base = medKalibrirana * area * energyFactor * lokacijskiFaktor;
+      ocenjenaTrznaVrednost = Math.round(base);
+      ocenaVrednostiMin = Math.round(base * 0.85); // wider range for national
+      ocenaVrednostiMax = Math.round(base * 1.15);
+    }
+    return {
+      steviloTransakcij: 0,
+      povprecnaCenaM2: Math.round(nationalMedian),
+      medianaCenaM2: Math.round(medKalibrirana),
+      minCenaM2: 0,
+      maxCenaM2: 0,
+      ocenjenaTrznaVrednost,
+      ocenaVrednostiMin,
+      ocenaVrednostiMax,
+      energetskaKorekcija,
+      lokacijskiPremium,
+      trendProcent: null,
+      trend: null,
+      zadnjeLeto: null,
+      predLeto: null,
+      imeKo: null,
+      letniPodatki: [],
+      vir: 'nacional',
+      zaupanje: 2,
+    };
+  }
 
-  if (parsed.length === 0) return null;
-
-  const imeKo = rows[0]?.ime_ko ?? null;
-
-  const prices = parsed.map((r) => r.cenaM2);
+  // ── Common processing for levels 1-3 ──
+  const prices = selectedParsed.map((r) => r.cenaM2);
   const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-  const med = median(prices);
+  const med = smartMedian(prices);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
 
   // Per-year breakdown
   const byYear = new Map<number, number[]>();
-  for (const r of parsed) {
+  for (const r of selectedParsed) {
     if (!byYear.has(r.leto)) byYear.set(r.leto, []);
     byYear.get(r.leto)!.push(r.cenaM2);
   }
   const letniPodatki = Array.from(byYear.entries())
     .map(([leto, vals]) => ({
       leto,
-      medianaCenaM2: Math.round(median(vals)),
+      medianaCenaM2: Math.round(smartMedian(vals)),
       steviloPoslov: vals.length,
     }))
     .sort((a, b) => a.leto - b.leto);
@@ -567,7 +757,7 @@ export async function getEtnAnaliza(
   let trendProcent: number | null = null;
   if (zadnjeLeto != null && predLeto != null && predLeto > 0) {
     const diff = (zadnjeLeto - predLeto) / predLeto;
-    trendProcent = Math.round(diff * 1000) / 10; // e.g. 12.3%
+    trendProcent = Math.round(diff * 1000) / 10;
     trend = diff > 0.02 ? "rast" : diff < -0.02 ? "padec" : "stabilno";
   }
 
@@ -583,14 +773,15 @@ export async function getEtnAnaliza(
     }
   }
 
-    // Lokacijski premium
+  // Lokacijski premium
   const lokacijskiPremium = lat != null && lng != null
     ? izracunajLokacijskiPremium(lat, lng, osmAmenitiesCount)
     : null;
   const lokacijskiFaktor = lokacijskiPremium?.skupniFaktor ?? 1;
 
   // Kalibracijski faktorji (backtest 19,183 transakcij)
-  const koKorekcija = KO_KALIBRACIJSKI_FAKTOR[koStr] ?? 0;
+  // For regija/nacional level, KO calibration factor not applied (wrong KO)
+  const koKorekcija = (vir === 'proximity' || vir === 'ko') ? (KO_KALIBRACIJSKI_FAKTOR[koStr] ?? 0) : 0;
   const povrsinaKor = area ? povrsinskaKorekcija(area) : 0;
   const kalibracijskiFaktor = 1 + koKorekcija + povrsinaKor;
 
@@ -604,12 +795,13 @@ export async function getEtnAnaliza(
   if (area && area > 0) {
     const base = medKalibrirana * area * energyFactor * lokacijskiFaktor;
     ocenjenaTrznaVrednost = Math.round(base);
-    ocenaVrednostiMin = Math.round(base * 0.9);
-    ocenaVrednostiMax = Math.round(base * 1.1);
+    const rangeMultiplier = vir === 'regija' ? 0.12 : 0.10; // wider range for regional estimates
+    ocenaVrednostiMin = Math.round(base * (1 - rangeMultiplier));
+    ocenaVrednostiMax = Math.round(base * (1 + rangeMultiplier));
   }
 
   return {
-    steviloTransakcij: parsed.length,
+    steviloTransakcij: selectedParsed.length,
     povprecnaCenaM2: Math.round(avg),
     medianaCenaM2: Math.round(medKalibrirana),
     minCenaM2: Math.round(min),
@@ -625,5 +817,7 @@ export async function getEtnAnaliza(
     predLeto,
     imeKo,
     letniPodatki,
+    vir,
+    zaupanje,
   };
 }

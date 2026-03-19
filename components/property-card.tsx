@@ -122,6 +122,8 @@ interface EtnAnaliza {
   predLeto: number | null;
   imeKo?: string | null;
   letniPodatki?: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
+  vir?: 'proximity' | 'ko' | 'regija' | 'nacional';
+  zaupanje?: 1 | 2 | 3 | 4 | 5;
 }
 
 interface EtnNajemAnaliza {
@@ -2035,9 +2037,30 @@ function OcenaVrednostiSection({
     </div>
   ) : null;
 
-  const etnCenaBlock = etnAnaliza && etnAnaliza.steviloTransakcij > 0 ? (
-    <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
-      <p className="text-xs text-gray-500 mb-1">Tržna ocena · {etnAnaliza.steviloTransakcij} primerljivih prodaj · {etnAnaliza.imeKo ?? "ista KO"}</p>
+  // Zaupanje indicator for ETN data source
+  const zaupanjeIndikator = (() => {
+    const z = etnAnaliza?.zaupanje ?? 4;
+    const v = etnAnaliza?.vir ?? 'ko';
+    if (z >= 4) return null; // zelen = default, no extra badge needed
+    if (z === 3) return (
+      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-medium">
+        🟡 Regijska ocena
+      </span>
+    );
+    // z <= 2
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">
+        🔴 Nacionalna ocena — premalo lokalnih podatkov
+      </span>
+    );
+  })();
+
+  const etnCenaBlock = etnAnaliza && (etnAnaliza.steviloTransakcij > 0 || etnAnaliza.vir === 'nacional') ? (
+    <div className={`rounded-lg border px-4 py-3 mt-3 ${(etnAnaliza.zaupanje ?? 4) >= 4 ? 'border-blue-100 bg-blue-50' : (etnAnaliza.zaupanje ?? 4) === 3 ? 'border-yellow-100 bg-yellow-50' : 'border-red-100 bg-red-50'}`}>
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
+        <p className="text-xs text-gray-500">{etnAnaliza.steviloTransakcij > 0 ? `Tržna ocena · ${etnAnaliza.steviloTransakcij} primerljivih prodaj · ${etnAnaliza.imeKo ?? "ista KO"}` : 'Nacionalna ocena · premalo lokalnih podatkov'}</p>
+        {zaupanjeIndikator}
+      </div>
 
       {/* Ko je enota izbrana → prikaži SAMO vrednost enote */}
       {unitMin != null && unitMax != null ? (
