@@ -17,17 +17,32 @@ export async function lookupEnergyCertificate({
   stStavbe,
   stDelaStavbe,
 }: EizLookupParams) {
-  const certificate = await prisma.energyCertificate.findFirst({
+  // 1. Najprej poskusi z izbrano enoto
+  if (stDelaStavbe != null) {
+    const unitCert = await prisma.energyCertificate.findFirst({
+      where: { koId, stStavbe, stDelaStavbe, validUntil: { gte: new Date() } },
+      orderBy: { issueDate: "desc" },
+    });
+    if (unitCert) return unitCert;
+  }
+
+  // 2. Fallback: stavbni certifikat (stDelaStavbe = null ali 0)
+  const buildingCert = await prisma.energyCertificate.findFirst({
     where: {
       koId,
       stStavbe,
-      ...(stDelaStavbe != null ? { stDelaStavbe } : {}),
+      OR: [{ stDelaStavbe: null }, { stDelaStavbe: 0 }],
       validUntil: { gte: new Date() },
     },
     orderBy: { issueDate: "desc" },
   });
+  if (buildingCert) return buildingCert;
 
-  return certificate;
+  // 3. Zadnji fallback: katerakoli izkaznica za to stavbo (brez filtra na enoto)
+  return prisma.energyCertificate.findFirst({
+    where: { koId, stStavbe, validUntil: { gte: new Date() } },
+    orderBy: { issueDate: "desc" },
+  });
 }
 
 /**
