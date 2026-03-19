@@ -414,14 +414,17 @@ export async function getEtnNajemAnaliza(
 
 // Map GURS vrsta/raba to ETN dejanska_raba filter
 function etnTipFilter(dejanskaRaba: string | null): string {
-  if (!dejanskaRaba) return "";
+  // Default: stanovanje (vrsta 1 = enostanovanjska, 2 = stanovanje v večstanovanjski)
+  const STANOVANJE = `AND d.vrsta_dela_stavbe IN ('1','2')`;
+  if (!dejanskaRaba) return STANOVANJE;
   const r = dejanskaRaba.toLowerCase();
-  if (r.includes("stanovan")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%stanovan%' OR d.vrsta_dela_stavbe = '2')`;
+  if (r.includes("stanovan")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%stanovan%' OR d.vrsta_dela_stavbe IN ('1','2'))`;
   if (r.includes("poslovn") || r.includes("pisarn")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%poslovn%' OR d.vrsta_dela_stavbe IN ('5','6'))`;
-  if (r.includes("garaza") || r.includes("parking") || r.includes("parkirn")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%garaza%' OR d.vrsta_dela_stavbe = '3')`;
+  if (r.includes("garaza") || r.includes("parking") || r.includes("parkirn")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%garaza%' OR d.vrsta_dela_stavbe IN ('3','4'))`;
   if (r.includes("klet")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%klet%' OR d.vrsta_dela_stavbe = '14')`;
   if (r.includes("trgov")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%trgov%' OR d.vrsta_dela_stavbe = '8')`;
-  return "";
+  // Neprepoznan tip → privzeto stanovanje
+  return STANOVANJE;
 }
 
 export async function getEtnAnaliza(
