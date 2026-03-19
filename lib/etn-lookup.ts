@@ -461,6 +461,8 @@ export async function getEtnAnaliza(
       AND d.povrsina_dela_stavbe <> ''
       AND d.povrsina_dela_stavbe ~ '^[0-9]+(\.[0-9]+)?$'
       AND d.povrsina_dela_stavbe::float > 0
+      AND p.trznost_posla IN ('1','2','5')
+      AND p.vrsta_kupoprodajnega_posla = '1'
       ${tipFilter}
     ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
     LIMIT 500
