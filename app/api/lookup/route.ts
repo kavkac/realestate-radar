@@ -178,6 +178,9 @@ export async function POST(request: NextRequest) {
     const useableArea =
       deliStavbe[0]?.uporabnaPovrsina ?? deliStavbe[0]?.povrsina ?? null;
 
+    // Determine property type for ETN filtering (use first unit's type)
+    const etnDejanskaRaba = (deliStavbe[0] as { vrstaRabe?: string | null; vrsta?: string | null })?.vrstaRabe ?? deliStavbe[0]?.vrsta ?? null;
+
     // Check gas infrastructure via ZK GJI
     const gasInfrastructure =
       lat != null && lng != null
@@ -199,7 +202,7 @@ export async function POST(request: NextRequest) {
       }).catch(() => null),
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
-      getEtnAnaliza(stavba.koId, useableArea, null).catch(() => null),
+      getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba).catch(() => null),
       getEtnNajemAnaliza(stavba.koId, useableArea).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
@@ -262,7 +265,7 @@ export async function POST(request: NextRequest) {
     // Re-run ETN with energy class if cert available (applies correction to value estimate)
     let etnAnalizaFinal = etnAnaliza;
     if (energyCertResult?.energyClass && etnAnaliza && useableArea) {
-      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass).catch(() => null);
+      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, etnDejanskaRaba).catch(() => null);
       if (corrected) etnAnalizaFinal = corrected;
     }
 

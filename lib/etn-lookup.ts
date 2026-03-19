@@ -184,10 +184,23 @@ export async function getEtnNajemAnaliza(
   };
 }
 
+// Map GURS vrsta/raba to ETN dejanska_raba filter
+function etnTipFilter(dejanskaRaba: string | null): string {
+  if (!dejanskaRaba) return "";
+  const r = dejanskaRaba.toLowerCase();
+  if (r.includes("stanovan")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%stanovan%' OR d.vrsta_dela_stavbe = '2')`;
+  if (r.includes("poslovn") || r.includes("pisarn")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%poslovn%' OR d.vrsta_dela_stavbe IN ('5','6'))`;
+  if (r.includes("garaza") || r.includes("parking") || r.includes("parkirn")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%garaza%' OR d.vrsta_dela_stavbe = '3')`;
+  if (r.includes("klet")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%klet%' OR d.vrsta_dela_stavbe = '14')`;
+  if (r.includes("trgov")) return `AND (d.dejanska_raba_dela_stavbe ILIKE '%trgov%' OR d.vrsta_dela_stavbe = '8')`;
+  return "";
+}
+
 export async function getEtnAnaliza(
   koId: number,
   area: number | null,
   energyClass?: string | null,
+  dejanskaRaba?: string | null,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 5);
@@ -196,6 +209,7 @@ export async function getEtnAnaliza(
 
   type Row = { cena: number; povrsina: number; leto: string; ime_ko: string | null };
 
+  const tipFilter = etnTipFilter(dejanskaRaba ?? null);
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `
     SELECT
@@ -212,6 +226,7 @@ export async function getEtnAnaliza(
       AND p.pogodbena_cena_odskodnina > 0
       AND d.povrsina_dela_stavbe IS NOT NULL
       AND d.povrsina_dela_stavbe > 0
+      ${tipFilter}
     ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
     LIMIT 500
     `,
