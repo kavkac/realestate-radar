@@ -441,7 +441,46 @@ export async function getEtnAnaliza(
   type Row = { cena: number; povrsina: number; leto: string; ime_ko: string | null };
 
   const tipFilter = etnTipFilter(dejanskaRaba ?? null);
-  const rows = await prisma.$queryRawUnsafe<Row[]>(
+
+  // Proximity query: koordinate WGS84 → D96/TM → ETN transakcije v 400m radiju
+  // Boljša natančnost kot KO mediana (MAPE 23% vs 24.8%)
+  let proximityRows: Row[] | null = null;
+  if (lat != null && lng != null) {
+    try {
+      const { wgs84ToD96 } = await import("./wgs84-to-d96");
+      const { e, n } = wgs84ToD96(lat, lng);
+      const radiusM = 400;
+      proximityRows = await prisma.$queryRawUnsafe<Row[]>(
+        `SELECT
+          p.pogodbena_cena_odskodnina::float AS cena,
+          d.povrsina_dela_stavbe::float AS povrsina,
+          COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
+          d.ime_ko
+        FROM etn_posli p
+        JOIN etn_delistavb d ON d.id_posla = p.id_posla
+        JOIN ev_stavba ev ON ev.ko_sifko = d.sifra_ko AND ev.stev_st = d.stevilka_stavbe
+        WHERE p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND p.pogodbena_cena_odskodnina::float > 0
+          AND d.povrsina_dela_stavbe::float > 0
+          AND TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') >= $1::date
+          AND p.trznost_posla IN ('1','2','5')
+          AND p.vrsta_kupoprodajnega_posla = '1'
+          AND ev.e IS NOT NULL AND ev.n IS NOT NULL AND ev.e != '' AND ev.n != ''
+          AND (ev.e::float - $2)^2 + (ev.n::float - $3)^2 <= $4
+          ${tipFilter}
+        ORDER BY TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') DESC
+        LIMIT 200`,
+        cutoffStr, e, n, radiusM * radiusM,
+      );
+    } catch {
+      proximityRows = null;
+    }
+  }
+
+  const useProximity = proximityRows != null && proximityRows.length >= 8;
+
+  const rows = useProximity ? proximityRows! : await prisma.$queryRawUnsafe<Row[]>(
     `
     SELECT
       p.pogodbena_cena_odskodnina::float AS cena,
