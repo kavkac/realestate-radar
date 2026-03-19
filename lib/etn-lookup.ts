@@ -65,8 +65,8 @@ export async function getEtnNajemAnaliza(
   const koStr = String(koId);
 
   type Row = {
-    najemnina: string;
-    povrsina: string;
+    najemnina: number;
+    povrsina: number;
     cas_najema: string;
     leto: string;
     ime_ko: string | null;
@@ -75,8 +75,8 @@ export async function getEtnNajemAnaliza(
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `
     SELECT
-      p."POGODBENA_NAJEMNINA" AS najemnina,
-      COALESCE(d."UPORABNA_POVRSINA_ODDANIH_PROSTOROV", d."POVRSINA_ODDANIH_PROSTOROV") AS povrsina,
+      p."POGODBENA_NAJEMNINA"::float AS najemnina,
+      COALESCE(d."UPORABNA_POVRSINA_ODDANIH_PROSTOROV", d."POVRSINA_ODDANIH_PROSTOROV")::float AS povrsina,
       p."CAS_NAJEMA" AS cas_najema,
       COALESCE(p."LETO", EXTRACT(YEAR FROM TO_DATE(p."DATUM_SKLENITVE_POGODBE", 'DD.MM.YYYY'))::text) AS leto,
       d."IME_KO" AS ime_ko
@@ -104,8 +104,8 @@ export async function getEtnNajemAnaliza(
   type Parsed = { najemninaM2Mesec: number; leto: number };
   const parsed: Parsed[] = rows
     .map((r) => {
-      const najemnina = parseFloat(r.najemnina);
-      const povrsina = parseFloat(r.povrsina);
+      const najemnina = Number(r.najemnina);
+      const povrsina = Number(r.povrsina);
       if (!isFinite(najemnina) || !isFinite(povrsina) || povrsina <= 0) return null;
       // Normalize to monthly: CAS_NAJEMA '2' = yearly
       const mesecna = r.cas_najema === "2" ? najemnina / 12 : najemnina;
@@ -194,13 +194,13 @@ export async function getEtnAnaliza(
   const cutoffStr = cutoff.toISOString().split("T")[0];
   const koStr = String(koId);
 
-  type Row = { cena: string; povrsina: string; leto: string; ime_ko: string | null };
+  type Row = { cena: number; povrsina: number; leto: string; ime_ko: string | null };
 
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `
     SELECT
-      p.pogodbena_cena_odskodnina AS cena,
-      COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe) AS povrsina,
+      p.pogodbena_cena_odskodnina::float AS cena,
+      COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe)::float AS povrsina,
       COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY'))::text) AS leto,
       d.ime_ko
     FROM etn_posli p
@@ -209,12 +209,10 @@ export async function getEtnAnaliza(
       d.sifra_ko = $1
       AND TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') >= $2::date
       AND p.pogodbena_cena_odskodnina IS NOT NULL
-      AND p.pogodbena_cena_odskodnina::text <> ''
-      AND p.pogodbena_cena_odskodnina::text <> '0'
+      AND p.pogodbena_cena_odskodnina > 0
       AND d.povrsina_dela_stavbe IS NOT NULL
-      AND d.povrsina_dela_stavbe::text <> ''
-      AND d.povrsina_dela_stavbe::text <> '0'
-    ORDER BY p.datum_sklenitve_pogodbe DESC
+      AND d.povrsina_dela_stavbe > 0
+    ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
     LIMIT 500
     `,
     koStr,
@@ -227,8 +225,8 @@ export async function getEtnAnaliza(
   type Parsed = { cenaM2: number; leto: number };
   const parsed: Parsed[] = rows
     .map((r) => {
-      const cena = parseFloat(r.cena);
-      const povrsina = parseFloat(r.povrsina);
+      const cena = Number(r.cena);
+      const povrsina = Number(r.povrsina);
       if (!isFinite(cena) || !isFinite(povrsina) || povrsina <= 0) return null;
       const cenaM2 = cena / povrsina;
       const leto = parseInt(r.leto ?? "0");
