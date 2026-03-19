@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { izracunajLokacijskiPremium, type LokacijskiPremium } from "./location-premium";
 
 // Energetski korekcijski faktorji za oceno tržne vrednosti
 const ENERGY_CORRECTION: Record<string, number> = {
@@ -18,6 +19,7 @@ export interface EtnAnaliza {
   povprecnaCenaM2: number;
   medianaCenaM2: number;
   minCenaM2: number;
+  lokacijskiPremium?: LokacijskiPremium | null;
   maxCenaM2: number;
   ocenjenaTrznaVrednost: number | null;
   ocenaVrednostiMin: number | null;
@@ -201,6 +203,9 @@ export async function getEtnAnaliza(
   area: number | null,
   energyClass?: string | null,
   dejanskaRaba?: string | null,
+  lat?: number | null,
+  lng?: number | null,
+  osmAmenitiesCount?: number | null,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 5);
@@ -308,12 +313,18 @@ export async function getEtnAnaliza(
     }
   }
 
-  // Ocenjena vrednost = median × površina × energetski faktor, ±10%
+    // Lokacijski premium
+  const lokacijskiPremium = lat != null && lng != null
+    ? izracunajLokacijskiPremium(lat, lng, osmAmenitiesCount)
+    : null;
+  const lokacijskiFaktor = lokacijskiPremium?.skupniFaktor ?? 1;
+
+  // Ocenjena vrednost = median × površina × energetski faktor × lokacijski faktor, ±10%
   let ocenjenaTrznaVrednost: number | null = null;
   let ocenaVrednostiMin: number | null = null;
   let ocenaVrednostiMax: number | null = null;
   if (area && area > 0) {
-    const base = med * area * energyFactor;
+    const base = med * area * energyFactor * lokacijskiFaktor;
     ocenjenaTrznaVrednost = Math.round(base);
     ocenaVrednostiMin = Math.round(base * 0.9);
     ocenaVrednostiMax = Math.round(base * 1.1);
@@ -329,6 +340,7 @@ export async function getEtnAnaliza(
     ocenaVrednostiMin,
     ocenaVrednostiMax,
     energetskaKorekcija,
+    lokacijskiPremium,
     trendProcent,
     trend,
     zadnjeLeto,

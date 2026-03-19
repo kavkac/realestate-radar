@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
       }).catch(() => null),
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
-      getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba).catch(() => null),
+      getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba, lat, lng, null).catch(() => null),
       getEtnNajemAnaliza(stavba.koId, useableArea).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
@@ -276,7 +276,8 @@ export async function POST(request: NextRequest) {
     // Re-run ETN with energy class if cert available (applies correction to value estimate)
     let etnAnalizaFinal = etnAnaliza;
     if (energyCertResult?.energyClass && etnAnaliza && useableArea) {
-      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, etnDejanskaRaba).catch(() => null);
+      const osmAmenitiesCount = osmData ? (Object.values(osmData as Record<string, unknown[]>).flat().length) : null;
+      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount).catch(() => null);
       if (corrected) etnAnalizaFinal = corrected;
     }
 

@@ -97,6 +97,13 @@ interface EnergyData {
   kondicionirana: number | null;
 }
 
+interface LokacijskiFaktor {
+  naziv: string;
+  opis: string;
+  korekcija: number;
+  ikona: string;
+}
+
 interface EtnAnaliza {
   steviloTransakcij: number;
   povprecnaCenaM2: number;
@@ -107,6 +114,7 @@ interface EtnAnaliza {
   ocenaVrednostiMin?: number | null;
   ocenaVrednostiMax?: number | null;
   energetskaKorekcija?: { razred: string; faktor: number } | null;
+  lokacijskiPremium?: { skupniFaktor: number; faktorji: LokacijskiFaktor[] } | null;
   trendProcent?: number | null;
   trend: "rast" | "padec" | "stabilno" | null;
   zadnjeLeto: number | null;
@@ -1899,8 +1907,9 @@ function OcenaVrednostiSection({
     ? 1 + etnAnaliza.energetskaKorekcija.faktor
     : 1;
 
-  const buildingValueBase = mediana && totalBuildingArea ? mediana * totalBuildingArea * energyFactor : null;
-  const unitValueBase = mediana && selectedUnitArea ? mediana * selectedUnitArea * energyFactor : null;
+  const lokacijskiFaktor = etnAnaliza?.lokacijskiPremium?.skupniFaktor ?? 1;
+  const buildingValueBase = mediana && totalBuildingArea ? mediana * totalBuildingArea * energyFactor * lokacijskiFaktor : null;
+  const unitValueBase = mediana && selectedUnitArea ? mediana * selectedUnitArea * energyFactor * lokacijskiFaktor : null;
   const buildingMin = buildingValueBase ? Math.round(buildingValueBase * 0.9) : null;
   const buildingMax = buildingValueBase ? Math.round(buildingValueBase * 1.1) : null;
   const unitMin = unitValueBase ? Math.round(unitValueBase * 0.9) : null;
@@ -2047,13 +2056,27 @@ function OcenaVrednostiSection({
         </div>
       )}
 
-      {/* Energetska korekcija */}
-      {etnAnaliza.energetskaKorekcija && (
-        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-medium mt-2 ${
-          etnAnaliza.energetskaKorekcija.faktor > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-        }`}>
-          EIZ {etnAnaliza.energetskaKorekcija.razred}: {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}% upoštevano
-        </span>
+      {/* Korekcijski faktorji */}
+      {(etnAnaliza.energetskaKorekcija || (etnAnaliza.lokacijskiPremium?.faktorji?.length ?? 0) > 0) && (
+        <div className="mt-2 pt-2 border-t border-blue-200">
+          <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Upoštevani faktorji</p>
+          <div className="flex flex-wrap gap-1">
+            {etnAnaliza.energetskaKorekcija && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                etnAnaliza.energetskaKorekcija.faktor > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              }`}>
+                EIZ {etnAnaliza.energetskaKorekcija.razred} {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}%
+              </span>
+            )}
+            {etnAnaliza.lokacijskiPremium?.faktorji?.map((f, i) => (
+              <span key={i} title={f.opis} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                f.korekcija > 0 ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
+              }`}>
+                {f.ikona} {f.naziv} {f.korekcija > 0 ? "+" : ""}{Math.round(f.korekcija * 100)}%
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {!hasSelectedUnit && !unitMin && totalBuildingArea && (
