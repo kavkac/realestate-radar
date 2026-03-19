@@ -104,9 +104,14 @@ interface EtnAnaliza {
   minCenaM2: number;
   maxCenaM2: number;
   ocenjenaTrznaVrednost: number | null;
+  ocenaVrednostiMin?: number | null;
+  ocenaVrednostiMax?: number | null;
+  energetskaKorekcija?: { razred: string; faktor: number } | null;
+  trendProcent?: number | null;
   trend: "rast" | "padec" | "stabilno" | null;
   zadnjeLeto: number | null;
   predLeto: number | null;
+  imeKo?: string | null;
   letniPodatki?: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
 }
 
@@ -579,6 +584,7 @@ export function PropertyCard({
               currentPartVrednotenje={currentPart?.vrednotenje}
               deliStavbe={deliStavbe}
               hasSelectedUnit={!!(activePart || requestedDel != null)}
+              etnAnaliza={etnAnaliza}
             />
           </div>
 
@@ -1850,12 +1856,40 @@ function OcenaVrednostiSection({
   currentPartVrednotenje,
   deliStavbe,
   hasSelectedUnit,
+  etnAnaliza,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
   deliStavbe: PropertyCardProps["deliStavbe"];
   hasSelectedUnit: boolean;
+  etnAnaliza?: EtnAnaliza | null;
 }) {
+  // ETN tržna primerjava — prikaži pod uradnimi vrednostmi
+  const etnBlock = etnAnaliza?.ocenaVrednostiMin != null && etnAnaliza?.ocenaVrednostiMax != null ? (
+    <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
+      <p className="text-xs text-gray-500 mb-0.5">Tržna ocena (ETN)</p>
+      <p className="text-lg font-bold text-gray-800">
+        {etnAnaliza.ocenaVrednostiMin!.toLocaleString("sl-SI")} – {etnAnaliza.ocenaVrednostiMax!.toLocaleString("sl-SI")} €
+      </p>
+      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+        <span className="text-[10px] text-gray-400">
+          {etnAnaliza.steviloTransakcij} prodaj v KO {etnAnaliza.imeKo ?? "isti KO"}
+        </span>
+        {etnAnaliza.energetskaKorekcija && (
+          <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${
+            etnAnaliza.energetskaKorekcija.faktor > 0
+              ? "bg-green-100 text-green-700"
+              : etnAnaliza.energetskaKorekcija.faktor < 0
+                ? "bg-red-100 text-red-700"
+                : "bg-gray-100 text-gray-600"
+          }`}>
+            EIZ {etnAnaliza.energetskaKorekcija.razred}: {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}%
+          </span>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   // Per-unit: izbrana enota z vrednotenjem
   if (hasSelectedUnit && currentPartVrednotenje?.posplosenaVrednost != null) {
     const posplosenaVrednost = currentPartVrednotenje.posplosenaVrednost!;
@@ -1863,7 +1897,7 @@ function OcenaVrednostiSection({
     return (
       <section>
         <Label vir="Množično vrednotenje · GURS · EV_SLO">Ocenjena vrednost enote</Label>
-        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 mb-4">
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
           <p className="text-2xl font-bold text-gray-800">
             {posplosenaVrednost.toLocaleString("sl-SI")} €
           </p>
@@ -1876,6 +1910,7 @@ function OcenaVrednostiSection({
             Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
           </p>
         </div>
+        {etnBlock}
       </section>
     );
   }
@@ -1889,7 +1924,7 @@ function OcenaVrednostiSection({
     return (
       <section>
         <Label vir="Množično vrednotenje · GURS">Ocenjena vrednost stavbe</Label>
-        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 mb-4">
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
           <p className="text-2xl font-bold text-gray-800">
             {renVrednost.vrednost.toLocaleString("sl-SI")} €
           </p>
@@ -1906,11 +1941,21 @@ function OcenaVrednostiSection({
             Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
           </p>
         </div>
+        {etnBlock}
       </section>
     );
   }
 
-  // Ni podatkov
+  // Ni uradnih podatkov — prikaži vsaj ETN če obstaja
+  if (etnBlock) {
+    return (
+      <section>
+        <Label vir="ETN GURS">Ocenjena vrednost</Label>
+        {etnBlock}
+      </section>
+    );
+  }
+
   return (
     <section>
       <Label vir="Množično vrednotenje · GURS">Ocenjena vrednost</Label>
@@ -2016,8 +2061,8 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
     data.trend === "rast" ? "↑" : data.trend === "padec" ? "↓" : data.trend === "stabilno" ? "→" : null;
   const trendColor =
     data.trend === "rast" ? "text-green-700" : data.trend === "padec" ? "text-red-600" : "text-gray-500";
-  const trendLabel =
-    data.trend === "rast" ? "Rast" : data.trend === "padec" ? "Padec" : "Stabilno";
+
+  const koLabel = data.imeKo ?? "isti KO";
 
   // Bar chart for yearly medians
   const letni = data.letniPodatki ?? [];
@@ -2025,18 +2070,50 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
 
   return (
     <section>
-      <Label vir="ETN GURS · zadnjih 5 let · samo tržni posli">Tržne cene v isti KO</Label>
+      <Label vir="ETN GURS · zadnjih 5 let · samo tržni posli">Tržna analiza vrednosti</Label>
 
-      {/* Hero: median price */}
+      {/* Hero: estimated value range */}
+      {data.ocenaVrednostiMin != null && data.ocenaVrednostiMax != null && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 mb-4">
+          <p className="text-xs text-gray-500 mb-1">Ocenjena tržna vrednost</p>
+          <p className="text-2xl font-bold text-gray-800">
+            {data.ocenaVrednostiMin.toLocaleString("sl-SI")} – {data.ocenaVrednostiMax.toLocaleString("sl-SI")} €
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-xs text-gray-500">
+              mediana {data.medianaCenaM2.toLocaleString("sl-SI")} €/m² × površina ± 10%
+            </span>
+            {data.energetskaKorekcija && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                data.energetskaKorekcija.faktor > 0
+                  ? "bg-green-100 text-green-700"
+                  : data.energetskaKorekcija.faktor < 0
+                    ? "bg-red-100 text-red-700"
+                    : "bg-gray-100 text-gray-600"
+              }`}>
+                EIZ {data.energetskaKorekcija.razred}: {data.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(data.energetskaKorekcija.faktor * 100)}%
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">
+            {data.steviloTransakcij} prodaj v KO {koLabel} · zadnjih 5 let
+          </p>
+        </div>
+      )}
+
+      {/* Median price + trend */}
       <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mb-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-gray-800">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-xl font-bold text-gray-800">
             {data.medianaCenaM2.toLocaleString("sl-SI")} €/m²
           </span>
           <span className="text-xs text-gray-500">mediana</span>
           {data.trend && (
             <span className={`text-sm font-semibold ml-auto ${trendColor}`}>
-              {trendArrow} {trendLabel}
+              {trendArrow}{" "}
+              {data.trendProcent != null && (
+                <>{data.trendProcent > 0 ? "+" : ""}{data.trendProcent}%</>
+              )}
               {data.zadnjeLeto != null && data.predLeto != null && (
                 <span className="text-xs font-normal text-gray-400 ml-1">
                   ({data.predLeto.toLocaleString("sl-SI")} → {data.zadnjeLeto.toLocaleString("sl-SI")} €/m²)
@@ -2045,22 +2122,10 @@ function VrednostnaAnalizaSection({ data }: { data?: EtnAnaliza | null }) {
             </span>
           )}
         </div>
-        {data.ocenjenaTrznaVrednost != null && (
-          <p className="text-sm font-semibold text-gray-700 mt-1">
-            Ocenjena vrednost: <span className="text-gray-900">{data.ocenjenaTrznaVrednost.toLocaleString("sl-SI")} €</span>
-            <span className="font-normal text-xs text-gray-400 ml-1">(mediana × površina)</span>
-          </p>
-        )}
-        <p className="text-xs text-gray-400 mt-1.5">
-          Ocena temelji na {data.steviloTransakcij} primerljivih prodajah v isti katastrski občini · ETN GURS · zadnjih 5 let
-        </p>
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-3 gap-x-4 gap-y-3 text-sm mb-4">
-        <Field label="Povprečje" value={`${data.povprecnaCenaM2.toLocaleString("sl-SI")} €/m²`} />
-        <Field label="Min" value={`${data.minCenaM2.toLocaleString("sl-SI")} €/m²`} />
-        <Field label="Max" value={`${data.maxCenaM2.toLocaleString("sl-SI")} €/m²`} />
+        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+          <span>razpon {data.minCenaM2.toLocaleString("sl-SI")} – {data.maxCenaM2.toLocaleString("sl-SI")} €/m²</span>
+          <span>povp. {data.povprecnaCenaM2.toLocaleString("sl-SI")} €/m²</span>
+        </div>
       </div>
 
       {/* Yearly trend mini bar chart */}

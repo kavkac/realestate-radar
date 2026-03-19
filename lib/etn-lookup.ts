@@ -1,5 +1,18 @@
 import { prisma } from "./prisma";
 
+// Energetski korekcijski faktorji za oceno tržne vrednosti
+const ENERGY_CORRECTION: Record<string, number> = {
+  A1: 0.08,
+  A2: 0.08,
+  B1: 0.04,
+  B2: 0.04,
+  C: 0,
+  D: -0.03,
+  E: -0.06,
+  F: -0.09,
+  G: -0.12,
+};
+
 export interface EtnAnaliza {
   steviloTransakcij: number;
   povprecnaCenaM2: number;
@@ -7,9 +20,14 @@ export interface EtnAnaliza {
   minCenaM2: number;
   maxCenaM2: number;
   ocenjenaTrznaVrednost: number | null;
+  ocenaVrednostiMin: number | null;
+  ocenaVrednostiMax: number | null;
+  energetskaKorekcija: { razred: string; faktor: number } | null;
+  trendProcent: number | null;
   trend: "rast" | "padec" | "stabilno" | null;
   zadnjeLeto: number | null;
   predLeto: number | null;
+  imeKo: string | null;
   letniPodatki: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
 }
 
@@ -25,20 +43,22 @@ function median(values: number[]): number {
 export async function getEtnAnaliza(
   koId: number,
   area: number | null,
+  energyClass?: string | null,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 5);
   const cutoffStr = cutoff.toISOString().split("T")[0];
   const koStr = String(koId);
 
-  type Row = { cena: string; povrsina: string; leto: string };
+  type Row = { cena: string; povrsina: string; leto: string; ime_ko: string | null };
 
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `
     SELECT
       p.pogodbena_cena_odskodnina AS cena,
-      d.povrsina_dela_stavbe      AS povrsina,
-      COALESCE(p.leto, EXTRACT(YEAR FROM p.datum_sklenitve_pogodbe::date)::text) AS leto
+      COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe) AS povrsina,
+      COALESCE(p.leto, EXTRACT(YEAR FROM p.datum_sklenitve_pogodbe::date)::text) AS leto,
+      d.ime_ko
     FROM etn_posli p
     JOIN etn_delistavb d ON d.id_posla = p.id_posla
     WHERE
@@ -75,6 +95,8 @@ export async function getEtnAnaliza(
 
   if (parsed.length === 0) return null;
 
+  const imeKo = rows[0]?.ime_ko ?? null;
+
   const prices = parsed.map((r) => r.cenaM2);
   const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
   const med = median(prices);
@@ -107,9 +129,34 @@ export async function getEtnAnaliza(
   const predLeto = predLetoData?.medianaCenaM2 ?? null;
 
   let trend: EtnAnaliza["trend"] = null;
+  let trendProcent: number | null = null;
   if (zadnjeLeto != null && predLeto != null && predLeto > 0) {
     const diff = (zadnjeLeto - predLeto) / predLeto;
+    trendProcent = Math.round(diff * 1000) / 10; // e.g. 12.3%
     trend = diff > 0.02 ? "rast" : diff < -0.02 ? "padec" : "stabilno";
+  }
+
+  // Energetska korekcija
+  let energetskaKorekcija: EtnAnaliza["energetskaKorekcija"] = null;
+  let energyFactor = 1;
+  if (energyClass) {
+    const normalized = energyClass.toUpperCase().replace(/\s/g, "");
+    const correction = ENERGY_CORRECTION[normalized];
+    if (correction !== undefined) {
+      energyFactor = 1 + correction;
+      energetskaKorekcija = { razred: normalized, faktor: correction };
+    }
+  }
+
+  // Ocenjena vrednost = median × površina × energetski faktor, ±10%
+  let ocenjenaTrznaVrednost: number | null = null;
+  let ocenaVrednostiMin: number | null = null;
+  let ocenaVrednostiMax: number | null = null;
+  if (area && area > 0) {
+    const base = med * area * energyFactor;
+    ocenjenaTrznaVrednost = Math.round(base);
+    ocenaVrednostiMin = Math.round(base * 0.9);
+    ocenaVrednostiMax = Math.round(base * 1.1);
   }
 
   return {
@@ -118,10 +165,15 @@ export async function getEtnAnaliza(
     medianaCenaM2: Math.round(med),
     minCenaM2: Math.round(min),
     maxCenaM2: Math.round(max),
-    ocenjenaTrznaVrednost: area ? Math.round(med * area) : null,
+    ocenjenaTrznaVrednost,
+    ocenaVrednostiMin,
+    ocenaVrednostiMax,
+    energetskaKorekcija,
+    trendProcent,
     trend,
     zadnjeLeto,
     predLeto,
+    imeKo,
     letniPodatki,
   };
 }

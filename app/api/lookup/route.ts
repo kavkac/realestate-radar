@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
       }).catch(() => null),
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
-      getEtnAnaliza(stavba.koId, useableArea).catch(() => null),
+      getEtnAnaliza(stavba.koId, useableArea, null).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
       lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
@@ -256,6 +256,13 @@ export async function POST(request: NextRequest) {
         co2: cert.co2Emissions,
         kondicionirana: cert.conditionedArea,
       };
+    }
+
+    // Re-run ETN with energy class if cert available (applies correction to value estimate)
+    let etnAnalizaFinal = etnAnaliza;
+    if (energyCertResult?.energyClass && etnAnaliza && useableArea) {
+      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass).catch(() => null);
+      if (corrected) etnAnalizaFinal = corrected;
     }
 
     return NextResponse.json({
@@ -320,7 +327,7 @@ export async function POST(request: NextRequest) {
       energetskaIzkaznica,
       parcele,
       renVrednost,
-      etnAnaliza,
+      etnAnaliza: etnAnalizaFinal,
       seizmicniPodatki,
       poplavnaNevarnost,
       osmData: osmData ?? null,
