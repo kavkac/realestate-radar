@@ -1975,44 +1975,48 @@ function OcenaVrednostiSection({
     <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
       <p className="text-xs text-gray-500 mb-1">Tržna ocena · {etnAnaliza.steviloTransakcij} primerljivih prodaj · {etnAnaliza.imeKo ?? "ista KO"}</p>
 
-      {/* Skupna vrednost objekta — PROMINENTNO */}
-      {buildingMin != null && buildingMax != null ? (
-        <div className="mb-2">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Ocenjena vrednost objekta</p>
-          <p className="text-2xl font-bold text-gray-900 leading-tight">
-            {buildingMin.toLocaleString("sl-SI")} – {buildingMax.toLocaleString("sl-SI")} €
-          </p>
-          <p className="text-[10px] text-gray-400 mt-0.5">{totalBuildingArea?.toLocaleString("sl-SI")} m² · ±10%</p>
-        </div>
-      ) : totalBuildingArea ? (
-        <div className="mb-2">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Ocenjena vrednost objekta</p>
-          <p className="text-xl font-bold text-gray-900">
-            ~{Math.round((etnAnaliza.medianaCenaM2 * totalBuildingArea * energyFactor * lokacijskiFaktor)).toLocaleString("sl-SI")} €
-          </p>
-          <p className="text-[10px] text-gray-400 mt-0.5">{totalBuildingArea} m² · groba ocena</p>
-        </div>
-      ) : null}
-
-      {/* Cena/m² + trend */}
-      <div className="flex items-baseline gap-1.5 mb-1 pt-1 border-t border-blue-100">
-        <span className="text-sm font-semibold text-gray-700">{etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m²</span>
-        <span className="text-[10px] text-gray-400">mediana</span>
-        {etnAnaliza.trendProcent != null && (
-          <span className={`text-[10px] font-medium ${etnAnaliza.trendProcent > 0 ? "text-green-600" : etnAnaliza.trendProcent < 0 ? "text-red-600" : "text-gray-500"}`}>
-            {etnAnaliza.trendProcent > 0 ? "↑" : etnAnaliza.trendProcent < 0 ? "↓" : "→"}{Math.abs(etnAnaliza.trendProcent)}% lani
-          </span>
-        )}
-      </div>
-
-      {/* Izbrana enota */}
-      {unitMin != null && unitMax != null && (
-        <div className="mt-2 pt-2 border-t border-blue-200">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Izbrana enota ({selectedUnitArea} m²)</p>
-          <p className="text-lg font-bold text-gray-800">
-            {unitMin.toLocaleString("sl-SI")} – {unitMax.toLocaleString("sl-SI")} €
-          </p>
-        </div>
+      {/* Ko je enota izbrana → prikaži SAMO vrednost enote */}
+      {unitMin != null && unitMax != null ? (
+        <>
+          <div className="mb-2">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Ocenjena vrednost enote</p>
+            <p className="text-2xl font-bold text-gray-900 leading-tight">
+              {unitMin.toLocaleString("sl-SI")} – {unitMax.toLocaleString("sl-SI")} €
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{selectedUnitArea?.toLocaleString("sl-SI")} m² · ±10%</p>
+          </div>
+          <div className="flex items-baseline gap-1.5 mb-1 pt-1 border-t border-blue-100">
+            <span className="text-sm font-semibold text-gray-700">{etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m²</span>
+            <span className="text-[10px] text-gray-400">mediana</span>
+            {etnAnaliza.trendProcent != null && (
+              <span className={`text-[10px] font-medium ${etnAnaliza.trendProcent > 0 ? "text-green-600" : etnAnaliza.trendProcent < 0 ? "text-red-600" : "text-gray-500"}`}>
+                {etnAnaliza.trendProcent > 0 ? "↑" : etnAnaliza.trendProcent < 0 ? "↓" : "→"}{Math.abs(etnAnaliza.trendProcent)}% lani
+              </span>
+            )}
+          </div>
+        </>
+      ) : (
+        /* Ko ni izbrane enote → prikaži vrednost celega objekta */
+        <>
+          {buildingMin != null && buildingMax != null ? (
+            <div className="mb-2">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Ocenjena vrednost objekta</p>
+              <p className="text-2xl font-bold text-gray-900 leading-tight">
+                {buildingMin.toLocaleString("sl-SI")} – {buildingMax.toLocaleString("sl-SI")} €
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{totalBuildingArea?.toLocaleString("sl-SI")} m² · ±10%</p>
+            </div>
+          ) : null}
+          <div className="flex items-baseline gap-1.5 mb-1 pt-1 border-t border-blue-100">
+            <span className="text-sm font-semibold text-gray-700">{etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m²</span>
+            <span className="text-[10px] text-gray-400">mediana</span>
+            {etnAnaliza.trendProcent != null && (
+              <span className={`text-[10px] font-medium ${etnAnaliza.trendProcent > 0 ? "text-green-600" : etnAnaliza.trendProcent < 0 ? "text-red-600" : "text-gray-500"}`}>
+                {etnAnaliza.trendProcent > 0 ? "↑" : etnAnaliza.trendProcent < 0 ? "↓" : "→"}{Math.abs(etnAnaliza.trendProcent)}% lani
+              </span>
+            )}
+          </div>
+        </>
       )}
 
       {/* Korekcijski faktorji */}
