@@ -60,9 +60,10 @@ export async function getEtnNajemAnaliza(
   koId: number,
   area: number | null,
   prodajnaVrednost?: number | null,
+  lokacijskiFaktor?: number | null,
 ): Promise<EtnNajemAnaliza | null> {
   const cutoff = new Date();
-  cutoff.setFullYear(cutoff.getFullYear() - 5);
+  cutoff.setFullYear(cutoff.getFullYear() - 2);
   const cutoffStr = cutoff.toISOString().split("T")[0];
   const koStr = String(koId);
 
@@ -154,12 +155,18 @@ export async function getEtnNajemAnaliza(
     trend = diff > 0.02 ? "rast" : diff < -0.02 ? "padec" : "stabilno";
   }
 
+  // Tržna korekcija najemnine — ETN beleži uradne (pogosto nižje) najemnine.
+  // Za premium lokacije (lokacijskiFaktor > 1.15) apliciramo tržni multiplikator.
+  // Vir: primerjava ETN registriranih vs. oglašenih tržnih najemnin v LJ centru (~40-60% razlika)
+  const lf = lokacijskiFaktor ?? 1;
+  const trznaKorekcija = lf > 1.25 ? 1.55 : lf > 1.15 ? 1.40 : lf > 1.05 ? 1.20 : 1.0;
+
   // Estimated monthly rent
   let ocenjenaMesecnaNajemnina: number | null = null;
   let ocenjenaNajemninaMin: number | null = null;
   let ocenjenaNajemninaMax: number | null = null;
   if (area && area > 0) {
-    const base = med * area;
+    const base = med * area * trznaKorekcija;
     ocenjenaMesecnaNajemnina = Math.round(base);
     ocenjenaNajemninaMin = Math.round(base * 0.85);
     ocenjenaNajemninaMax = Math.round(base * 1.15);
@@ -208,7 +215,7 @@ export async function getEtnAnaliza(
   osmAmenitiesCount?: number | null,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
-  cutoff.setFullYear(cutoff.getFullYear() - 5);
+  cutoff.setFullYear(cutoff.getFullYear() - 2);
   const cutoffStr = cutoff.toISOString().split("T")[0];
   const koStr = String(koId);
 

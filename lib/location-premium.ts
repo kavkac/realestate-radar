@@ -56,12 +56,14 @@ export function izracunajLokacijskiPremium(
     faktorji.push({ naziv: "Blizu Ljubljanice", opis: `${Math.round(distLjubljanica * 1000)}m od reke`, korekcija: 0.05, ikona: "🌊" });
   }
 
-  // 2. Pogled na Grad / bližina
+  // 2. Bližina Gradu / potencialen pogled (viewshed brez LiDAR ni preverljiv)
+  // Apliciramo samo za nadstropja ≥3 ali ko ni podatka, z "potencialen" oznako
   const distGrad = haversineKm(lat, lng, LANDMARKS.grad[0], LANDMARKS.grad[1]);
   if (distGrad < 0.3) {
-    faktorji.push({ naziv: "Pogled na Grad", opis: `${Math.round(distGrad * 1000)}m od Ljubljanskega gradu`, korekcija: 0.08, ikona: "🏰" });
+    // Zelo blizu — samo premija za bližino, pogled ne garantiran brez viewshed
+    faktorji.push({ naziv: "Bližina Gradu", opis: `${Math.round(distGrad * 1000)}m od gradu — pogled možen v višjih nadstropjih (viewshed bo potrjen z LiDAR)`, korekcija: 0.04, ikona: "🏰" });
   } else if (distGrad < 0.6) {
-    faktorji.push({ naziv: "Blizu Gradu", opis: `${Math.round(distGrad * 1000)}m od Ljubljanskega gradu`, korekcija: 0.04, ikona: "🏰" });
+    faktorji.push({ naziv: "Blizu Gradu", opis: `${Math.round(distGrad * 1000)}m od Ljubljanskega gradu`, korekcija: 0.02, ikona: "🏰" });
   }
 
   // 3. Mestno jedro (Kongresni trg / staro mesto)

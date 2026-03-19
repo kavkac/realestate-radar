@@ -289,7 +289,8 @@ export async function POST(request: NextRequest) {
     let etnNajemAnalizaFinal = etnNajemAnaliza;
     const prodajnaVrednost = etnAnalizaFinal?.ocenjenaTrznaVrednost ?? null;
     if (etnNajemAnaliza && prodajnaVrednost && useableArea) {
-      const withDonos = await getEtnNajemAnaliza(stavba.koId, useableArea, prodajnaVrednost).catch(() => null);
+      const lokacijskiFaktor = etnAnalizaFinal?.lokacijskiPremium?.skupniFaktor ?? null;
+      const withDonos = await getEtnNajemAnaliza(stavba.koId, useableArea, prodajnaVrednost, lokacijskiFaktor).catch(() => null);
       if (withDonos) etnNajemAnalizaFinal = withDonos;
     }
 

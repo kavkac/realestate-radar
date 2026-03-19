@@ -2023,8 +2023,9 @@ function OcenaVrednostiSection({
       </p>
       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
         <span className="text-[10px] text-gray-400">
-          {etnNajemAnaliza.medianaNajemnineM2.toLocaleString("sl-SI", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} €/m²/mesec · {etnNajemAnaliza.steviloPoslov} najemnih poslov
+          {etnNajemAnaliza.medianaNajemnineM2.toLocaleString("sl-SI", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} €/m²/mesec (ETN) · {etnNajemAnaliza.steviloPoslov} poslov
         </span>
+        <span className="text-[10px] text-purple-400 italic">tržno korigirano</span>
       </div>
       {etnNajemAnaliza.brutoDonosLetni != null && (
         <p className={`text-sm font-bold mt-1.5 ${etnNajemAnaliza.brutoDonosLetni >= 5 ? "text-green-700" : etnNajemAnaliza.brutoDonosLetni >= 3 ? "text-yellow-700" : "text-red-600"}`}>
