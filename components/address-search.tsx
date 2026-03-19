@@ -113,6 +113,8 @@ interface LookupResult {
     yearBuilt?: number;
     name?: string;
   } | null;
+  totalBuildingArea?: number | null;
+  selectedUnitArea?: number | null;
 }
 
 type SearchMode = "naslov" | "parcela";
