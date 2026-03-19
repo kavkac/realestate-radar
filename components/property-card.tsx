@@ -1971,65 +1971,6 @@ function OcenaVrednostiSection({
     </div>
   ) : null;
 
-  // Per-unit: izbrana enota z vrednotenjem
-  if (hasSelectedUnit && currentPartVrednotenje?.posplosenaVrednost != null) {
-    const posplosenaVrednost = currentPartVrednotenje.posplosenaVrednost!;
-    const vrednostNaM2 = currentPartVrednotenje.vrednostNaM2;
-    return (
-      <section>
-        <Label vir="Množično vrednotenje · GURS · EV_SLO">Ocenjena vrednost enote</Label>
-        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
-          <p className="text-2xl font-bold text-gray-800">
-            {posplosenaVrednost.toLocaleString("sl-SI")} €
-          </p>
-          {vrednostNaM2 != null && (
-            <p className="text-xs text-gray-500 mt-0.5">
-              {vrednostNaM2.toLocaleString("sl-SI")} €/m²
-            </p>
-          )}
-          <p className="text-xs text-gray-400 mt-1">
-            Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
-          </p>
-        </div>
-        {etnCenaBlock ?? etnBlock}
-        {najemBlock}
-      </section>
-    );
-  }
-
-  // Building-level: cela stavba z renVrednost
-  if (!hasSelectedUnit && renVrednost) {
-    const evSkupaj = deliStavbe.reduce(
-      (sum, d) => sum + (d.vrednotenje?.posplosenaVrednost ?? 0),
-      0,
-    );
-    return (
-      <section>
-        <Label vir="Množično vrednotenje · GURS">Ocenjena vrednost stavbe</Label>
-        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
-          <p className="text-2xl font-bold text-gray-800">
-            {renVrednost.vrednost.toLocaleString("sl-SI")} €
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Vir: GURS množično vrednotenje
-            {renVrednost.datumOcene ? ` — ${renVrednost.datumOcene}` : ""}
-          </p>
-          {evSkupaj > 0 && (
-            <p className="text-xs text-gray-400 mt-1">
-              Skupna vrednost enot (EV): {evSkupaj.toLocaleString("sl-SI")} € — informativno
-            </p>
-          )}
-          <p className="text-xs text-gray-400 mt-1">
-            Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
-          </p>
-        </div>
-        {etnBlock}
-        {najemBlock}
-      </section>
-    );
-  }
-
-  // ETN cena/m² blok — prikaži vedno ko imamo ETN podatke (tudi brez izračunane vrednosti)
   const etnCenaBlock = etnAnaliza && etnAnaliza.steviloTransakcij > 0 ? (
     <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
       <p className="text-xs text-gray-500 mb-1">Tržna ocena · {etnAnaliza.steviloTransakcij} primerljivih prodaj · {etnAnaliza.imeKo ?? "ista KO"}</p>
@@ -2111,6 +2052,66 @@ function OcenaVrednostiSection({
       )}
     </div>
   ) : null;
+
+    // Per-unit: izbrana enota z vrednotenjem
+  if (hasSelectedUnit && currentPartVrednotenje?.posplosenaVrednost != null) {
+    const posplosenaVrednost = currentPartVrednotenje.posplosenaVrednost!;
+    const vrednostNaM2 = currentPartVrednotenje.vrednostNaM2;
+    return (
+      <section>
+        <Label vir="Množično vrednotenje · GURS · EV_SLO">Ocenjena vrednost enote</Label>
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
+          <p className="text-2xl font-bold text-gray-800">
+            {posplosenaVrednost.toLocaleString("sl-SI")} €
+          </p>
+          {vrednostNaM2 != null && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              {vrednostNaM2.toLocaleString("sl-SI")} €/m²
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">
+            Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
+          </p>
+        </div>
+        {etnCenaBlock ?? etnBlock}
+        {najemBlock}
+      </section>
+    );
+  }
+
+  // Building-level: cela stavba z renVrednost
+  if (!hasSelectedUnit && renVrednost) {
+    const evSkupaj = deliStavbe.reduce(
+      (sum, d) => sum + (d.vrednotenje?.posplosenaVrednost ?? 0),
+      0,
+    );
+    return (
+      <section>
+        <Label vir="Množično vrednotenje · GURS">Ocenjena vrednost stavbe</Label>
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3">
+          <p className="text-2xl font-bold text-gray-800">
+            {renVrednost.vrednost.toLocaleString("sl-SI")} €
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Vir: GURS množično vrednotenje
+            {renVrednost.datumOcene ? ` — ${renVrednost.datumOcene}` : ""}
+          </p>
+          {evSkupaj > 0 && (
+            <p className="text-xs text-gray-400 mt-1">
+              Skupna vrednost enot (EV): {evSkupaj.toLocaleString("sl-SI")} € — informativno
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">
+            Posplošena tržna vrednost — GURS množično vrednotenje. Ni enako tržni ceni.
+          </p>
+        </div>
+        {etnBlock}
+        {najemBlock}
+      </section>
+    );
+  }
+
+  // ETN cena/m² blok — prikaži vedno ko imamo ETN podatke (tudi brez izračunane vrednosti)
 
   // Ni uradnih podatkov — prikaži vsaj ETN ali najem če obstaja
   if (etnCenaBlock || etnBlock || najemBlock) {
