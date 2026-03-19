@@ -171,6 +171,8 @@ interface PropertyCardProps {
   renVrednost?: RenVrednost | null;
   etnAnaliza?: EtnAnaliza | null;
   etnNajemAnaliza?: EtnNajemAnaliza | null;
+  totalBuildingArea?: number | null;
+  selectedUnitArea?: number | null;
   lat?: number | null;
   lng?: number | null;
   requestedDel?: number;
@@ -254,6 +256,8 @@ export function PropertyCard({
   renVrednost,
   etnAnaliza,
   etnNajemAnaliza,
+  totalBuildingArea,
+  selectedUnitArea,
   lat,
   lng,
   requestedDel,
@@ -602,6 +606,8 @@ export function PropertyCard({
               hasSelectedUnit={!!(activePart || requestedDel != null)}
               etnAnaliza={etnAnaliza}
               etnNajemAnaliza={etnNajemAnaliza}
+              totalBuildingArea={totalBuildingArea}
+              selectedUnitArea={selectedUnitArea}
             />
           </div>
 
@@ -1875,6 +1881,8 @@ function OcenaVrednostiSection({
   hasSelectedUnit,
   etnAnaliza,
   etnNajemAnaliza,
+  totalBuildingArea,
+  selectedUnitArea,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
@@ -1882,7 +1890,21 @@ function OcenaVrednostiSection({
   hasSelectedUnit: boolean;
   etnAnaliza?: EtnAnaliza | null;
   etnNajemAnaliza?: EtnNajemAnaliza | null;
+  totalBuildingArea?: number | null;
+  selectedUnitArea?: number | null;
 }) {
+  // Compute ETN-based value estimates using correct areas
+  const mediana = etnAnaliza?.medianaCenaM2 ?? null;
+  const energyFactor = etnAnaliza?.energetskaKorekcija
+    ? 1 + etnAnaliza.energetskaKorekcija.faktor
+    : 1;
+
+  const buildingValueBase = mediana && totalBuildingArea ? mediana * totalBuildingArea * energyFactor : null;
+  const unitValueBase = mediana && selectedUnitArea ? mediana * selectedUnitArea * energyFactor : null;
+  const buildingMin = buildingValueBase ? Math.round(buildingValueBase * 0.9) : null;
+  const buildingMax = buildingValueBase ? Math.round(buildingValueBase * 1.1) : null;
+  const unitMin = unitValueBase ? Math.round(unitValueBase * 0.9) : null;
+  const unitMax = unitValueBase ? Math.round(unitValueBase * 1.1) : null;
   // ETN tržna primerjava — prikaži pod uradnimi vrednostmi
   const etnBlock = etnAnaliza?.ocenaVrednostiMin != null && etnAnaliza?.ocenaVrednostiMax != null ? (
     <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
@@ -1990,39 +2012,52 @@ function OcenaVrednostiSection({
   // ETN cena/m² blok — prikaži vedno ko imamo ETN podatke (tudi brez izračunane vrednosti)
   const etnCenaBlock = etnAnaliza && etnAnaliza.steviloTransakcij > 0 ? (
     <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
-      <p className="text-xs text-gray-500 mb-0.5">Tržna cena (primerljive prodaje)</p>
-      {etnAnaliza.ocenaVrednostiMin != null && etnAnaliza.ocenaVrednostiMax != null ? (
-        <>
-          <p className="text-lg font-bold text-gray-800">
-            {etnAnaliza.ocenaVrednostiMin.toLocaleString("sl-SI")} – {etnAnaliza.ocenaVrednostiMax.toLocaleString("sl-SI")} €
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">ocenjena vrednost ±10%</p>
-        </>
-      ) : (
-        <p className="text-lg font-bold text-gray-800">
-          {etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m²
-          <span className="text-xs font-normal text-gray-500 ml-1">(mediana)</span>
-        </p>
-      )}
-      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+      <p className="text-xs text-gray-500 mb-1">Tržna ocena · {etnAnaliza.steviloTransakcij} primerljivih prodaj · {etnAnaliza.imeKo ?? "ista KO"}</p>
+
+      {/* Cena/m² vedno */}
+      <div className="flex items-baseline gap-1.5 mb-1">
+        <span className="text-base font-bold text-gray-800">{etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m²</span>
+        <span className="text-[10px] text-gray-400">mediana</span>
         {etnAnaliza.trendProcent != null && (
           <span className={`text-[10px] font-medium ${etnAnaliza.trendProcent > 0 ? "text-green-600" : etnAnaliza.trendProcent < 0 ? "text-red-600" : "text-gray-500"}`}>
-            {etnAnaliza.trendProcent > 0 ? "↑" : etnAnaliza.trendProcent < 0 ? "↓" : "→"} {Math.abs(etnAnaliza.trendProcent)}% lani
+            {etnAnaliza.trendProcent > 0 ? "↑" : etnAnaliza.trendProcent < 0 ? "↓" : "→"}{Math.abs(etnAnaliza.trendProcent)}% lani
           </span>
         )}
-        <span className="text-[10px] text-gray-400">
-          {etnAnaliza.steviloTransakcij} prodaj · {etnAnaliza.imeKo ?? "ista KO"} · 5 let
-        </span>
       </div>
+
+      {/* Cel objekt */}
+      {buildingMin != null && buildingMax != null && (
+        <div className="mt-1.5">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Cel objekt</p>
+          <p className="text-xl font-bold text-gray-900">
+            {buildingMin.toLocaleString("sl-SI")} – {buildingMax.toLocaleString("sl-SI")} €
+          </p>
+          <p className="text-[10px] text-gray-400">{totalBuildingArea?.toLocaleString("sl-SI")} m² × {etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m² ±10%</p>
+        </div>
+      )}
+
+      {/* Izbrana enota */}
+      {unitMin != null && unitMax != null && (
+        <div className="mt-2 pt-2 border-t border-blue-200">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Izbrana enota</p>
+          <p className="text-lg font-bold text-gray-800">
+            {unitMin.toLocaleString("sl-SI")} – {unitMax.toLocaleString("sl-SI")} €
+          </p>
+          <p className="text-[10px] text-gray-400">{selectedUnitArea?.toLocaleString("sl-SI")} m² ±10%</p>
+        </div>
+      )}
+
+      {/* Energetska korekcija */}
       {etnAnaliza.energetskaKorekcija && (
-        <span className={`inline-block text-[10px] px-1 py-0.5 rounded font-medium mt-1 ${
+        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-medium mt-2 ${
           etnAnaliza.energetskaKorekcija.faktor > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
         }`}>
-          EIZ {etnAnaliza.energetskaKorekcija.razred}: {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}%
+          EIZ {etnAnaliza.energetskaKorekcija.razred}: {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}% upoštevano
         </span>
       )}
-      {!hasSelectedUnit && (
-        <p className="text-[10px] text-gray-400 mt-1 italic">Izberite enoto za natančno oceno vrednosti</p>
+
+      {!hasSelectedUnit && !unitMin && totalBuildingArea && (
+        <p className="text-[10px] text-gray-400 mt-1.5 italic">Izberite enoto za vrednost posamezne enote</p>
       )}
     </div>
   ) : null;
@@ -2031,7 +2066,7 @@ function OcenaVrednostiSection({
   if (etnCenaBlock || etnBlock || najemBlock) {
     return (
       <section>
-        <Label vir="ETN GURS">Ocenjena vrednost</Label>
+        <Label vir="ETN GURS · tržne transakcije">Ocenjena vrednost</Label>
         {etnCenaBlock ?? etnBlock}
         {najemBlock}
       </section>

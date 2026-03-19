@@ -175,11 +175,22 @@ export async function POST(request: NextRequest) {
       delStavbe ?? (deliStavbe.length === 1 ? deliStavbe[0].stDelaStavbe : undefined);
 
     // Useable area for ETN analysis
-    const useableArea =
-      deliStavbe[0]?.uporabnaPovrsina ?? deliStavbe[0]?.povrsina ?? null;
+    // If a specific unit is selected → use that unit's area
+    // If no unit selected → use total building area (sum of all units)
+    const selectedUnit = delStavbe != null ? deliStavbe.find(d => d.stDelaStavbe === delStavbe) : null;
+    const totalBuildingArea = deliStavbe.reduce((sum, d) => sum + (d.uporabnaPovrsina ?? d.povrsina ?? 0), 0) || null;
+    const useableArea = selectedUnit
+      ? (selectedUnit.uporabnaPovrsina ?? selectedUnit.povrsina ?? null)
+      : totalBuildingArea;
 
-    // Determine property type for ETN filtering (use first unit's type)
-    const etnDejanskaRaba = (deliStavbe[0] as { vrstaRabe?: string | null; vrsta?: string | null })?.vrstaRabe ?? deliStavbe[0]?.vrsta ?? null;
+    // Also compute selected unit area separately for display
+    const selectedUnitArea = selectedUnit
+      ? (selectedUnit.uporabnaPovrsina ?? selectedUnit.povrsina ?? null)
+      : null;
+
+    // Determine property type for ETN filtering
+    const etnSourceUnit = selectedUnit ?? deliStavbe[0];
+    const etnDejanskaRaba = (etnSourceUnit as { vrstaRabe?: string | null; vrsta?: string | null })?.vrstaRabe ?? etnSourceUnit?.vrsta ?? null;
 
     // Check gas infrastructure via ZK GJI
     const gasInfrastructure =
@@ -341,6 +352,8 @@ export async function POST(request: NextRequest) {
       renVrednost,
       etnAnaliza: etnAnalizaFinal,
       etnNajemAnaliza: etnNajemAnalizaFinal,
+      totalBuildingArea,
+      selectedUnitArea,
       seizmicniPodatki,
       poplavnaNevarnost,
       osmData: osmData ?? null,
