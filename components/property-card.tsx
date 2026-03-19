@@ -1987,12 +1987,52 @@ function OcenaVrednostiSection({
     );
   }
 
+  // ETN cena/m² blok — prikaži vedno ko imamo ETN podatke (tudi brez izračunane vrednosti)
+  const etnCenaBlock = etnAnaliza && etnAnaliza.steviloTransakcij > 0 ? (
+    <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
+      <p className="text-xs text-gray-500 mb-0.5">Tržna cena (primerljive prodaje)</p>
+      {etnAnaliza.ocenaVrednostiMin != null && etnAnaliza.ocenaVrednostiMax != null ? (
+        <>
+          <p className="text-lg font-bold text-gray-800">
+            {etnAnaliza.ocenaVrednostiMin.toLocaleString("sl-SI")} – {etnAnaliza.ocenaVrednostiMax.toLocaleString("sl-SI")} €
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">ocenjena vrednost ±10%</p>
+        </>
+      ) : (
+        <p className="text-lg font-bold text-gray-800">
+          {etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m²
+          <span className="text-xs font-normal text-gray-500 ml-1">(mediana)</span>
+        </p>
+      )}
+      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+        {etnAnaliza.trendProcent != null && (
+          <span className={`text-[10px] font-medium ${etnAnaliza.trendProcent > 0 ? "text-green-600" : etnAnaliza.trendProcent < 0 ? "text-red-600" : "text-gray-500"}`}>
+            {etnAnaliza.trendProcent > 0 ? "↑" : etnAnaliza.trendProcent < 0 ? "↓" : "→"} {Math.abs(etnAnaliza.trendProcent)}% lani
+          </span>
+        )}
+        <span className="text-[10px] text-gray-400">
+          {etnAnaliza.steviloTransakcij} prodaj · {etnAnaliza.imeKo ?? "ista KO"} · 5 let
+        </span>
+      </div>
+      {etnAnaliza.energetskaKorekcija && (
+        <span className={`inline-block text-[10px] px-1 py-0.5 rounded font-medium mt-1 ${
+          etnAnaliza.energetskaKorekcija.faktor > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+        }`}>
+          EIZ {etnAnaliza.energetskaKorekcija.razred}: {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}%
+        </span>
+      )}
+      {!hasSelectedUnit && (
+        <p className="text-[10px] text-gray-400 mt-1 italic">Izberite enoto za natančno oceno vrednosti</p>
+      )}
+    </div>
+  ) : null;
+
   // Ni uradnih podatkov — prikaži vsaj ETN ali najem če obstaja
-  if (etnBlock || najemBlock) {
+  if (etnCenaBlock || etnBlock || najemBlock) {
     return (
       <section>
         <Label vir="ETN GURS">Ocenjena vrednost</Label>
-        {etnBlock}
+        {etnCenaBlock ?? etnBlock}
         {najemBlock}
       </section>
     );
