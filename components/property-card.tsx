@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
+import { izracunajVisinoStropov } from "@/lib/location-premium";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
 import { izracunajOcenaStanja } from "@/lib/gurs-api";
 
@@ -609,6 +610,9 @@ export function PropertyCard({
               etnNajemAnaliza={etnNajemAnaliza}
               totalBuildingArea={totalBuildingArea}
               selectedUnitArea={selectedUnitArea}
+              stavbaVisina={stavba.visina}
+              stavbaSteviloEtaz={stavba.steviloEtaz}
+              stavbaLetoIzgradnje={stavba.letoIzgradnje}
             />
           </div>
 
@@ -1884,6 +1888,9 @@ function OcenaVrednostiSection({
   etnNajemAnaliza,
   totalBuildingArea,
   selectedUnitArea,
+  stavbaVisina,
+  stavbaSteviloEtaz,
+  stavbaLetoIzgradnje,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
@@ -1893,7 +1900,18 @@ function OcenaVrednostiSection({
   etnNajemAnaliza?: EtnNajemAnaliza | null;
   totalBuildingArea?: number | null;
   selectedUnitArea?: number | null;
+  stavbaVisina?: number | null;
+  stavbaSteviloEtaz?: number | null;
+  stavbaLetoIzgradnje?: number | null;
 }) {
+  // Višina stropov
+  const visinaStropov = izracunajVisinoStropov(
+    stavbaVisina ?? null,
+    stavbaSteviloEtaz ?? null,
+    stavbaLetoIzgradnje ?? null,
+  );
+  const stropKorekcija = visinaStropov.korekcija;
+
   // Compute ETN-based value estimates using correct areas
   const mediana = etnAnaliza?.medianaCenaM2 ?? null;
   const energyFactor = etnAnaliza?.energetskaKorekcija
@@ -1901,8 +1919,8 @@ function OcenaVrednostiSection({
     : 1;
 
   const lokacijskiFaktor = etnAnaliza?.lokacijskiPremium?.skupniFaktor ?? 1;
-  const buildingValueBase = mediana && totalBuildingArea ? mediana * totalBuildingArea * energyFactor * lokacijskiFaktor : null;
-  const unitValueBase = mediana && selectedUnitArea ? mediana * selectedUnitArea * energyFactor * lokacijskiFaktor : null;
+  const buildingValueBase = mediana && totalBuildingArea ? mediana * totalBuildingArea * energyFactor * lokacijskiFaktor * (1 + stropKorekcija) : null;
+  const unitValueBase = mediana && selectedUnitArea ? mediana * selectedUnitArea * energyFactor * lokacijskiFaktor * (1 + stropKorekcija) : null;
   const buildingMin = buildingValueBase ? Math.round(buildingValueBase * 0.9) : null;
   const buildingMax = buildingValueBase ? Math.round(buildingValueBase * 1.1) : null;
   const unitMin = unitValueBase ? Math.round(unitValueBase * 0.9) : null;
@@ -2066,6 +2084,15 @@ function OcenaVrednostiSection({
                 etnAnaliza.energetskaKorekcija.faktor > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
               }`}>
                 EIZ {etnAnaliza.energetskaKorekcija.razred} {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}%
+              </span>
+            )}
+            {/* Višina stropov */}
+            {visinaStropov.visinaCm > 0 && (
+              <span title={visinaStropov.opis} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                visinaStropov.korekcija > 0 ? "bg-blue-100 text-blue-700" : visinaStropov.korekcija < 0 ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"
+              }`}>
+                📐 {(visinaStropov.visinaCm / 100).toFixed(2)}m stropi{visinaStropov.korekcija !== 0 ? ` ${visinaStropov.korekcija > 0 ? "+" : ""}${Math.round(visinaStropov.korekcija * 100)}%` : ""}
+                {visinaStropov.metoda !== "izmerjena" && " ~"}
               </span>
             )}
             {etnAnaliza.lokacijskiPremium?.faktorji?.map((f, i) => (

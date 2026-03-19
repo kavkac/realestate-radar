@@ -104,3 +104,44 @@ export function izracunajLokacijskiPremium(
 
   return { skupniFaktor, faktorji };
 }
+
+export interface VisinaSstropov {
+  visinaCm: number;
+  metoda: "izmerjena" | "ocenjena_leto" | "ocenjena_default";
+  opis: string;
+  korekcija: number; // vrednostna korekcija
+}
+
+export function izracunajVisinoStropov(
+  visinaStvabe: number | null,
+  steviloEtaz: number | null,
+  letoIzgradnje: number | null,
+): VisinaSstropov {
+  // Metoda 1: Iz izmerjene višine stavbe / število etaž
+  if (visinaStvabe && visinaStvabe > 0 && steviloEtaz && steviloEtaz > 0) {
+    // Odštejemo ~0.3m na etažo za medetažne plošče
+    const brutoNaEtazo = visinaStvabe / steviloEtaz;
+    const netoCm = Math.round((brutoNaEtazo - 0.3) * 100);
+    if (netoCm >= 200 && netoCm <= 500) {
+      const korekcija = netoCm >= 320 ? 0.05 : netoCm >= 290 ? 0.02 : netoCm < 250 ? -0.03 : 0;
+      return {
+        visinaCm: netoCm,
+        metoda: "izmerjena",
+        opis: `${(visinaStvabe / steviloEtaz).toFixed(1)}m bruto / etažo`,
+        korekcija,
+      };
+    }
+  }
+
+  // Metoda 2: Ocena iz leta izgradnje
+  if (letoIzgradnje) {
+    if (letoIzgradnje < 1918) return { visinaCm: 350, metoda: "ocenjena_leto", opis: "Predvojna gradnja", korekcija: 0.06 };
+    if (letoIzgradnje < 1945) return { visinaCm: 320, metoda: "ocenjena_leto", opis: "Medvojna gradnja", korekcija: 0.04 };
+    if (letoIzgradnje < 1965) return { visinaCm: 295, metoda: "ocenjena_leto", opis: "Povojska gradnja", korekcija: 0.02 };
+    if (letoIzgradnje < 1990) return { visinaCm: 265, metoda: "ocenjena_leto", opis: "Socialistična gradnja", korekcija: 0 };
+    if (letoIzgradnje < 2005) return { visinaCm: 270, metoda: "ocenjena_leto", opis: "Gradnja 90ih", korekcija: 0 };
+    return { visinaCm: 275, metoda: "ocenjena_leto", opis: "Sodobna gradnja", korekcija: 0.01 };
+  }
+
+  return { visinaCm: 265, metoda: "ocenjena_default", opis: "Povprečna vrednost", korekcija: 0 };
+}
