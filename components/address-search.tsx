@@ -630,6 +630,8 @@ export function AddressSearch() {
               renVrednost={activeTab.data.renVrednost}
               etnAnaliza={activeTab.data.etnAnaliza}
               etnNajemAnaliza={activeTab.data.etnNajemAnaliza}
+              totalBuildingArea={activeTab.data.totalBuildingArea}
+              selectedUnitArea={activeTab.data.selectedUnitArea}
               lat={activeTab.data.lat}
               lng={activeTab.data.lng}
               osmData={activeTab.data.osmData}

@@ -541,13 +541,6 @@ export function PropertyCard({
             />
           </CollapsibleSection>
 
-          {/* 8. Tržne transakcije (ETN) — zložljivo, privzeto ZAPRTO */}
-          {etnAnaliza && (
-            <CollapsibleSection title="Tržne transakcije" vir="ETN · GURS" defaultOpen={false}>
-              <VrednostnaAnalizaSection data={etnAnaliza} />
-            </CollapsibleSection>
-          )}
-
           {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
           {/* 9. Storitve — vedno odprto */}
