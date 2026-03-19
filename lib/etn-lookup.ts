@@ -624,47 +624,46 @@ export async function getEtnAnaliza(
     }
   }
 
-  // ── LEVEL 3: Regijska mediana 15km na KO centroidih (min 20 skupaj) → zaupanje 3 ──
+  // ── LEVEL 3: Regijska mediana 2km direktna proximity (min 15 skupaj) → zaupanje 3 ──
+  // Namesto 15km KO centroidov: 2km direktna proximity na ev_stavba (kot Level 1 a širša)
   if (selectedParsed.length < 5 && lat != null && lng != null) {
-    const hasCentroids = await checkKoCentroidsTable();
-    if (hasCentroids) {
-      try {
-        const { wgs84ToD96 } = await import("./wgs84-to-d96");
-        const { e, n } = wgs84ToD96(lat, lng);
-        const radiusM = 15000;
-        const regijskeRows = await prisma.$queryRawUnsafe<Row[]>(
-          `SELECT
-            p.pogodbena_cena_odskodnina::float AS cena,
-            COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe)::float AS povrsina,
-            COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
-            d.ime_ko
-          FROM etn_posli p
-          JOIN etn_delistavb d ON d.id_posla = p.id_posla
-          JOIN ko_centroids kc ON kc.ko_sifko = d.sifra_ko
-          WHERE p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
-            AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
-            AND p.pogodbena_cena_odskodnina::float > 0
-            AND d.povrsina_dela_stavbe::float > 0
-            AND TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') >= $1::date
-            AND p.trznost_posla IN ('1','2','5')
-            AND p.vrsta_kupoprodajnega_posla = '1'
-            AND (kc.e_centroid - $2)^2 + (kc.n_centroid - $3)^2 <= $4
-            ${tipFilter}
-          ORDER BY TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') DESC
-          LIMIT 500`,
-          cutoffStr, e, n, radiusM * radiusM,
-        );
-        const parsed = parseRows(regijskeRows);
-        if (parsed.length >= 20) {
-          selectedRows = regijskeRows;
-          selectedParsed = parsed;
-          vir = 'regija';
-          zaupanje = 3;
-          imeKo = null; // regijsko, ne specifična KO
-        }
-      } catch {
-        // fall through
+    try {
+      const { wgs84ToD96 } = await import("./wgs84-to-d96");
+      const { e, n } = wgs84ToD96(lat, lng);
+      const radiusM = 2000; // 2km — sosednje ulice, ne cela regija
+      const regijskeRows = await prisma.$queryRawUnsafe<Row[]>(
+        `SELECT
+          p.pogodbena_cena_odskodnina::float AS cena,
+          d.povrsina_dela_stavbe::float AS povrsina,
+          COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
+          d.ime_ko
+        FROM etn_posli p
+        JOIN etn_delistavb d ON d.id_posla = p.id_posla
+        JOIN ev_stavba ev ON ev.ko_sifko = d.sifra_ko AND ev.stev_st = d.stevilka_stavbe
+        WHERE p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND p.pogodbena_cena_odskodnina::float > 0
+          AND d.povrsina_dela_stavbe::float > 0
+          AND TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') >= $1::date
+          AND p.trznost_posla IN ('1','2','5')
+          AND p.vrsta_kupoprodajnega_posla = '1'
+          AND ev.e IS NOT NULL AND ev.n IS NOT NULL AND ev.e != '' AND ev.n != ''
+          AND (ev.e::float - $2)^2 + (ev.n::float - $3)^2 <= $4
+          ${tipFilter}
+        ORDER BY TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') DESC
+        LIMIT 500`,
+        cutoffStr, e, n, radiusM * radiusM,
+      );
+      const parsed = parseRows(regijskeRows);
+      if (parsed.length >= 15) {
+        selectedRows = regijskeRows;
+        selectedParsed = parsed;
+        vir = 'regija';
+        zaupanje = 3;
+        imeKo = regijskeRows[0]?.ime_ko ?? null;
       }
+    } catch {
+      // fall through to Level 4
     }
   }
 
