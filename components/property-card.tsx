@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { CreditCalculator } from "./credit-calculator";
-import { izracunajVisinoStropov } from "@/lib/location-premium";
+import { izracunajVisinoStropov, izracunajStavbneKorekcije } from "@/lib/location-premium";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
 import { izracunajOcenaStanja } from "@/lib/gurs-api";
 
@@ -147,6 +147,9 @@ interface OsmBuildingData {
   wallMaterial?: string;
   yearBuilt?: number;
   name?: string;
+  busStopsCount?: number;
+  trainStationsCount?: number;
+  tramStopsCount?: number;
 }
 
 interface PropertyCardProps {
@@ -314,6 +317,8 @@ export function PropertyCard({
       },
     }),
   };
+
+  const varstvoPodatki = jeVVarstveniConi(lat, lng);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-left text-gray-700 print:shadow-none print:border-0">
@@ -613,6 +618,17 @@ export function PropertyCard({
               stavbaVisina={stavba.visina}
               stavbaSteviloEtaz={stavba.steviloEtaz}
               stavbaLetoIzgradnje={stavba.letoIzgradnje}
+              stavbaKonstrukcija={stavba.konstrukcija}
+              stavbaLetoObnove={stavba.letoObnove}
+              varstvo={varstvoPodatki}
+              selectedUnitDvigalo={currentPart?.dvigalo ?? (deliStavbe.length === 1 ? deliStavbe[0].dvigalo : undefined)}
+              selectedUnitLetoObnoveInstalacij={currentPart?.letoObnoveInstalacij ?? (deliStavbe.length === 1 ? deliStavbe[0].letoObnoveInstalacij : undefined)}
+              selectedUnitLetoObnoveOken={currentPart?.letoObnoveOken ?? (deliStavbe.length === 1 ? deliStavbe[0].letoObnoveOken : undefined)}
+              selectedUnitLastniki={currentPart?.lastnistvo ?? (deliStavbe.length === 1 ? deliStavbe[0].lastnistvo : undefined)}
+              osmBusStops={osmData?.busStopsCount}
+              osmTrainStations={osmData?.trainStationsCount}
+              osmTramStops={osmData?.tramStopsCount}
+              osmWallMaterial={osmData?.wallMaterial}
             />
           </div>
 
@@ -1891,6 +1907,17 @@ function OcenaVrednostiSection({
   stavbaVisina,
   stavbaSteviloEtaz,
   stavbaLetoIzgradnje,
+  stavbaKonstrukcija,
+  stavbaLetoObnove,
+  varstvo,
+  selectedUnitDvigalo,
+  selectedUnitLetoObnoveInstalacij,
+  selectedUnitLetoObnoveOken,
+  selectedUnitLastniki,
+  osmBusStops,
+  osmTrainStations,
+  osmTramStops,
+  osmWallMaterial,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
@@ -1903,6 +1930,17 @@ function OcenaVrednostiSection({
   stavbaVisina?: number | null;
   stavbaSteviloEtaz?: number | null;
   stavbaLetoIzgradnje?: number | null;
+  stavbaKonstrukcija?: string | null;
+  stavbaLetoObnove?: { fasade: number | null; strehe: number | null } | null;
+  varstvo?: { varuje: boolean; naziv: string | null } | null;
+  selectedUnitDvigalo?: boolean;
+  selectedUnitLetoObnoveInstalacij?: number | null;
+  selectedUnitLetoObnoveOken?: number | null;
+  selectedUnitLastniki?: { tipOsebe: string }[];
+  osmBusStops?: number;
+  osmTrainStations?: number;
+  osmTramStops?: number;
+  osmWallMaterial?: string | null;
 }) {
   // Višina stropov
   const visinaStropov = izracunajVisinoStropov(
@@ -1912,6 +1950,31 @@ function OcenaVrednostiSection({
   );
   const stropKorekcija = visinaStropov.korekcija;
 
+  // Stavbne korekcije — izračunamo po mediani
+  const stavbneKorekcije = izracunajStavbneKorekcije({
+    varuje: varstvo?.varuje,
+    varstvo: varstvo?.naziv,
+    dvigalo: selectedUnitDvigalo,
+    steviloEtaz: stavbaSteviloEtaz ?? undefined,
+    letoObnoveInstalacij: selectedUnitLetoObnoveInstalacij,
+    letoObnoveOken: selectedUnitLetoObnoveOken,
+    letoObnoveFasade: stavbaLetoObnove?.fasade,
+    letoObnoveSrehe: stavbaLetoObnove?.strehe,
+    letoIzgradnje: stavbaLetoIzgradnje ?? undefined,
+    konstrukcija: stavbaKonstrukcija,
+    wallMaterial: osmWallMaterial,
+    letniPodatki: etnAnaliza?.letniPodatki,
+    steviloTransakcij: etnAnaliza?.steviloTransakcij,
+    evVrednost: renVrednost?.vrednost ?? null,
+    etnEstimate: (etnAnaliza?.medianaCenaM2 ?? 0) > 0 && (totalBuildingArea ?? 0) > 0
+      ? etnAnaliza!.medianaCenaM2 * totalBuildingArea!
+      : null,
+    lastniki: selectedUnitLastniki?.map(l => ({ tipOsebe: l.tipOsebe })),
+    busStopsCount: osmBusStops,
+    trainStationsCount: osmTrainStations,
+    tramStopsCount: osmTramStops,
+  });
+
   // Compute ETN-based value estimates using correct areas
   const mediana = etnAnaliza?.medianaCenaM2 ?? null;
   const energyFactor = etnAnaliza?.energetskaKorekcija
@@ -1919,8 +1982,8 @@ function OcenaVrednostiSection({
     : 1;
 
   const lokacijskiFaktor = etnAnaliza?.lokacijskiPremium?.skupniFaktor ?? 1;
-  const buildingValueBase = mediana && totalBuildingArea ? mediana * totalBuildingArea * energyFactor * lokacijskiFaktor * (1 + stropKorekcija) : null;
-  const unitValueBase = mediana && selectedUnitArea ? mediana * selectedUnitArea * energyFactor * lokacijskiFaktor * (1 + stropKorekcija) : null;
+  const buildingValueBase = mediana && totalBuildingArea ? mediana * totalBuildingArea * energyFactor * lokacijskiFaktor * (1 + stropKorekcija) * stavbneKorekcije.skupniFaktor : null;
+  const unitValueBase = mediana && selectedUnitArea ? mediana * selectedUnitArea * energyFactor * lokacijskiFaktor * (1 + stropKorekcija) * stavbneKorekcije.skupniFaktor : null;
   const buildingMin = buildingValueBase ? Math.round(buildingValueBase * 0.9) : null;
   const buildingMax = buildingValueBase ? Math.round(buildingValueBase * 1.1) : null;
   const unitMin = unitValueBase ? Math.round(unitValueBase * 0.9) : null;
@@ -2020,36 +2083,46 @@ function OcenaVrednostiSection({
       )}
 
       {/* Korekcijski faktorji */}
-      {(etnAnaliza.energetskaKorekcija || (etnAnaliza.lokacijskiPremium?.faktorji?.length ?? 0) > 0) && (
-        <div className="mt-2 pt-2 border-t border-blue-200">
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Upoštevani faktorji</p>
-          <div className="flex flex-wrap gap-1">
-            {etnAnaliza.energetskaKorekcija && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                etnAnaliza.energetskaKorekcija.faktor > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-              }`}>
-                EIZ {etnAnaliza.energetskaKorekcija.razred} {etnAnaliza.energetskaKorekcija.faktor > 0 ? "+" : ""}{Math.round(etnAnaliza.energetskaKorekcija.faktor * 100)}%
-              </span>
-            )}
-            {/* Višina stropov */}
-            {visinaStropov.visinaCm > 0 && (
-              <span title={visinaStropov.opis} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                visinaStropov.korekcija > 0 ? "bg-blue-100 text-blue-700" : visinaStropov.korekcija < 0 ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"
-              }`}>
-                📐 {(visinaStropov.visinaCm / 100).toFixed(2)}m stropi{visinaStropov.korekcija !== 0 ? ` ${visinaStropov.korekcija > 0 ? "+" : ""}${Math.round(visinaStropov.korekcija * 100)}%` : ""}
-                {visinaStropov.metoda !== "izmerjena" && " ~"}
-              </span>
-            )}
-            {etnAnaliza.lokacijskiPremium?.faktorji?.map((f, i) => (
-              <span key={i} title={f.opis} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                f.korekcija > 0 ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"
-              }`}>
-                {f.ikona} {f.naziv} {f.korekcija > 0 ? "+" : ""}{Math.round(f.korekcija * 100)}%
-              </span>
-            ))}
+      {/* Faktorji — vsi zbrani */}
+      {(() => {
+        const vsiFaktorji = [
+          // EIZ
+          ...(etnAnaliza.energetskaKorekcija ? [{
+            naziv: `EIZ ${etnAnaliza.energetskaKorekcija.razred}`,
+            ikona: "⚡",
+            opis: `Energetski razred ${etnAnaliza.energetskaKorekcija.razred}`,
+            korekcija: etnAnaliza.energetskaKorekcija.faktor,
+          }] : []),
+          // Višina stropov
+          ...(visinaStropov.visinaCm > 0 ? [{
+            naziv: `${(visinaStropov.visinaCm / 100).toFixed(2)}m stropi${visinaStropov.metoda !== "izmerjena" ? " ~" : ""}`,
+            ikona: "📐",
+            opis: visinaStropov.opis,
+            korekcija: visinaStropov.korekcija,
+          }] : []),
+          // Lokacijski premium
+          ...(etnAnaliza.lokacijskiPremium?.faktorji ?? []),
+          // Stavbne korekcije
+          ...stavbneKorekcije.faktorji,
+        ];
+        if (vsiFaktorji.length === 0) return null;
+        return (
+          <div className="mt-2 pt-2 border-t border-blue-200">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Upoštevani faktorji</p>
+            <div className="flex flex-wrap gap-1">
+              {vsiFaktorji.map((f, i) => (
+                <span key={i} title={f.opis} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  f.korekcija > 0.001 ? "bg-green-100 text-green-700" :
+                  f.korekcija < -0.001 ? "bg-red-100 text-red-700" :
+                  "bg-gray-100 text-gray-500"
+                }`}>
+                  {f.ikona} {f.naziv}{f.korekcija !== 0 ? ` ${f.korekcija > 0 ? "+" : ""}${Math.round(f.korekcija * 100)}%` : ""}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {!hasSelectedUnit && !unitMin && totalBuildingArea && (
         <p className="text-[10px] text-gray-400 mt-1.5 italic">Izberite enoto za vrednost posamezne enote</p>

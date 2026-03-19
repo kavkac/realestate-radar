@@ -7,6 +7,10 @@ export interface OsmBuildingData {
   wallMaterial?: string;
   yearBuilt?: number;
   name?: string;
+  // Javni promet v bližini (300m)
+  busStopsCount?: number;
+  trainStationsCount?: number;
+  tramStopsCount?: number;
 }
 
 export async function fetchOsmBuildingData(
@@ -14,10 +18,20 @@ export async function fetchOsmBuildingData(
   lng: number,
 ): Promise<OsmBuildingData | null> {
   try {
-    const query = `[out:json][timeout:10];way["building"](around:30,${lat},${lng});out tags;`;
+    // Query 1: building data (30m radius)
+    // Query 2: javni promet (300m radius) — combined in one request
+    const query = `[out:json][timeout:15];
+(
+  way["building"](around:30,${lat},${lng});
+  node["highway"="bus_stop"](around:300,${lat},${lng});
+  node["railway"="station"](around:300,${lat},${lng});
+  node["railway"="tram_stop"](around:300,${lat},${lng});
+  node["public_transport"="stop_position"](around:300,${lat},${lng});
+);
+out tags;`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(() => controller.abort(), 12_000);
 
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
@@ -34,30 +48,44 @@ export async function fetchOsmBuildingData(
     const elements = json?.elements;
     if (!Array.isArray(elements) || elements.length === 0) return null;
 
-    const way = elements[0];
-    const tags = way.tags ?? {};
+    // Building data (first way element)
+    const wayEl = elements.find((e: { type: string }) => e.type === "way");
+    const result: OsmBuildingData = { osmId: wayEl?.id };
 
-    const result: OsmBuildingData = { osmId: way.id };
+    if (wayEl) {
+      const tags = wayEl.tags ?? {};
+      if (tags["building:levels"]) {
+        const v = parseInt(tags["building:levels"], 10);
+        if (!isNaN(v)) result.levels = v;
+      }
+      if (tags["building:height"]) {
+        const v = parseFloat(tags["building:height"]);
+        if (!isNaN(v)) result.heightM = v;
+      }
+      if (tags["roof:shape"]) result.roofShape = tags["roof:shape"];
+      if (tags["roof:material"]) result.roofMaterial = tags["roof:material"];
+      if (tags["wall"]) result.wallMaterial = tags["wall"];
+      if (tags["building:year"]) {
+        const v = parseInt(tags["building:year"], 10);
+        if (!isNaN(v)) result.yearBuilt = v;
+      } else if (tags["start_date"]) {
+        const v = parseInt(tags["start_date"], 10);
+        if (!isNaN(v)) result.yearBuilt = v;
+      }
+      if (tags["name"]) result.name = tags["name"];
+    }
 
-    if (tags["building:levels"]) {
-      const v = parseInt(tags["building:levels"], 10);
-      if (!isNaN(v)) result.levels = v;
-    }
-    if (tags["building:height"]) {
-      const v = parseFloat(tags["building:height"]);
-      if (!isNaN(v)) result.heightM = v;
-    }
-    if (tags["roof:shape"]) result.roofShape = tags["roof:shape"];
-    if (tags["roof:material"]) result.roofMaterial = tags["roof:material"];
-    if (tags["wall"]) result.wallMaterial = tags["wall"];
-    if (tags["building:year"]) {
-      const v = parseInt(tags["building:year"], 10);
-      if (!isNaN(v)) result.yearBuilt = v;
-    } else if (tags["start_date"]) {
-      const v = parseInt(tags["start_date"], 10);
-      if (!isNaN(v)) result.yearBuilt = v;
-    }
-    if (tags["name"]) result.name = tags["name"];
+    // Javni promet
+    const nodes = elements.filter((e: { type: string }) => e.type === "node");
+    result.busStopsCount = nodes.filter((n: { tags?: Record<string, string> }) =>
+      n.tags?.["highway"] === "bus_stop" || n.tags?.["public_transport"] === "stop_position"
+    ).length;
+    result.trainStationsCount = nodes.filter((n: { tags?: Record<string, string> }) =>
+      n.tags?.["railway"] === "station"
+    ).length;
+    result.tramStopsCount = nodes.filter((n: { tags?: Record<string, string> }) =>
+      n.tags?.["railway"] === "tram_stop"
+    ).length;
 
     return result;
   } catch {

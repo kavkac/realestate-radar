@@ -145,3 +145,189 @@ export function izracunajVisinoStropov(
 
   return { visinaCm: 265, metoda: "ocenjena_default", opis: "Povprečna vrednost", korekcija: 0 };
 }
+
+export interface StavbnaKorekcija {
+  naziv: string;
+  ikona: string;
+  opis: string;
+  korekcija: number;
+}
+
+export interface StavbneKorekcije {
+  faktorji: StavbnaKorekcija[];
+  skupniFaktor: number; // multiplikativni produkt vseh korekcij, capped ±30%
+}
+
+interface StavbneKorekcijeInput {
+  // Varstvo
+  varuje?: boolean;
+  varstvo?: string | null;
+  // Dvigalo + etaže
+  dvigalo?: boolean;
+  steviloEtaz?: number | null;
+  // Obnova
+  letoObnoveInstalacij?: number | null;
+  letoObnoveOken?: number | null;
+  letoObnoveFasade?: number | null;
+  letoObnoveSrehe?: number | null;
+  letoIzgradnje?: number | null;
+  // Konstrukcija
+  konstrukcija?: string | null;
+  // ETN apreciacija (iz letniPodatki)
+  letniPodatki?: { leto: number; medianaCenaM2: number; steviloPoslov: number }[];
+  steviloTransakcij?: number;
+  // EV vs ETN
+  evVrednost?: number | null;
+  etnEstimate?: number | null;
+  // Lastniška struktura (delež pravnih oseb)
+  lastniki?: { tipOsebe: string }[];
+  // OSM javni promet
+  busStopsCount?: number;
+  trainStationsCount?: number;
+  tramStopsCount?: number;
+  // OSM wall material
+  wallMaterial?: string | null;
+}
+
+export function izracunajStavbneKorekcije(input: StavbneKorekcijeInput): StavbneKorekcije {
+  const faktorji: StavbnaKorekcija[] = [];
+  const now = new Date().getFullYear();
+
+  // 1. VARSTVO NEPREMIČNINE
+  if (input.varuje) {
+    faktorji.push({
+      naziv: "Varstvo",
+      ikona: "🏛️",
+      opis: `Stavba pod spomeniškim varstvom${input.varstvo ? `: ${input.varstvo}` : ""} — kakovostna arhitektura, privilegirana lokacija`,
+      korekcija: 0.12,
+    });
+  }
+
+  // 2. DVIGALO + NADSTROPJA
+  if (input.steviloEtaz != null && input.steviloEtaz >= 4) {
+    if (input.dvigalo === false) {
+      const malus = input.steviloEtaz >= 6 ? -0.10 : -0.06;
+      faktorji.push({
+        naziv: "Brez dvigala",
+        ikona: "🪜",
+        opis: `${input.steviloEtaz}-etažna stavba brez dvigala — fizični napor, nizka dostopnost`,
+        korekcija: malus,
+      });
+    } else if (input.dvigalo === true) {
+      faktorji.push({
+        naziv: "Dvigalo",
+        ikona: "🛗",
+        opis: "Stavba ima dvigalo — udobna dostopnost",
+        korekcija: 0.03,
+      });
+    }
+  }
+
+  // 3. OBNOVA — vsak svežo obnovljen element +2%
+  const obnovaElements: { leto: number | null | undefined; naziv: string }[] = [
+    { leto: input.letoObnoveInstalacij, naziv: "instalacije" },
+    { leto: input.letoObnoveOken, naziv: "okna" },
+    { leto: input.letoObnoveFasade, naziv: "fasada" },
+    { leto: input.letoObnoveSrehe, naziv: "streha" },
+  ];
+  const svezaObnova = obnovaElements.filter(e => e.leto != null && now - e.leto! <= 10);
+  if (svezaObnova.length > 0) {
+    const k = Math.min(svezaObnova.length * 0.02, 0.08);
+    faktorji.push({
+      naziv: "Sveža obnova",
+      ikona: "🔧",
+      opis: `Obnovljeno v zadnjih 10 letih: ${svezaObnova.map(e => e.naziv).join(", ")}`,
+      korekcija: k,
+    });
+  }
+  // Stara neobnova malus
+  if (input.letoIzgradnje && now - input.letoIzgradnje > 40 && svezaObnova.length === 0) {
+    faktorji.push({
+      naziv: "Zastarelo",
+      ikona: "🏚️",
+      opis: `Stavba iz ${input.letoIzgradnje}, brez evidentirane obnove — višji stroški vzdrževanja`,
+      korekcija: -0.05,
+    });
+  }
+
+  // 4. KONSTRUKCIJA
+  if (input.konstrukcija) {
+    const k = input.konstrukcija.toLowerCase();
+    if (k.includes("masivn") || k.includes("kamen") || k.includes("opeka")) {
+      faktorji.push({ naziv: "Masivna gradnja", ikona: "🧱", opis: "Opeka/kamen — trajnost, zvočna izolacija, kakovost", korekcija: 0.03 });
+    } else if (k.includes("montažn") || k.includes("panel")) {
+      faktorji.push({ naziv: "Montažna gradnja", ikona: "🏗️", opis: "Montažna/panelna konstrukcija — nižja kakovost gradnje", korekcija: -0.04 });
+    } else if (k.includes("les")) {
+      // Lesena: premium če nova, malus če stara
+      const letoBonus = input.letoIzgradnje && input.letoIzgradnje >= 2010 ? 0.05 : -0.03;
+      faktorji.push({ naziv: "Lesena gradnja", ikona: "🪵", opis: input.letoIzgradnje && input.letoIzgradnje >= 2010 ? "Sodobna lesena gradnja — ekološko, premium segment" : "Starejša lesena gradnja", korekcija: letoBonus });
+    }
+  }
+
+  // 5. OSM wall material
+  if (input.wallMaterial) {
+    const w = input.wallMaterial.toLowerCase();
+    if (["stone", "brick", "sandstone"].some(v => w.includes(v))) {
+      faktorji.push({ naziv: "Fasada", ikona: "✨", opis: `OSM: ${input.wallMaterial} — kakovostna/umetniška fasada`, korekcija: 0.04 });
+    }
+  }
+
+  // 6. APRECIACIJA KO (trend zadnja 3 leta)
+  if (input.letniPodatki && input.letniPodatki.length >= 3) {
+    const sorted = [...input.letniPodatki].sort((a, b) => b.leto - a.leto);
+    const recent = sorted.slice(0, 3).filter(d => d.steviloPoslov >= 3);
+    if (recent.length >= 2) {
+      const growth = (recent[0].medianaCenaM2 - recent[recent.length - 1].medianaCenaM2) / recent[recent.length - 1].medianaCenaM2;
+      const annualized = growth / (recent.length - 1);
+      if (annualized > 0.08) {
+        faktorji.push({ naziv: "Visoka apreciacija", ikona: "📈", opis: `Cene v tej KO rastejo ${Math.round(annualized * 100)}%/leto — višje povpraševanje`, korekcija: 0.03 });
+      } else if (annualized < -0.03) {
+        faktorji.push({ naziv: "Padajoč trg", ikona: "📉", opis: `Cene v tej KO padajo ${Math.round(Math.abs(annualized) * 100)}%/leto`, korekcija: -0.03 });
+      }
+    }
+  }
+
+  // 7. LIKVIDNOST — hitrost prometa
+  if (input.steviloTransakcij != null) {
+    if (input.steviloTransakcij >= 100) {
+      faktorji.push({ naziv: "Likviden trg", ikona: "⚡", opis: `${input.steviloTransakcij} transakcij v KO — hitro prodajno območje`, korekcija: 0.02 });
+    } else if (input.steviloTransakcij < 15) {
+      faktorji.push({ naziv: "Nelikviden trg", ikona: "🐌", opis: `Samo ${input.steviloTransakcij} transakcij — manjši interes, počasna prodaja`, korekcija: -0.03 });
+    }
+  }
+
+  // 8. EV vs ETN: podvrednoteno?
+  if (input.evVrednost && input.etnEstimate && input.etnEstimate > 0) {
+    const ratio = input.evVrednost / input.etnEstimate;
+    if (ratio < 0.70) {
+      faktorji.push({ naziv: "GURS podvrednoten", ikona: "💡", opis: `Uradna vrednost ${Math.round(ratio * 100)}% od tržne ocene — nižja davčna osnova`, korekcija: 0 }); // informativno, ne vpliva na ceno
+    } else if (ratio > 1.30) {
+      faktorji.push({ naziv: "GURS nadvrednoten", ikona: "⚠️", opis: `Uradna vrednost ${Math.round(ratio * 100)}% od tržne ocene`, korekcija: 0 });
+    }
+  }
+
+  // 9. LASTNIŠKA STRUKTURA
+  if (input.lastniki && input.lastniki.length > 0) {
+    const pravneOsebe = input.lastniki.filter(l => l.tipOsebe === "Pravna oseba").length;
+    const delez = pravneOsebe / input.lastniki.length;
+    if (delez > 0.5) {
+      faktorji.push({ naziv: "Investicijska stavba", ikona: "🏢", opis: `${Math.round(delez * 100)}% lastnikov so pravne osebe — profesionalno upravljana stavba`, korekcija: 0.03 });
+    }
+  }
+
+  // 10. JAVNI PROMET (OSM)
+  const transitScore = (input.busStopsCount ?? 0) + (input.tramStopsCount ?? 0) * 2 + (input.trainStationsCount ?? 0) * 4;
+  if (transitScore >= 6) {
+    faktorji.push({ naziv: "Odlična dostopnost", ikona: "🚌", opis: `${input.busStopsCount ?? 0} avtobusnih + ${input.tramStopsCount ?? 0} tramvajskih + ${input.trainStationsCount ?? 0} železniških postaj v 300m`, korekcija: 0.04 });
+  } else if (transitScore >= 2) {
+    faktorji.push({ naziv: "Dobra dostopnost", ikona: "🚌", opis: `Javni promet v 300m: ${input.busStopsCount ?? 0} bus postaj`, korekcija: 0.02 });
+  } else if (transitScore === 0) {
+    faktorji.push({ naziv: "Slab javni promet", ikona: "🚗", opis: "Ni javnega prevoza v 300m — odvisnost od avtomobila", korekcija: -0.03 });
+  }
+
+  // Skupni faktor (multiplikativno, capped ±30%)
+  const raw = faktorji.reduce((acc, f) => acc * (1 + f.korekcija), 1);
+  const skupniFaktor = Math.max(0.70, Math.min(1.30, raw));
+
+  return { faktorji, skupniFaktor };
+}

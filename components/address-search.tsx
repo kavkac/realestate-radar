@@ -112,6 +112,9 @@ interface LookupResult {
     wallMaterial?: string;
     yearBuilt?: number;
     name?: string;
+    busStopsCount?: number;
+    trainStationsCount?: number;
+    tramStopsCount?: number;
   } | null;
   totalBuildingArea?: number | null;
   selectedUnitArea?: number | null;
