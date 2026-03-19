@@ -536,13 +536,6 @@ export function PropertyCard({
             </CollapsibleSection>
           )}
 
-          {/* 8b. Najemni posli (ETN) */}
-          {etnNajemAnaliza && (
-            <CollapsibleSection title="Najemni posli" vir="ETN · GURS · najemni posli" defaultOpen={false}>
-              <NajemAnalyzaSection data={etnNajemAnaliza} />
-            </CollapsibleSection>
-          )}
-
           {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
           {/* 9. Storitve — vedno odprto */}
