@@ -9,11 +9,14 @@
  * Transit R²<2% iz ETN analize (kolinearen z KO lokacijo).
  */
 
+import { prisma } from "@/lib/prisma";
+
 const GOOGLE_MAPS_API_KEY =
   process.env.GOOGLE_MAPS_API_KEY ?? "AIzaSyBdsTqzdIZ8MTDnnrvtelugoEYXjS-V1wQ";
 
 const RADIUS_TRANSIT = 600;   // 600m za javni prevoz
 const RADIUS_SERVICES = 500;  // 500m za storitve
+const DB_CACHE_DAYS = 30;     // 30 dni TTL v DB
 
 export interface TransitInfo {
   busStops: number;
@@ -47,12 +50,42 @@ export interface PlacesData {
   cached?: boolean;
 }
 
-// In-memory cache — resets on cold start
-const cache = new Map<string, { data: PlacesData; ts: number }>();
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+// In-memory L1 cache (per process, resets on cold start)
+const memCache = new Map<string, { data: PlacesData; ts: number }>();
+const MEM_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
 
-function cacheKey(lat: number, lng: number): string {
-  return `${lat.toFixed(3)},${lng.toFixed(3)}`;
+function gridKey(lat: number, lng: number): { latGrid: number; lngGrid: number } {
+  return {
+    latGrid: Math.round(lat * 1000) / 1000,
+    lngGrid: Math.round(lng * 1000) / 1000,
+  };
+}
+
+async function dbGet(latGrid: number, lngGrid: number): Promise<PlacesData | null> {
+  try {
+    type Row = { data: unknown; fetched_at: Date };
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT data, fetched_at FROM places_cache WHERE lat_grid = $1 AND lng_grid = $2 LIMIT 1`,
+      latGrid, lngGrid
+    );
+    if (!rows.length) return null;
+    const row = rows[0];
+    const ageMs = Date.now() - new Date(row.fetched_at).getTime();
+    if (ageMs > DB_CACHE_DAYS * 24 * 60 * 60 * 1000) return null; // expired
+    return row.data as PlacesData;
+  } catch { return null; }
+}
+
+async function dbSet(latGrid: number, lngGrid: number, data: PlacesData): Promise<void> {
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO places_cache (lat_grid, lng_grid, data, fetched_at)
+       VALUES ($1, $2, $3::jsonb, NOW())
+       ON CONFLICT (lat_grid, lng_grid)
+       DO UPDATE SET data = EXCLUDED.data, fetched_at = NOW()`,
+      latGrid, lngGrid, JSON.stringify(data)
+    );
+  } catch { /* non-critical */ }
 }
 
 interface PlacesResult {
@@ -121,10 +154,20 @@ export async function getPlacesData(
   lat: number,
   lng: number
 ): Promise<PlacesData | null> {
-  const key = cacheKey(lat, lng);
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
-    return { ...hit.data, cached: true };
+  const { latGrid, lngGrid } = gridKey(lat, lng);
+  const memKey = `${latGrid},${lngGrid}`;
+
+  // L1: in-memory (najhitrejše)
+  const memHit = memCache.get(memKey);
+  if (memHit && Date.now() - memHit.ts < MEM_CACHE_TTL_MS) {
+    return { ...memHit.data, cached: true };
+  }
+
+  // L2: DB cache (preživi restarte, deljeno med instancemi)
+  const dbHit = await dbGet(latGrid, lngGrid);
+  if (dbHit) {
+    memCache.set(memKey, { data: dbHit, ts: Date.now() });
+    return { ...dbHit, cached: true };
   }
 
   try {
@@ -240,7 +283,11 @@ export async function getPlacesData(
     };
 
     const result: PlacesData = { transit, services };
-    cache.set(key, { data: result, ts: Date.now() });
+
+    // Shrani v oba cache-a
+    memCache.set(memKey, { data: result, ts: Date.now() });
+    void dbSet(latGrid, lngGrid, result); // async, ne čakamo
+
     return result;
   } catch (err) {
     console.error("Places API error:", err);
