@@ -1560,9 +1560,8 @@ function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: 
         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <span className="text-sm font-medium text-gray-800 truncate">{u.naziv}</span>
-          <span className="text-sm text-gray-500 flex-shrink-0">{strosekLabel}</span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className={`text-xs ${prioritetaTextColor}`}>{prioritetaLabel}</span>
@@ -1573,6 +1572,8 @@ function UkrepKartica({ u, delez, hasSelectedUnit, isLast }: { u: Ukrep; delez: 
       {/* Podrobnosti — razvijejo se na klik */}
       {expanded && (
         <div className="px-3 pb-3 border-t border-gray-50 pt-2 space-y-1.5">
+          {/* Cena — prikazana šele ob razvitju */}
+          <p className="text-sm font-semibold text-gray-700">{strosekLabel}</p>
           <p className="text-xs text-gray-500">{u.opis}</p>
 
           {showDelez && u.skupniStrosekMin != null && (
