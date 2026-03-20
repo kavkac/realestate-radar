@@ -7,6 +7,7 @@ import { getEtnAnaliza, getEtnNajemAnaliza } from "@/lib/etn-lookup";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
+import { getPlacesData } from "@/lib/places-api";
 import { prisma } from "@/lib/prisma";
 
 const LookupSchema = z.object({
@@ -229,6 +230,12 @@ export async function POST(request: NextRequest) {
         ? fetchOsmBuildingData(lat, lng).catch(() => null)
         : Promise.resolve(null);
 
+    // Google Places — transit + amenitete (non-blocking, per-usage pricing ~$0.13/lookup)
+    const placesDataPromise =
+      lat != null && lng != null
+        ? getPlacesData(lat, lng).catch(() => null)
+        : Promise.resolve(null);
+
     // Oglasne cene — vzporedno z ostalimi klici
     const oglasneAnalizePromise = getOglasneAnalize(stavba.koId, null).catch(() => null);
 
@@ -418,6 +425,7 @@ export async function POST(request: NextRequest) {
       seizmicniPodatki,
       poplavnaNevarnost,
       osmData: osmData ?? null,
+      placesData: await placesDataPromise,
       oglasneAnalize: oglasneAnalize ?? null,
       propertyContext,
       // Tip prodaje: ločimo med prodajo enote in prodajo celotne stavbe

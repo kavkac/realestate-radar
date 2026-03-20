@@ -208,6 +208,7 @@ interface PropertyCardProps {
   oglasneAnalize?: OglasneAnalize | null;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   propertyContext?: PropertyContextData | null;
+  placesData?: unknown | null;
 }
 
 export interface PropertyContextData {
@@ -307,6 +308,7 @@ export function PropertyCard({
   oglasneAnalize,
   tipProdaje,
   propertyContext,
+  placesData,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
@@ -671,6 +673,7 @@ export function PropertyCard({
                 tipProdaje={tipProdaje}
                 parcele={parcele}
                 steviloEnot={stavba.steviloStanovanj}
+                placesData={(placesData as unknown as PlacesDataCard | null) ?? null}
               />
             </div>
           )}
@@ -1799,11 +1802,22 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
     );
 }
 
-function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot }: {
+interface PlacesTransit {
+  busStops: number; tramStops: number; trainStations: number;
+  nearestBusM: number | null; nearestTrainM: number | null;
+  kvaliteta: 'odlicna'|'dobra'|'srednja'|'slaba'; opis: string;
+}
+interface PlacesAmenity {
+  supermarkets: number; nearestSupermarketM: number | null;
+}
+interface PlacesDataCard { transit: PlacesTransit; amenities: PlacesAmenity }
+
+function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot, placesData }: {
   ctx: PropertyContextData;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   parcele?: Parcela[];
   steviloEnot?: number | null;
+  placesData?: PlacesDataCard | null;
 }) {
   const score = ctx.scoreTotal;
   const scoreColor = score >= 70 ? 'text-green-600' : score >= 50 ? 'text-yellow-600' : 'text-red-600';
@@ -1867,6 +1881,29 @@ function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot }: {
                 ⚠️ {s}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Javni prevoz + amenitete (Google Places) */}
+      {placesData && (
+        <div className="border-t border-gray-100 pt-2 space-y-1.5">
+          <p className="text-xs font-medium text-gray-500">Okolica (500m)</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+            {/* Transit */}
+            <span className={`font-medium ${
+              placesData.transit.kvaliteta === 'odlicna' ? 'text-green-700' :
+              placesData.transit.kvaliteta === 'dobra' ? 'text-blue-700' :
+              placesData.transit.kvaliteta === 'srednja' ? 'text-yellow-700' : 'text-red-600'
+            }`}>
+              🚌 {placesData.transit.opis}
+            </span>
+            {/* Supermarket */}
+            {placesData.amenities.supermarkets > 0 && (
+              <span>🛒 {placesData.amenities.supermarkets} trgovin
+                {placesData.amenities.nearestSupermarketM != null && ` (${placesData.amenities.nearestSupermarketM}m)`}
+              </span>
+            )}
           </div>
         </div>
       )}

@@ -654,6 +654,7 @@ export function AddressSearch() {
               oglasneAnalize={activeTab.data.oglasneAnalize}
               tipProdaje={(activeTab.data as unknown as { tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' }).tipProdaje}
               propertyContext={(activeTab.data as unknown as { propertyContext?: import('@/components/property-card').PropertyContextData }).propertyContext}
+              placesData={(activeTab.data as unknown as { placesData?: unknown }).placesData}
               seizmicniPodatki={activeTab.data.seizmicniPodatki as never}
               poplavnaNevarnost={activeTab.data.poplavnaNevarnost as never}
               requestedDel={activeTab.del}
