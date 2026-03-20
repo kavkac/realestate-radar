@@ -241,8 +241,8 @@ export async function POST(request: NextRequest) {
       }).catch(() => null),
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
-      getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba, lat, lng, null)
-        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, null, null, lat, lng, null).catch(() => null))
+      getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba, lat, lng, null, stavba.stStavbe)
+        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, null, null, lat, lng, null, stavba.stStavbe).catch(() => null))
         .catch(() => null),
       getEtnNajemAnaliza(stavba.koId, useableArea).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
@@ -307,8 +307,8 @@ export async function POST(request: NextRequest) {
     let etnAnalizaFinal = etnAnaliza;
     if (energyCertResult?.energyClass && etnAnaliza && useableArea) {
       const osmAmenitiesCount = osmData ? (Object.values(osmData as Record<string, unknown[]>).flat().length) : null;
-      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount)
-        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, null, lat, lng, osmAmenitiesCount).catch(() => null))
+      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe)
+        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe).catch(() => null))
         .catch(() => null);
       if (corrected) etnAnalizaFinal = corrected;
     }

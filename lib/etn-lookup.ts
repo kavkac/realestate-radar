@@ -514,6 +514,7 @@ export async function getEtnAnaliza(
   lat?: number | null,
   lng?: number | null,
   osmAmenitiesCount?: number | null,
+  stStavbe?: number | null,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 2);
@@ -545,10 +546,44 @@ export async function getEtnAnaliza(
   let zaupanje: EtnAnaliza['zaupanje'] = 4;
   let imeKo: string | null = null;
 
-  if (lat != null && lng != null) {
+  // Pridobi koordinate stavbe direktno iz ev_stavba (zanesljivejše kot GURS→D96 konverzija)
+  // ev_stavba koordinate so isti vir kot ETN transakcije → garantirano ujemanje
+  let evE: number | null = null;
+  let evN: number | null = null;
+  try {
+    type CoordRow = { e: string; n: string };
+    // Najprej specifična stavba (stStavbe), potem KO centroid kot fallback
+    const coordRows = stStavbe != null
+      ? await prisma.$queryRawUnsafe<CoordRow[]>(
+          `SELECT e, n FROM ev_stavba WHERE ko_sifko = $1 AND stev_st = $2 AND e IS NOT NULL AND n IS NOT NULL AND e != '' AND n != '' LIMIT 1`,
+          koStr, String(stStavbe)
+        )
+      : await prisma.$queryRawUnsafe<CoordRow[]>(
+          `SELECT e, n FROM ev_stavba WHERE ko_sifko = $1 AND e IS NOT NULL AND n IS NOT NULL AND e != '' AND n != '' LIMIT 1`,
+          koStr
+        );
+    if (coordRows.length > 0) {
+      evE = parseFloat(coordRows[0].e);
+      evN = parseFloat(coordRows[0].n);
+      if (!isFinite(evE) || !isFinite(evN)) { evE = null; evN = null; }
+    }
+  } catch { /* ignore, fall through to GURS coords */ }
+
+  // Uporabi ev_stavba koordinate (primarno) ali GURS lat/lng (fallback)
+  let coordE: number | null = evE;
+  let coordN: number | null = evN;
+  if ((coordE == null || coordN == null) && lat != null && lng != null) {
     try {
       const { wgs84ToD96 } = await import("./wgs84-to-d96");
-      const { e, n } = wgs84ToD96(lat, lng);
+      const c = wgs84ToD96(lat, lng);
+      coordE = c.e; coordN = c.n;
+    } catch { /* ignore */ }
+  }
+
+  if (coordE != null && coordN != null) {
+    try {
+      const e = coordE;
+      const n = coordN;
       const radiusM = 400;
       const proximityRows = await prisma.$queryRawUnsafe<Row[]>(
         `SELECT
