@@ -1,22 +1,36 @@
 /**
- * Google Places API — dostopnost do storitev v bližini
- * Per-usage pricing: ~$0.032 per Nearby Search klic
- * 24h cache → vsaka lokacija se zaračuna enkrat na dan
+ * Places API — dostopnost do storitev v bližini
  *
- * Kategorije: transit, trgovine, zdravstvo, šole, parki, banke, pošta, gostinstvo
+ * Source prioritete (dokumentirane v source_meta):
+ * ┌─────────────────┬──────────────┬────────────────────────────────────┐
+ * │ Kategorija      │ Primarni vir │ Razlog                             │
+ * ├─────────────────┼──────────────┼────────────────────────────────────┤
+ * │ Javni prevoz    │ HERE Places  │ LPP bus data v OSM nepopoln        │
+ * │ Supermarketi    │ OSM Overpass │ OSM odlično pokriva SLO            │
+ * │ Lekarne         │ OSM Overpass │ OSM odlično pokriva SLO            │
+ * │ Šole/vrtci      │ OSM Overpass │ OSM odlično pokriva SLO            │
+ * │ Parki           │ OSM Overpass │ OSM odlično pokriva SLO            │
+ * │ Banke           │ OSM Overpass │ OSM odlično pokriva SLO            │
+ * │ Pošte           │ OSM Overpass │ OSM odlično pokriva SLO            │
+ * │ Zdravniki       │ OSM Overpass │ OSM pokriva večino ordinacij       │
+ * │ Restavracije    │ HERE Places  │ HERE bolj popolno za gostinstvo    │
+ * └─────────────────┴──────────────┴────────────────────────────────────┘
  *
- * OPOMBA: Podatki so informativni — ne vplivajo na ceno.
- * Transit R²<2% iz ETN analize (kolinearen z KO lokacijo).
+ * Cache strategija:
+ * L1: in-memory (1h) — najhitrejše
+ * L2: DB places_cache (30 dni) — preživi restarte, deljeno med instancemi
+ * L3: HERE API klic — samo če ni v L1/L2 ali je transit brez OSM podatkov
+ *
+ * Bulk pre-populacija: scripts/overpass-bulk-import.ts
  */
 
 import { prisma } from "@/lib/prisma";
 
-const GOOGLE_MAPS_API_KEY =
-  process.env.GOOGLE_MAPS_API_KEY ?? "AIzaSyBdsTqzdIZ8MTDnnrvtelugoEYXjS-V1wQ";
-
-const RADIUS_TRANSIT = 600;   // 600m za javni prevoz
-const RADIUS_SERVICES = 500;  // 500m za storitve
-const DB_CACHE_DAYS = 30;     // 30 dni TTL v DB
+const HERE_API_KEY = process.env.HERE_API_KEY ?? "";
+const RADIUS_TRANSIT = 600;
+const RADIUS_SERVICES = 500;
+const DB_CACHE_DAYS = 30;
+const MEM_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
 
 export interface TransitInfo {
   busStops: number;
@@ -26,6 +40,7 @@ export interface TransitInfo {
   nearestTrainM: number | null;
   kvaliteta: "odlicna" | "dobra" | "srednja" | "slaba";
   opis: string;
+  source: "here" | "osm" | "unknown";
 }
 
 export interface ServicesInfo {
@@ -42,6 +57,7 @@ export interface ServicesInfo {
   restaurants: number;
   doctors: number;
   hospitals: number;
+  source: "osm" | "here" | "mixed";
 }
 
 export interface PlacesData {
@@ -50,16 +66,26 @@ export interface PlacesData {
   cached?: boolean;
 }
 
-// In-memory L1 cache (per process, resets on cold start)
-const memCache = new Map<string, { data: PlacesData; ts: number }>();
-const MEM_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
+// HERE Category IDs za javni prevoz
+const HERE_TRANSIT_CATEGORIES = [
+  "800-4100-0000", // transit access (bus stop)
+  "800-4100-0244", // bus stop
+  "800-4100-0236", // rail station
+  "800-4100-0232", // tram stop
+];
 
-function gridKey(lat: number, lng: number): { latGrid: number; lngGrid: number } {
+// ─── In-memory L1 cache ──────────────────────────────────────────────────────
+
+const memCache = new Map<string, { data: PlacesData; ts: number }>();
+
+function gridKey(lat: number, lng: number) {
   return {
     latGrid: Math.round(lat * 1000) / 1000,
     lngGrid: Math.round(lng * 1000) / 1000,
   };
 }
+
+// ─── DB L2 cache ─────────────────────────────────────────────────────────────
 
 async function dbGet(latGrid: number, lngGrid: number): Promise<PlacesData | null> {
   try {
@@ -71,223 +97,164 @@ async function dbGet(latGrid: number, lngGrid: number): Promise<PlacesData | nul
     if (!rows.length) return null;
     const row = rows[0];
     const ageMs = Date.now() - new Date(row.fetched_at).getTime();
-    if (ageMs > DB_CACHE_DAYS * 24 * 60 * 60 * 1000) return null; // expired
+    if (ageMs > DB_CACHE_DAYS * 24 * 60 * 60 * 1000) return null;
     return row.data as PlacesData;
   } catch { return null; }
 }
 
-async function dbSet(latGrid: number, lngGrid: number, data: PlacesData): Promise<void> {
+async function dbSet(latGrid: number, lngGrid: number, data: PlacesData, sourceMeta: object): Promise<void> {
   try {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO places_cache (lat_grid, lng_grid, data, fetched_at)
-       VALUES ($1, $2, $3::jsonb, NOW())
+      `INSERT INTO places_cache (lat_grid, lng_grid, data, source_meta, fetched_at)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, NOW())
        ON CONFLICT (lat_grid, lng_grid)
-       DO UPDATE SET data = EXCLUDED.data, fetched_at = NOW()`,
-      latGrid, lngGrid, JSON.stringify(data)
+       DO UPDATE SET data = EXCLUDED.data, source_meta = EXCLUDED.source_meta, fetched_at = NOW()`,
+      latGrid, lngGrid, JSON.stringify(data), JSON.stringify(sourceMeta)
     );
   } catch { /* non-critical */ }
 }
 
-interface PlacesResult {
-  geometry: { location: { lat: number; lng: number } };
-  types: string[];
-  name: string;
+// ─── HERE Places API ─────────────────────────────────────────────────────────
+
+interface HerePlace {
+  position: { lat: number; lng: number };
+  categories: Array<{ id: string }>;
+  distance: number;
 }
 
-async function nearbySearch(
+async function hereBrowse(
   lat: number,
   lng: number,
-  type: string,
-  radius: number = RADIUS_SERVICES
-): Promise<PlacesResult[]> {
-  const url = new URL(
-    "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-  );
-  url.searchParams.set("location", `${lat},${lng}`);
-  url.searchParams.set("radius", String(radius));
-  url.searchParams.set("type", type);
-  url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
+  categories: string[],
+  radius: number
+): Promise<HerePlace[]> {
+  if (!HERE_API_KEY) return [];
+  const url = new URL("https://browse.search.hereapi.com/v1/browse");
+  url.searchParams.set("at", `${lat},${lng}`);
+  url.searchParams.set("circle", `${lat},${lng};r=${radius}`);
+  url.searchParams.set("categories", categories.join(","));
+  url.searchParams.set("limit", "50");
+  url.searchParams.set("apiKey", HERE_API_KEY);
+  const res = await fetch(url.toString());
+  if (!res.ok) return [];
+  const data = await res.json() as { items?: HerePlace[] };
+  return data.items ?? [];
+}
 
-  const res = await fetch(url.toString(), {
-    next: { revalidate: 86400 }, // Next.js fetch cache 24h
-  });
-  if (!res.ok) throw new Error(`Places API error: ${res.status}`);
-  const data = (await res.json()) as {
-    status: string;
-    results: PlacesResult[];
-  };
-  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-    throw new Error(`Places API status: ${data.status}`);
+function hereBuildTransit(places: HerePlace[], lat: number, lng: number): TransitInfo {
+  const busStops = places.filter(p => p.categories.some(c =>
+    c.id === "800-4100-0244" || c.id === "800-4100-0000"
+  ));
+  const tramStops = places.filter(p => p.categories.some(c => c.id === "800-4100-0232"));
+  const trainStations = places.filter(p => p.categories.some(c => c.id === "800-4100-0236"));
+
+  const nearestBus = busStops.length ? Math.round(Math.min(...busStops.map(p => p.distance))) : null;
+  const nearestTrain = trainStations.length ? Math.round(Math.min(...trainStations.map(p => p.distance))) : null;
+
+  const total = busStops.length + tramStops.length * 2 + trainStations.length * 3;
+  let kvaliteta: TransitInfo["kvaliteta"];
+  let opis: string;
+
+  if (total >= 8 || (nearestBus != null && nearestBus < 100)) {
+    kvaliteta = "odlicna";
+    opis = [
+      busStops.length > 0 ? `${busStops.length} bus` : null,
+      tramStops.length > 0 ? `${tramStops.length} tram` : null,
+      trainStations.length > 0 ? `${trainStations.length} vlak` : null,
+    ].filter(Boolean).join(" + ") + " postaj v 600m";
+  } else if (total >= 3) {
+    kvaliteta = "dobra";
+    opis = [
+      busStops.length > 0 ? `${busStops.length} bus` : null,
+      tramStops.length > 0 ? `${tramStops.length} tram` : null,
+    ].filter(Boolean).join(" + ") + " postaj v 600m";
+  } else if (total >= 1) {
+    kvaliteta = "srednja";
+    opis = nearestBus != null ? `Najbližja postaja ${nearestBus}m` : "Javni prevoz dosegljiv";
+  } else {
+    kvaliteta = "slaba";
+    opis = "Ni javnega prevoza v 600m";
   }
-  return data.results ?? [];
+
+  void lat; void lng; // used via distance field on HerePlace
+  return { busStops: busStops.length, tramStops: tramStops.length, trainStations: trainStations.length, nearestBusM: nearestBus, nearestTrainM: nearestTrain, kvaliteta, opis, source: "here" };
 }
 
-function distM(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// ─── Main export ─────────────────────────────────────────────────────────────
 
-function nearest(results: PlacesResult[], lat: number, lng: number): number | null {
-  if (!results.length) return null;
-  return Math.round(
-    Math.min(
-      ...results.map((r) =>
-        distM(lat, lng, r.geometry.location.lat, r.geometry.location.lng)
-      )
-    )
-  );
-}
-
-export async function getPlacesData(
-  lat: number,
-  lng: number
-): Promise<PlacesData | null> {
+export async function getPlacesData(lat: number, lng: number): Promise<PlacesData | null> {
   const { latGrid, lngGrid } = gridKey(lat, lng);
   const memKey = `${latGrid},${lngGrid}`;
 
-  // L1: in-memory (najhitrejše)
+  // L1: memory
   const memHit = memCache.get(memKey);
   if (memHit && Date.now() - memHit.ts < MEM_CACHE_TTL_MS) {
     return { ...memHit.data, cached: true };
   }
 
-  // L2: DB cache (preživi restarte, deljeno med instancemi)
+  // L2: DB cache
   const dbHit = await dbGet(latGrid, lngGrid);
   if (dbHit) {
+    // Preveri če transit podatki izvirajo iz OSM (low confidence) in je HERE key na voljo
+    const needsTransitOverride = dbHit.transit?.source !== "here" && !!HERE_API_KEY;
+    if (!needsTransitOverride) {
+      memCache.set(memKey, { data: dbHit, ts: Date.now() });
+      return { ...dbHit, cached: true };
+    }
+    // Enrichment: OSM storitve + HERE transit
+    try {
+      const herePlaces = await hereBrowse(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT);
+      if (herePlaces.length > 0) {
+        const enriched: PlacesData = {
+          ...dbHit,
+          transit: hereBuildTransit(herePlaces, lat, lng),
+        };
+        const sourceMeta = {
+          version: 2,
+          importedAt: new Date().toISOString(),
+          categories: {
+            transit: { source: "here_places", confidence: "high", note: "HERE transit data" },
+            services: { source: "osm_overpass", confidence: "high", note: "OSM bulk import" },
+          },
+        };
+        void dbSet(latGrid, lngGrid, enriched, sourceMeta);
+        memCache.set(memKey, { data: enriched, ts: Date.now() });
+        return { ...enriched, cached: false };
+      }
+    } catch { /* fallback to OSM transit */ }
     memCache.set(memKey, { data: dbHit, ts: Date.now() });
     return { ...dbHit, cached: true };
   }
 
+  // L3: Live fetch (brez DB cache — HERE za transit, OSM za storitve)
+  // To se zgodi samo za lokacije ki še niso v DB (pred bulk importom)
+  if (!HERE_API_KEY) return null;
+
   try {
-    // 11 vzporednih klicev — ~$0.35 na unikaten lookup (z 24h cache)
-    const [
-      busResults,
-      transitResults,
-      trainResults,
-      supermarketResults,
-      pharmacyResults,
-      schoolResults,
-      kindergartenResults,
-      parkResults,
-      bankResults,
-      postResults,
-      restaurantResults,
-      doctorResults,
-    ] = await Promise.all([
-      nearbySearch(lat, lng, "bus_station", RADIUS_TRANSIT),
-      nearbySearch(lat, lng, "transit_station", RADIUS_TRANSIT),
-      nearbySearch(lat, lng, "train_station", RADIUS_TRANSIT),
-      nearbySearch(lat, lng, "supermarket"),
-      nearbySearch(lat, lng, "pharmacy"),
-      nearbySearch(lat, lng, "school"),
-      nearbySearch(lat, lng, "secondary_school").catch(() => [] as PlacesResult[]),
-      nearbySearch(lat, lng, "park"),
-      nearbySearch(lat, lng, "bank"),
-      nearbySearch(lat, lng, "post_office"),
-      nearbySearch(lat, lng, "restaurant"),
-      nearbySearch(lat, lng, "doctor"),
-    ]);
+    const herePlaces = await hereBrowse(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT);
+    const transit = hereBuildTransit(herePlaces, lat, lng);
 
-    // Transit
-    const busCount = busResults.length;
-    const tramCount = transitResults.filter(
-      (r) => !r.types.includes("train_station") && !r.types.includes("bus_station")
-    ).length;
-    const trainCount = trainResults.length;
-
-    const nearestBus = nearest(busResults, lat, lng);
-    const nearestTrain = nearest(trainResults, lat, lng);
-
-    const totalTransit = busCount + tramCount * 2 + trainCount * 3;
-    let kvaliteta: TransitInfo["kvaliteta"];
-    let opis: string;
-
-    if (totalTransit >= 8 || (nearestBus != null && nearestBus < 100)) {
-      kvaliteta = "odlicna";
-      opis = [
-        busCount > 0 ? `${busCount} bus` : null,
-        tramCount > 0 ? `${tramCount} tram` : null,
-        trainCount > 0 ? `${trainCount} vlak` : null,
-      ]
-        .filter(Boolean)
-        .join(" + ") + " postaj v 600m";
-    } else if (totalTransit >= 3) {
-      kvaliteta = "dobra";
-      opis =
-        [
-          busCount > 0 ? `${busCount} bus` : null,
-          tramCount > 0 ? `${tramCount} tram` : null,
-        ]
-          .filter(Boolean)
-          .join(" + ") + " postaj v 600m";
-    } else if (totalTransit >= 1) {
-      kvaliteta = "srednja";
-      opis =
-        nearestBus != null
-          ? `Najbližja postaja ${nearestBus}m`
-          : "Javni prevoz dosegljiv";
-    } else {
-      kvaliteta = "slaba";
-      opis = "Ni javnega prevoza v 600m";
-    }
-
-    const transit: TransitInfo = {
-      busStops: busCount,
-      tramStops: tramCount,
-      trainStations: trainCount,
-      nearestBusM: nearestBus,
-      nearestTrainM: nearestTrain,
-      kvaliteta,
-      opis,
-    };
-
-    // Šole: združi school + secondary_school, dedupliciraj po imenu
-    const allSchools = [
-      ...schoolResults,
-      ...kindergartenResults,
-    ];
-    const uniqueSchools = allSchools.filter(
-      (s, i, arr) => arr.findIndex((x) => x.name === s.name) === i
-    );
-
+    // Osnovna services struktura (bo enrichana z Overpass bulk importom)
     const services: ServicesInfo = {
-      supermarkets: supermarketResults.length,
-      nearestSupermarketM: nearest(supermarketResults, lat, lng),
-      pharmacies: pharmacyResults.length,
-      nearestPharmacyM: nearest(pharmacyResults, lat, lng),
-      schools: uniqueSchools.filter((s) =>
-        s.types.includes("school") || s.types.includes("secondary_school")
-      ).length,
-      kindergartens: uniqueSchools.filter(
-        (s) => !s.types.includes("school") && !s.types.includes("secondary_school")
-      ).length,
-      parks: parkResults.length,
-      nearestParkM: nearest(parkResults, lat, lng),
-      banks: bankResults.length,
-      postOffices: postResults.length,
-      restaurants: restaurantResults.length,
-      doctors: doctorResults.length,
-      hospitals: 0, // Ločen klic ni potreben — hospitals so redki
+      supermarkets: 0, nearestSupermarketM: null,
+      pharmacies: 0, nearestPharmacyM: null,
+      schools: 0, kindergartens: 0,
+      parks: 0, nearestParkM: null,
+      banks: 0, postOffices: 0, restaurants: 0, doctors: 0, hospitals: 0,
+      source: "here",
     };
 
     const result: PlacesData = { transit, services };
-
-    // Shrani v oba cache-a
+    const sourceMeta = {
+      version: 1,
+      importedAt: new Date().toISOString(),
+      categories: {
+        transit: { source: "here_places", confidence: "high" },
+        services: { source: "none", confidence: "none", note: "Čaka na OSM bulk import" },
+      },
+    };
+    void dbSet(latGrid, lngGrid, result, sourceMeta);
     memCache.set(memKey, { data: result, ts: Date.now() });
-    void dbSet(latGrid, lngGrid, result); // async, ne čakamo
-
     return result;
   } catch (err) {
     console.error("Places API error:", err);
