@@ -317,15 +317,11 @@ export function izracunajStavbneKorekcije(input: StavbneKorekcijeInput): Stavbne
     }
   }
 
-  // 10. JAVNI PROMET (OSM)
-  const transitScore = (input.busStopsCount ?? 0) + (input.tramStopsCount ?? 0) * 2 + (input.trainStationsCount ?? 0) * 4;
-  if (transitScore >= 6) {
-    faktorji.push({ naziv: "Odlična dostopnost", ikona: "🚌", opis: `${input.busStopsCount ?? 0} avtobusnih + ${input.tramStopsCount ?? 0} tramvajskih + ${input.trainStationsCount ?? 0} železniških postaj v 300m`, korekcija: 0.04 });
-  } else if (transitScore >= 2) {
-    faktorji.push({ naziv: "Dobra dostopnost", ikona: "🚌", opis: `Javni promet v 300m: ${input.busStopsCount ?? 0} bus postaj`, korekcija: 0.02 });
-  } else if (transitScore === 0) {
-    faktorji.push({ naziv: "Slab javni promet", ikona: "🚗", opis: "Ni javnega prevoza v 300m — odvisnost od avtomobila", korekcija: -0.03 });
-  }
+  // 10. JAVNI PROMET — ONEMOGOČENO
+  // Statistična analiza (n=12,018 ETN): OSM transit count R²<2% = šum.
+  // OSM podatki pogosto nepopolni → napačne penalizacije (npr. Celovška cesta z odličnim JP).
+  // Javni promet je kolinearen z lokacijo (KO) ki že nosi 59.8% variance.
+  // void (input.busStopsCount);
 
   // Skupni faktor (multiplikativno, capped ±30%)
   const raw = faktorji.reduce((acc, f) => acc * (1 + f.korekcija), 1);

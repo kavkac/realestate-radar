@@ -194,22 +194,26 @@ export async function POST(request: NextRequest) {
     const etnSourceUnit = selectedUnit ?? deliStavbe[0];
     let etnDejanskaRaba = (etnSourceUnit as { vrstaRabe?: string | null; vrsta?: string | null })?.vrstaRabe ?? etnSourceUnit?.vrsta ?? null;
 
-    // Size-based override: enota > 25m² je verjetno stanovanje ne glede na GURS oznako
-    // (GURS ima pogosto napačno vrsto za posamezne enote)
-    const unitAreaForType = selectedUnit
-      ? ((selectedUnit as { uporabnaPovrsina?: number | null; povrsina?: number | null }).uporabnaPovrsina ?? (selectedUnit as { povrsina?: number | null }).povrsina ?? null)
-      : null;
-    if (unitAreaForType != null && unitAreaForType > 25) {
-      // Garažne/parkirne kategorije iz VRSTA_DEJANSKE_RABE: 6=Garaža, 30=Garažno mesto, 31=Parkirno mesto, 50=Garaža(starejši)
-      // Unicode-safe matching: ž=\u017e
-      const raba = (etnDejanskaRaba ?? "").toLowerCase();
-      const isGarage = raba.includes("gara\u017e") || raba.includes("parkirn") || raba.includes("parking") || raba.includes("garaze");
-      // Dodatno: preveri po vrstaStanovanjaUradno — če ima vrednost, je definitivno stanovanje
-      const stUnit = selectedUnit as { vrstaStanovanjaUradno?: string | null } | null;
-      const isDefinitelyStanovanje = stUnit?.vrstaStanovanjaUradno != null;
-      if (isGarage && !isDefinitelyStanovanje) {
-        // Zavrnemo garažno oznako — enota > 25m² je stanovanje
-        etnDejanskaRaba = "stanovanje";
+    // ETN tip filter override — troslojno:
+    // 1. Stavba z >3 standovanji = vse enote so stanovanja (GURS oznaka enote je irelevantna)
+    // 2. Enota > 25m² z garažno oznako → override na stanovanje
+    // 3. Default: ohrani GURS vrsto (za poslovna, garažna, klet brez stavbnega konteksta)
+    const jeVecstanovanjska = (stavba.steviloStanovanj ?? 0) > 3;
+    if (jeVecstanovanjska && selectedUnit) {
+      // V večstanovanjski stavbi — vsaka enota je stanovanje za namen ETN analize
+      etnDejanskaRaba = "stanovanje";
+    } else {
+      // Enota v majhni stavbi — size-based + unicode-safe override
+      const unitArea = selectedUnit
+        ? (selectedUnit.uporabnaPovrsina ?? selectedUnit.povrsina ?? null)
+        : null;
+      if (unitArea != null && (unitArea as number) > 25) {
+        const raba = (etnDejanskaRaba ?? "").toLowerCase();
+        // Unicode-safe: ž=\u017e; pokrijemo vse garažne/parkirne kode iz VRSTA_DEJANSKE_RABE
+        const isGarage = raba.includes("gara\u017e") || raba.includes("parkirn") || raba.includes("parking") || raba.includes("garaze") || raba.includes("garaz");
+        if (isGarage) {
+          etnDejanskaRaba = "stanovanje";
+        }
       }
     }
 
