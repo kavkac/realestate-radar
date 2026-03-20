@@ -26,6 +26,15 @@
  */
 
 import { Pool } from "pg";
+import proj4 from "proj4";
+
+const WGS84 = "EPSG:4326";
+const D96_TM = "+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9999 +x_0=500000 +y_0=-5000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+
+function d96ToWgs84(e: number, n: number): { lat: number; lon: number } {
+  const [lng, lat] = proj4(D96_TM, WGS84, [e, n]);
+  return { lat, lon: lng };
+}
 
 const DB_URL =
   process.env.DATABASE_URL ??
@@ -280,22 +289,30 @@ async function downloadOverpassData(): Promise<OsmNode[]> {
 }
 
 async function getUniqueGridCells(pool: Pool): Promise<Array<{ lat: number; lon: number }>> {
-  // Pridobi unikatne koordinate stavb iz ev_stavba (100m grid)
-  console.log("📊 Pridobivam unikatne grid celice iz ev_stavba...");
+  // ev_stavba ima D96/TM koordinate (e, n) → konvertiramo v WGS84 in grupiramo na 100m grid
+  console.log("📊 Pridobivam koordinate stavb iz ev_stavba (D96→WGS84)...");
   const result = await pool.query(`
-    SELECT
-      ROUND(("Y_WGS84")::numeric, 3) AS lat_grid,
-      ROUND(("X_WGS84")::numeric, 3) AS lng_grid,
-      COUNT(*) AS stavbe
+    SELECT e, n
     FROM ev_stavba
-    WHERE "Y_WGS84" IS NOT NULL AND "X_WGS84" IS NOT NULL
-      AND "Y_WGS84" BETWEEN 45.4 AND 46.9
-      AND "X_WGS84" BETWEEN 13.3 AND 16.6
-    GROUP BY lat_grid, lng_grid
-    ORDER BY stavbe DESC
+    WHERE e IS NOT NULL AND n IS NOT NULL
+      AND e::float BETWEEN 374000 AND 622000
+      AND n::float BETWEEN 29000 AND 195000
   `);
-  console.log(`✅ ${result.rows.length} unikatnih grid celic`);
-  return result.rows.map((r) => ({ lat: Number(r.lat_grid), lon: Number(r.lng_grid) }));
+  console.log(`  Skupaj stavb: ${result.rows.length}`);
+
+  // Konvertiraj D96→WGS84 in grupiraj na 0.001° grid
+  const gridMap = new Map<string, { lat: number; lon: number }>();
+  for (const row of result.rows) {
+    const { lat, lon } = d96ToWgs84(Number(row.e), Number(row.n));
+    if (lat < 45.4 || lat > 46.9 || lon < 13.3 || lon > 16.6) continue;
+    const latG = Math.round(lat * 1000) / 1000;
+    const lonG = Math.round(lon * 1000) / 1000;
+    const key = `${latG},${lonG}`;
+    if (!gridMap.has(key)) gridMap.set(key, { lat: latG, lon: lonG });
+  }
+  const cells = Array.from(gridMap.values());
+  console.log(`✅ ${cells.length} unikatnih grid celic (0.001° ≈ 100m)`);
+  return cells;
 }
 
 async function main() {
@@ -310,13 +327,22 @@ async function main() {
     const cells = await getUniqueGridCells(pool);
     console.log(`\n🔄 Agregiram ${cells.length} celic...`);
 
+    // Pridobi že uvožene celice
+    const existingRes = await pool.query(
+      `SELECT lat_grid::text || ',' || lng_grid::text AS key FROM places_cache`
+    );
+    const existing = new Set(existingRes.rows.map((r: { key: string }) => r.key));
+    const remaining = cells.filter(c => !existing.has(`${c.lat},${c.lon}`));
+    console.log(`⏭️  Že uvoženo: ${existing.size}, preostalo: ${remaining.length}`);
+    const todo = remaining;
+
     // 3. Batch processing
-    const BATCH_SIZE = 500;
-    let processed = 0;
+    const BATCH_SIZE = 200; // manjši batch za stabilnejšo DB konekcijo
+    let processed = existing.size;
     let skipped = 0;
 
-    for (let i = 0; i < cells.length; i += BATCH_SIZE) {
-      const batch = cells.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < todo.length; i += BATCH_SIZE) {
+      const batch = todo.slice(i, i + BATCH_SIZE);
 
       const values: string[] = [];
       const params: unknown[] = [];
@@ -340,8 +366,8 @@ async function main() {
       );
 
       processed += batch.length;
-      if (processed % 5000 === 0 || processed === cells.length) {
-        console.log(`  ✅ ${processed}/${cells.length} celic (${skipped} brez POI-jev)`);
+      if (processed % 5000 === 0 || processed === existing.size + todo.length) {
+        console.log(`  ✅ ${processed}/${cells.length} celic`);
       }
     }
 
