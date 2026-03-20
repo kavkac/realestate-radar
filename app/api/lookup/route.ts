@@ -200,9 +200,14 @@ export async function POST(request: NextRequest) {
       ? ((selectedUnit as { uporabnaPovrsina?: number | null; povrsina?: number | null }).uporabnaPovrsina ?? (selectedUnit as { povrsina?: number | null }).povrsina ?? null)
       : null;
     if (unitAreaForType != null && unitAreaForType > 25) {
+      // Garažne/parkirne kategorije iz VRSTA_DEJANSKE_RABE: 6=Garaža, 30=Garažno mesto, 31=Parkirno mesto, 50=Garaža(starejši)
+      // Unicode-safe matching: ž=\u017e
       const raba = (etnDejanskaRaba ?? "").toLowerCase();
-      const isGarage = raba.includes("garaza") || raba.includes("parkirn") || raba.includes("parking");
-      if (isGarage) {
+      const isGarage = raba.includes("gara\u017e") || raba.includes("parkirn") || raba.includes("parking") || raba.includes("garaze");
+      // Dodatno: preveri po vrstaStanovanjaUradno — če ima vrednost, je definitivno stanovanje
+      const stUnit = selectedUnit as { vrstaStanovanjaUradno?: string | null } | null;
+      const isDefinitelyStanovanje = stUnit?.vrstaStanovanjaUradno != null;
+      if (isGarage && !isDefinitelyStanovanje) {
         // Zavrnemo garažno oznako — enota > 25m² je stanovanje
         etnDejanskaRaba = "stanovanje";
       }
