@@ -192,7 +192,21 @@ export async function POST(request: NextRequest) {
 
     // Determine property type for ETN filtering
     const etnSourceUnit = selectedUnit ?? deliStavbe[0];
-    const etnDejanskaRaba = (etnSourceUnit as { vrstaRabe?: string | null; vrsta?: string | null })?.vrstaRabe ?? etnSourceUnit?.vrsta ?? null;
+    let etnDejanskaRaba = (etnSourceUnit as { vrstaRabe?: string | null; vrsta?: string | null })?.vrstaRabe ?? etnSourceUnit?.vrsta ?? null;
+
+    // Size-based override: enota > 25m² je verjetno stanovanje ne glede na GURS oznako
+    // (GURS ima pogosto napačno vrsto za posamezne enote)
+    const unitAreaForType = selectedUnit
+      ? ((selectedUnit as { uporabnaPovrsina?: number | null; povrsina?: number | null }).uporabnaPovrsina ?? (selectedUnit as { povrsina?: number | null }).povrsina ?? null)
+      : null;
+    if (unitAreaForType != null && unitAreaForType > 25) {
+      const raba = (etnDejanskaRaba ?? "").toLowerCase();
+      const isGarage = raba.includes("garaza") || raba.includes("parkirn") || raba.includes("parking");
+      if (isGarage) {
+        // Zavrnemo garažno oznako — enota > 25m² je stanovanje
+        etnDejanskaRaba = "stanovanje";
+      }
+    }
 
     // Check gas infrastructure via ZK GJI
     const gasInfrastructure =

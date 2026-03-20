@@ -535,7 +535,7 @@ export async function getEtnAnaliza(
         const leto = parseInt(r.leto ?? "0");
         return { cenaM2, leto };
       })
-      .filter((r): r is Parsed => r !== null && r.cenaM2 >= 500 && r.cenaM2 <= 15000);
+      .filter((r): r is Parsed => r !== null && r.cenaM2 >= 500 && r.cenaM2 <= 25000);
   }
 
   // ── LEVEL 1: Proximity 400m (min 8 transakcij) → zaupanje 5 ──
@@ -573,7 +573,43 @@ export async function getEtnAnaliza(
         LIMIT 200`,
         cutoffStr, e, n, radiusM * radiusM,
       );
-      const parsed = parseRows(proximityRows);
+      let parsed = parseRows(proximityRows);
+
+      // Razširjeno okno: če je premalo podatkov v 2 letih → probaj 4 leta
+      // (za premium/redke lokacije kjer se prodaja redko)
+      if (parsed.length < 8) {
+        const cutoff4y = new Date();
+        cutoff4y.setFullYear(cutoff4y.getFullYear() - 4);
+        const cutoffStr4y = cutoff4y.toISOString().split("T")[0];
+        const proximityRows4y = await prisma.$queryRawUnsafe<Row[]>(
+          `SELECT
+            p.pogodbena_cena_odskodnina::float AS cena,
+            d.povrsina_dela_stavbe::float AS povrsina,
+            COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
+            d.ime_ko
+          FROM etn_posli p
+          JOIN etn_delistavb d ON d.id_posla = p.id_posla
+          JOIN ev_stavba ev ON ev.ko_sifko = d.sifra_ko AND ev.stev_st = d.stevilka_stavbe
+          WHERE p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
+            AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
+            AND p.pogodbena_cena_odskodnina::float > 0
+            AND d.povrsina_dela_stavbe::float > 0
+            AND TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') >= $1::date
+            AND p.trznost_posla IN ('1','2','5')
+            AND p.vrsta_kupoprodajnega_posla = '1'
+            AND ev.e IS NOT NULL AND ev.n IS NOT NULL AND ev.e != '' AND ev.n != ''
+            AND (ev.e::float - $2)^2 + (ev.n::float - $3)^2 <= $4
+            ${tipFilter}
+          ORDER BY TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') DESC
+          LIMIT 200`,
+          cutoffStr4y, e, n, radiusM * radiusM,
+        );
+        const parsed4y = parseRows(proximityRows4y);
+        if (parsed4y.length > parsed.length) {
+          parsed = parsed4y;
+        }
+      }
+
       if (parsed.length >= 8) {
         selectedRows = proximityRows;
         selectedParsed = parsed;
