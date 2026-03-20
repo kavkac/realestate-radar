@@ -850,8 +850,10 @@ export async function getEtnAnaliza(
   const lokacijskiFaktor = lokacijskiPremium?.skupniFaktor ?? 1;
 
   // Kalibracijski faktorji (backtest 19,183 transakcij)
-  // For regija/nacional level, KO calibration factor not applied (wrong KO)
-  const koKorekcija = (vir === 'proximity' || vir === 'ko') ? (KO_KALIBRACIJSKI_FAKTOR[koStr] ?? 0) : 0;
+  // POMEMBNO: KO korekcija se NE aplicira pri proximity (vir='proximity') —
+  // proximity mediana že sama odraža lokalni trg → double-counting bi popačil vrednost.
+  // KO korekcija se aplicira samo pri KO-level fallbacku (vir='ko').
+  const koKorekcija = (vir === 'ko') ? (KO_KALIBRACIJSKI_FAKTOR[koStr] ?? 0) : 0;
   const povrsinaKor = area ? povrsinskaKorekcija(area) : 0;
   const kalibracijskiFaktor = 1 + koKorekcija + povrsinaKor;
 
