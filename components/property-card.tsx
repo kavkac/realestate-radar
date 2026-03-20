@@ -1807,10 +1807,15 @@ interface PlacesTransit {
   nearestBusM: number | null; nearestTrainM: number | null;
   kvaliteta: 'odlicna'|'dobra'|'srednja'|'slaba'; opis: string;
 }
-interface PlacesAmenity {
+interface PlacesServices {
   supermarkets: number; nearestSupermarketM: number | null;
+  pharmacies: number; nearestPharmacyM: number | null;
+  schools: number; kindergartens: number;
+  parks: number; nearestParkM: number | null;
+  banks: number; postOffices: number;
+  restaurants: number; doctors: number;
 }
-interface PlacesDataCard { transit: PlacesTransit; amenities: PlacesAmenity }
+interface PlacesDataCard { transit: PlacesTransit; services: PlacesServices }
 
 function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot, placesData }: {
   ctx: PropertyContextData;
@@ -1885,26 +1890,62 @@ function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot, placesD
         </div>
       )}
 
-      {/* Javni prevoz + amenitete (Google Places) */}
+      {/* Dostopnost — Google Places */}
       {placesData && (
-        <div className="border-t border-gray-100 pt-2 space-y-1.5">
-          <p className="text-xs font-medium text-gray-500">Okolica (500m)</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-            {/* Transit */}
-            <span className={`font-medium ${
+        <div className="border-t border-gray-100 pt-2 space-y-2">
+          <p className="text-xs font-medium text-gray-500">Dostopnost v bližini</p>
+
+          {/* Javni prevoz */}
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Javni prevoz (600m)</p>
+            <span className={`text-xs font-medium ${
               placesData.transit.kvaliteta === 'odlicna' ? 'text-green-700' :
               placesData.transit.kvaliteta === 'dobra' ? 'text-blue-700' :
-              placesData.transit.kvaliteta === 'srednja' ? 'text-yellow-700' : 'text-red-600'
+              placesData.transit.kvaliteta === 'srednja' ? 'text-amber-600' : 'text-red-600'
             }`}>
               🚌 {placesData.transit.opis}
             </span>
-            {/* Supermarket */}
-            {placesData.amenities.supermarkets > 0 && (
-              <span>🛒 {placesData.amenities.supermarkets} trgovin
-                {placesData.amenities.nearestSupermarketM != null && ` (${placesData.amenities.nearestSupermarketM}m)`}
+            {placesData.transit.trainStations > 0 && (
+              <span className="ml-2 text-xs text-gray-600">
+                🚂 {placesData.transit.trainStations} železniška postaja
+                {placesData.transit.nearestTrainM != null && ` (${placesData.transit.nearestTrainM}m)`}
               </span>
             )}
           </div>
+
+          {/* Storitve — grid prikaz */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+            {placesData.services.supermarkets > 0 && (
+              <span>🛒 {placesData.services.supermarkets} trgovin{placesData.services.nearestSupermarketM != null ? ` (${placesData.services.nearestSupermarketM}m)` : ''}</span>
+            )}
+            {placesData.services.pharmacies > 0 && (
+              <span>💊 {placesData.services.pharmacies} lekarn{placesData.services.nearestPharmacyM != null ? ` (${placesData.services.nearestPharmacyM}m)` : ''}</span>
+            )}
+            {placesData.services.schools > 0 && (
+              <span>🏫 {placesData.services.schools} šol{placesData.services.kindergartens > 0 ? ` + ${placesData.services.kindergartens} vrtcev` : ''}</span>
+            )}
+            {placesData.services.parks > 0 && (
+              <span>🌳 {placesData.services.parks} parkov{placesData.services.nearestParkM != null ? ` (${placesData.services.nearestParkM}m)` : ''}</span>
+            )}
+            {placesData.services.banks > 0 && (
+              <span>🏦 {placesData.services.banks} bank</span>
+            )}
+            {placesData.services.postOffices > 0 && (
+              <span>📮 {placesData.services.postOffices} pošt</span>
+            )}
+            {placesData.services.doctors > 0 && (
+              <span>🩺 {placesData.services.doctors} zdravnikov</span>
+            )}
+            {placesData.services.restaurants > 0 && (
+              <span>🍽️ {placesData.services.restaurants} restavracij</span>
+            )}
+          </div>
+
+          {/* Prazna okolica */}
+          {placesData.services.supermarkets === 0 && placesData.services.pharmacies === 0 &&
+           placesData.services.banks === 0 && placesData.transit.busStops === 0 && (
+            <p className="text-xs text-gray-400">Malo storitev v neposredni bližini</p>
+          )}
         </div>
       )}
     </div>
