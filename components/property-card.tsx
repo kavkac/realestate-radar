@@ -206,6 +206,19 @@ interface PropertyCardProps {
   poplavnaNevarnost?: PoplavnaNevarnost | null;
   osmData?: OsmBuildingData | null;
   oglasneAnalize?: OglasneAnalize | null;
+  tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
+  propertyContext?: PropertyContextData | null;
+}
+
+export interface PropertyContextData {
+  lokacija: { kategorija: 'center'|'primestno'|'obrobje'|'ruralno'|null; score: number; distancaCenterKm: number | null };
+  stavba: { starostKategorija: string|null; score: number };
+  trg: { steviloTransakcij: number|null; discountEtnOglas: number|null; score: number };
+  tveganja: { poplavnaNevarnost: boolean; visokaSeizmicnost: boolean; penalty: number };
+  prednosti: string[];
+  slabosti: string[];
+  scoreTotal: number;
+  confidence: number;
 }
 
 const ENERGY_COLORS: Record<string, string> = {
@@ -292,6 +305,8 @@ export function PropertyCard({
   poplavnaNevarnost,
   osmData,
   oglasneAnalize,
+  tipProdaje,
+  propertyContext,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
@@ -647,6 +662,18 @@ export function PropertyCard({
               oglasneAnalize={oglasneAnalize}
             />
           </div>
+
+          {/* 2b. Property Context */}
+          {propertyContext && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <PropertyContextSection
+                ctx={propertyContext}
+                tipProdaje={tipProdaje}
+                parcele={parcele}
+                steviloEnot={stavba.steviloStanovanj}
+              />
+            </div>
+          )}
 
           {/* 3. Lastništvo */}
           {(() => {
@@ -1769,6 +1796,81 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
         )}
       </section>
     );
+}
+
+function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot }: {
+  ctx: PropertyContextData;
+  tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
+  parcele?: Parcela[];
+  steviloEnot?: number | null;
+}) {
+  const score = ctx.scoreTotal;
+  const scoreColor = score >= 70 ? 'text-green-600' : score >= 50 ? 'text-yellow-600' : 'text-red-600';
+  const scoreBg = score >= 70 ? 'bg-green-50 border-green-200' : score >= 50 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
+
+  const tipLabel = tipProdaje === 'stavba' ? 'Celotna stavba'
+    : tipProdaje === 'parcela_s_stavbo' ? 'Parcela s stavbo'
+    : 'Stanovanje';
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Kontekst nepremičnine</p>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded border ${scoreBg}`}>
+          {tipLabel}
+        </span>
+      </div>
+
+      {/* Score */}
+      <div className={`flex items-center gap-3 rounded-lg border p-3 ${scoreBg}`}>
+        <span className={`text-3xl font-bold ${scoreColor}`}>{score}</span>
+        <div>
+          <p className={`text-sm font-semibold ${scoreColor}`}>
+            {score >= 70 ? 'Dobra nepremičnina' : score >= 50 ? 'Povprečna lokacija' : 'Slabša lokacija'}
+          </p>
+          <p className="text-xs text-gray-500">Skupni indeks · {Math.round(ctx.confidence * 100)}% zaupanje</p>
+        </div>
+      </div>
+
+      {/* Tip prodaje info */}
+      {tipProdaje === 'stavba' && parcele && parcele.length > 0 && (
+        <div className="text-xs text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
+          {parcele[0].povrsina && <span>📐 Površina parcele: <strong>{parcele[0].povrsina.toLocaleString('sl-SI')} m²</strong></span>}
+        </div>
+      )}
+      {tipProdaje === 'enota' && steviloEnot != null && steviloEnot > 1 && (
+        <p className="text-xs text-gray-500">Vrednost posamezne enote · stavba ima skupaj {steviloEnot} enot</p>
+      )}
+
+      {/* Prednosti */}
+      {ctx.prednosti.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Prednosti</p>
+          <div className="flex flex-wrap gap-1.5">
+            {ctx.prednosti.map((p, i) => (
+              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs text-green-800">
+                ✅ {p}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Slabosti */}
+      {ctx.slabosti.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 mb-1">Slabosti</p>
+          <div className="flex flex-wrap gap-1.5">
+            {ctx.slabosti.map((s, i) => (
+              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-xs text-orange-800">
+                ⚠️ {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ParceleSection({ parcele }: { parcele?: Parcela[] }) {

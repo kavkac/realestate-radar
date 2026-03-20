@@ -416,6 +416,17 @@ export async function POST(request: NextRequest) {
       osmData: osmData ?? null,
       oglasneAnalize: oglasneAnalize ?? null,
       propertyContext,
+      // Tip prodaje: ločimo med prodajo enote in prodajo celotne stavbe
+      tipProdaje: (() => {
+        const imaParcele = parcele && parcele.length > 0;
+        const jeEnostanovanjska = (stavba.steviloStanovanj ?? 0) <= 1;
+        const imaDeleStavbe = deliStavbe.length > 1;
+        const izbranaEnota = stDelaStavbe != null;
+        if (imaDeleStavbe && izbranaEnota) return 'enota'; // stanovanje v večstanovanjski
+        if (jeEnostanovanjska || !imaDeleStavbe) return 'stavba'; // hiša, vila, cela stavba
+        if (imaParcele && !izbranaEnota) return 'parcela_s_stavbo';
+        return 'enota'; // default
+      })() as 'enota' | 'stavba' | 'parcela_s_stavbo',
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
