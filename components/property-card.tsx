@@ -2,7 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { useUser } from "@clerk/nextjs";
 import { CreditCalculator } from "./credit-calculator";
+import EditPropertyForm from "./edit-property-form";
 import { izracunajVisinoStropov, izracunajStavbneKorekcije } from "@/lib/location-premium";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
 import { izracunajOcenaStanja } from "@/lib/gurs-api";
@@ -313,6 +315,20 @@ export function PropertyCard({
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
   const [showAllUnits, setShowAllUnits] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [corrections, setCorrections] = useState<Array<{ atribut: string; vrednost: string; trust_level: string }>>([]);
+  const { isSignedIn } = useUser();
+
+  const stavbaId = enolicniId ? `${enolicniId.koId}-${enolicniId.stStavbe}` : null;
+  const delStavbeId = selectedDel != null ? String(selectedDel) : null;
+
+  useEffect(() => {
+    if (!stavbaId) return;
+    fetch(`/api/corrections?stavba_id=${stavbaId}`)
+      .then(r => r.json())
+      .then(d => setCorrections(d.corrections ?? []))
+      .catch(() => {});
+  }, [stavbaId]);
   const VISIBLE_DEFAULT = 4; // 2 polni vrstici × 2 stolpci
   const FADE_ROW = 0; // ni fade vrstice — samo prve 4 + button
 
@@ -600,8 +616,58 @@ export function PropertyCard({
                 <CreditCalculator />
               </div>
             )}
+
+            {/* ── USER CORRECTIONS ── */}
+            {corrections.length > 0 && (
+              <div className="mt-4 border-t border-gray-100 pt-3 space-y-1.5">
+                <p className="text-xs font-medium text-gray-500 mb-2">Podatki lastnika / posrednika</p>
+                {corrections.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 capitalize">{c.atribut.replace(/_/g, " ")}</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-gray-800 font-medium">{c.vrednost}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                        c.trust_level === "bank" || c.trust_level === "agent"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}>
+                        {c.trust_level === "bank" ? "✅ Verificirano" :
+                         c.trust_level === "agent" ? "✅ Posrednik" : "👤 Lastnik poroča"}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── EDIT BUTTON (samo za prijavljene) ── */}
+            {isSignedIn && stavbaId && (
+              <div className="mt-4 border-t border-gray-100 pt-3">
+                <button
+                  onClick={() => setEditOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 text-xs text-gray-500 hover:text-brand-600 hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-lg py-2 transition-colors"
+                >
+                  ✏️ Uredi podatke o tej nepremičnini
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Edit modal */}
+        {editOpen && stavbaId && (
+          <EditPropertyForm
+            stavbaId={stavbaId}
+            delStavbeId={delStavbeId}
+            onClose={() => setEditOpen(false)}
+            onSaved={() => {
+              fetch(`/api/corrections?stavba_id=${stavbaId}`)
+                .then(r => r.json())
+                .then(d => setCorrections(d.corrections ?? []))
+                .catch(() => {});
+            }}
+          />
+        )}
 
         {/* ── DESNI SIDEBAR — referenčni podatki ── */}
         {/* Na mobilnem: order-first pomakne sidebar takoj za KP, pred levi stolpec */}
