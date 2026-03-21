@@ -1,5 +1,9 @@
 import { Suspense } from "react";
 import { AddressSearch } from "@/components/address-search";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import Link from "next/link";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const L = Link as any;
 
 export default function HomePage() {
   return (
@@ -9,8 +13,21 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold text-brand-500">🏠 RealEstateRadar</span>
           </div>
-          <nav className="text-sm text-muted-foreground hidden sm:block">
-            <span>Pregled nepremičnin v Sloveniji</span>
+          <nav className="flex items-center gap-3 text-sm">
+            <SignedIn>
+              <L href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+                Moj profil
+              </L>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+            <SignedOut>
+              <L href="/sign-in" className="text-muted-foreground hover:text-foreground transition-colors">
+                Prijava
+              </L>
+              <L href="/sign-up" className="bg-brand-500 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-brand-600 transition-colors">
+                Registracija
+              </L>
+            </SignedOut>
           </nav>
         </div>
       </header>
