@@ -990,23 +990,31 @@ function mergeValue(
 }
 
 function SourceBadge({ source, registryOriginal }: { source: DataSource; registryOriginal?: string | number | null }) {
+  const [show, setShow] = useState(false);
+
   if (source === "registry") return null; // No badge for registry-only data
-  if (source === "verified") {
-    return (
-      <span
-        className="text-[10px] text-green-500 ml-1 cursor-help"
-        title={registryOriginal ? `Verificiran vir (register: ${registryOriginal})` : "Verificiran vir"}
-      >
-        ✅
-      </span>
-    );
-  }
+
+  const label = source === "verified"
+    ? "✅ Verificiran vir"
+    : "👤 Lastnik poroča";
+  const tooltip = registryOriginal
+    ? `${label}\nRegister: ${registryOriginal}`
+    : label;
+
   return (
-    <span
-      className="text-[10px] text-amber-400 ml-1 cursor-help"
-      title={registryOriginal ? `Lastnik poroča (register: ${registryOriginal})` : "Lastnik poroča"}
-    >
-      👤
+    <span className="relative inline-block ml-1">
+      <span
+        className={`text-[11px] cursor-help ${source === "verified" ? "text-green-500" : "text-amber-500"}`}
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      >
+        {source === "verified" ? "✅" : "👤"}
+      </span>
+      {show && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 bg-gray-800 text-white text-[10px] rounded px-2 py-1 whitespace-pre pointer-events-none shadow-lg">
+          {tooltip}
+        </span>
+      )}
     </span>
   );
 }
@@ -1023,13 +1031,28 @@ function MergedField({
   atribut: string;
 }) {
   const { value, source, registryOriginal } = mergeValue(registryValue, corrections, atribut);
-  if (value == null) return null;
+  if (value == null && registryOriginal == null) return null;
+
+  // Show both registry and user value when correction exists
+  const hasCorrection = source !== "registry" && registryOriginal != null;
+
   return (
     <div>
       <span className="text-xs text-gray-400">{label}</span>
       <p className="text-sm text-gray-800">
-        {value}
-        <SourceBadge source={source} registryOriginal={registryOriginal} />
+        {hasCorrection ? (
+          <>
+            <span className="font-medium">{registryOriginal}</span>
+            <span className="text-gray-400 mx-1">→</span>
+            <span className="font-medium text-gray-700">{value}</span>
+            <SourceBadge source={source} registryOriginal={registryOriginal} />
+          </>
+        ) : (
+          <>
+            {value}
+            <SourceBadge source={source} registryOriginal={registryOriginal} />
+          </>
+        )}
       </p>
     </div>
   );
@@ -1253,8 +1276,19 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
           <div>
             <span className="text-xs text-gray-400">Dvigalo</span>
             <p className="text-sm text-gray-800">
-              {dvigaloMerge.value}
-              <SourceBadge source={dvigaloMerge.source} registryOriginal={dvigaloMerge.registryOriginal} />
+              {dvigaloMerge.source !== "registry" && dvigaloMerge.registryOriginal != null ? (
+                <>
+                  <span className="font-medium">{dvigaloMerge.registryOriginal}</span>
+                  <span className="text-gray-400 mx-1">→</span>
+                  <span className="font-medium text-gray-700">{dvigaloMerge.value}</span>
+                  <SourceBadge source={dvigaloMerge.source} registryOriginal={dvigaloMerge.registryOriginal} />
+                </>
+              ) : (
+                <>
+                  {dvigaloMerge.value}
+                  <SourceBadge source={dvigaloMerge.source} registryOriginal={dvigaloMerge.registryOriginal} />
+                </>
+              )}
             </p>
           </div>
         )}
