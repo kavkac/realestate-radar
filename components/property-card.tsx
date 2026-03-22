@@ -778,6 +778,12 @@ export function PropertyCard({
             </div>
           )}
 
+          {placesData && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <OkolicaSection placesData={(placesData as unknown as PlacesDataCard)} />
+            </div>
+          )}
+
           {/* 3. Lastništvo */}
           {(() => {
             const lastnistvoData = isMultiUnit && !activePart
@@ -2204,6 +2210,45 @@ interface PlacesServices {
   restaurants: number; doctors: number;
 }
 interface PlacesDataCard { transit: PlacesTransit; services: PlacesServices }
+
+function OkolicaSection({ placesData }: { placesData: PlacesDataCard }) {
+  const t = placesData.transit;
+  const s = placesData.services;
+
+  const rows: { label: string; value: string }[] = [];
+
+  // Javni prevoz
+  const lppLines = Math.min(t.lppLineCount ?? 0, 20);
+  if (lppLines > 0) rows.push({ label: "Avtobusne linije", value: `${lppLines} linij LPP${t.nearestBusM != null ? ` · najbližja ${t.nearestBusM}m` : ''}` });
+  else if (t.busStops > 0) rows.push({ label: "Avtobusna postajališča", value: `${t.busStops}${t.nearestBusM != null ? ` · najbližje ${t.nearestBusM}m` : ''}` });
+  if (t.trainStations > 0) rows.push({ label: "Železnica", value: `${t.trainStations} postaja${t.nearestTrainM != null ? ` · ${t.nearestTrainM}m` : ''}` });
+
+  // Storitve
+  if (s.supermarkets > 0) rows.push({ label: "Trgovine", value: `${s.supermarkets}${s.nearestSupermarketM != null ? ` · najbližja ${s.nearestSupermarketM}m` : ''}` });
+  if (s.pharmacies > 0) rows.push({ label: "Lekarne", value: `${s.pharmacies}${s.nearestPharmacyM != null ? ` · najbližja ${s.nearestPharmacyM}m` : ''}` });
+  if (s.schools > 0 || s.kindergartens > 0) {
+    const parts = [s.schools > 0 ? `${s.schools} šol` : null, s.kindergartens > 0 ? `${s.kindergartens} vrtcev` : null].filter(Boolean);
+    rows.push({ label: "Šole in vrtci", value: parts.join(' · ') });
+  }
+  if (s.parks > 0) rows.push({ label: "Parki", value: `${s.parks}${s.nearestParkM != null ? ` · najbližji ${s.nearestParkM}m` : ''}` });
+  if (s.banks > 0) rows.push({ label: "Banke", value: String(s.banks) });
+  if (s.postOffices > 0) rows.push({ label: "Pošte", value: String(s.postOffices) });
+  if (s.doctors > 0) rows.push({ label: "Zdravniki", value: String(s.doctors) });
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div>
+      <Label>Okolica</Label>
+      {rows.map((r, i) => (
+        <div key={i} className="flex items-baseline justify-between py-2 border-b border-gray-100 last:border-0">
+          <span className="text-xs text-gray-400">{r.label}</span>
+          <span className="text-xs text-gray-700">{r.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ContextRow({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
   return (
