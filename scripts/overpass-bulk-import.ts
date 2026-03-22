@@ -42,7 +42,7 @@ const DB_URL =
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const RADIUS_M = 500; // agregacijski radij
-const TRANSIT_RADIUS_M = 600;
+const TRANSIT_RADIUS_M = 500;
 const GRID_STEP = 0.001; // ~100m
 
 // SLO bounding box
@@ -213,16 +213,16 @@ function buildPlacesData(
 
   if (totalTransit >= 6 || (nearestBus != null && nearestBus < 80)) {
     kvaliteta = "odlicna";
-    opis = `${busStops.length} bus${trainStations.length > 0 ? ` + ${trainStations.length} vlak` : ""} postaj v 600m`;
+    opis = `${busStops.length} bus${trainStations.length > 0 ? ` + ${trainStations.length} vlak` : ""} postajališč v 500m`;
   } else if (totalTransit >= 2) {
     kvaliteta = "dobra";
-    opis = `${busStops.length} bus postaj v 600m`;
+    opis = `${busStops.length} bus postajališč v 500m`;
   } else if (totalTransit >= 1) {
     kvaliteta = "srednja";
     opis = nearestBus != null ? `Najbližja postaja ${nearestBus}m` : "Javni prevoz dosegljiv";
   } else {
     kvaliteta = "slaba";
-    opis = "Ni javnega prevoza v 600m";
+    opis = "Ni javnega prevoza v 500m";
   }
 
   const supermarkets = catsSvc.supermarket ?? [];
@@ -399,7 +399,7 @@ async function main() {
     console.log(`\n📈 Rezultati v places_cache:`);
     console.log(`   Skupaj celic: ${s.total_cells}`);
     console.log(`   S supermarketom (500m): ${s.cells_with_supermarket}`);
-    console.log(`   Z bus postajo (600m): ${s.cells_with_bus}`);
+    console.log(`   Z bus postajo (500m): ${s.cells_with_bus}`);
     console.log(`   S šolo (500m): ${s.cells_with_school}`);
     console.log(`\n⚠️  Transit podatki iz OSM — priporočamo override z HERE Places za transit.\n`);
 

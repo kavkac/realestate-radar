@@ -27,7 +27,7 @@
 import { prisma } from "@/lib/prisma";
 
 const HERE_API_KEY = process.env.HERE_API_KEY ?? "";
-const RADIUS_TRANSIT = 600;
+const RADIUS_TRANSIT = 500;
 const RADIUS_SERVICES = 500;
 const DB_CACHE_DAYS = 30;
 const MEM_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
@@ -161,19 +161,19 @@ function hereBuildTransit(places: HerePlace[], lat: number, lng: number): Transi
       busStops.length > 0 ? `${busStops.length} bus` : null,
       tramStops.length > 0 ? `${tramStops.length} tram` : null,
       trainStations.length > 0 ? `${trainStations.length} vlak` : null,
-    ].filter(Boolean).join(" + ") + " postaj v 600m";
+    ].filter(Boolean).join(" + ") + " postajališč v 500m";
   } else if (total >= 3) {
     kvaliteta = "dobra";
     opis = [
       busStops.length > 0 ? `${busStops.length} bus` : null,
       tramStops.length > 0 ? `${tramStops.length} tram` : null,
-    ].filter(Boolean).join(" + ") + " postaj v 600m";
+    ].filter(Boolean).join(" + ") + " postajališč v 500m";
   } else if (total >= 1) {
     kvaliteta = "srednja";
     opis = nearestBus != null ? `Najbližja postaja ${nearestBus}m` : "Javni prevoz dosegljiv";
   } else {
     kvaliteta = "slaba";
-    opis = "Ni javnega prevoza v 600m";
+    opis = "Ni javnega prevoza v 500m";
   }
 
   void lat; void lng; // used via distance field on HerePlace
