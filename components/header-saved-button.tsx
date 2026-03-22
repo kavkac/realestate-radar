@@ -62,7 +62,7 @@ export function HeaderSavedButton() {
         </svg>
         <span className="hidden sm:inline text-xs font-medium">Shranjeni</span>
         {count > 0 && (
-          <span className="text-[10px] bg-brand-500 text-white rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+          <span className="text-[10px] text-gray-500 font-medium">
             {count}
           </span>
         )}
