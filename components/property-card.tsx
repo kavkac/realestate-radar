@@ -2205,12 +2205,20 @@ interface PlacesServices {
 }
 interface PlacesDataCard { transit: PlacesTransit; services: PlacesServices }
 
+function ContextRow({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between py-2 border-b border-gray-100 last:border-0 text-sm">
+      <span className="text-gray-400 text-xs">{label}</span>
+      <span className={`text-xs font-medium ${alert ? "text-red-500" : "text-gray-700"}`}>{value}</span>
+    </div>
+  );
+}
+
 function PropertyContextSection({
   ctx,
   tipProdaje,
   placesData,
   stavbaLetoIzgradnje,
-  stavbaTip,
   poplavnaNevarnost,
 }: {
   ctx: PropertyContextData;
@@ -2220,138 +2228,42 @@ function PropertyContextSection({
   stavbaTip?: string | null;
   poplavnaNevarnost?: PoplavnaNevarnost | null;
 }) {
-  const tipLabel = tipProdaje === 'stavba' ? 'Celotna stavba'
-    : tipProdaje === 'parcela_s_stavbo' ? 'Parcela s stavbo'
-    : 'Stanovanje';
+  // Lokacija
+  const lokacijaKat = ctx.lokacija.kategorija;
+  const lokacijaLabel = lokacijaKat === 'center' ? 'Center mesta'
+    : lokacijaKat === 'primestno' ? 'Primestno'
+    : lokacijaKat === 'obrobje' ? 'Obrobje'
+    : lokacijaKat === 'ruralno' ? 'Ruralno'
+    : '—';
+  const lppLines = Math.min(placesData?.transit?.lppLineCount ?? 0, 20);
+  const lokacijaValue = [lokacijaLabel, lppLines > 0 ? `${lppLines} linij LPP` : null].filter(Boolean).join(' · ');
 
-  // Score per dimension (0-100 → 0-10)
-  const lokacijaScoreNum = ctx.lokacija.score / 10;
-  const stavbaScoreNum = ctx.stavba.score / 10;
-  const trgScoreNum = ctx.trg.score / 10;
+  // Stavba
+  const leto = stavbaLetoIzgradnje;
+  const stavbaValue = leto ? `Leto ${leto}` : '—';
+  const stavbaAlert = ctx.stavba.score < 40;
 
-  // Color helper: score >= 7 → green, 4-7 → amber, < 4 → red
-  const getScoreColor = (s: number) =>
-    s >= 7 ? 'text-green-600' : s >= 4 ? 'text-amber-600' : 'text-red-600';
-
-  // Lokacija insights
-  const lokacijaKategorija = ctx.lokacija.kategorija;
-  const lokacijaLabel = lokacijaKategorija === 'center' ? 'Center mesta'
-    : lokacijaKategorija === 'primestno' ? 'Primestno območje'
-    : lokacijaKategorija === 'obrobje' ? 'Obrobje mesta'
-    : lokacijaKategorija === 'ruralno' ? 'Ruralno območje'
-    : null;
-
-  // Transit insights with sanity caps
-  const rawLppLines = placesData?.transit?.lppLineCount ?? 0;
-  const lppLines = Math.min(rawLppLines, 20); // Cap at 20
-
-  // Stavba insights
-  const stavbaKategorija = stavbaTip || ctx.stavba.starostKategorija;
-  const isOldBuilding = stavbaScoreNum < 5;
-
-  // Trg insights
-  const stTransakcij = ctx.trg.steviloTransakcij ?? 0;
-  const trgLikvidnost = stTransakcij >= 10 ? 'Likviden trg' : stTransakcij >= 5 ? 'Zmerno likviden' : 'Nelikviden trg';
+  // Trg
+  const stT = ctx.trg.steviloTransakcij ?? 0;
+  const trgLabel = stT >= 10 ? 'Likviden trg' : stT >= 5 ? 'Zmerno likviden' : 'Malo poslov';
+  const trgValue = stT > 0 ? `${trgLabel} · ${stT} poslov/leto` : trgLabel;
 
   // Tveganja
-  const floodStopnja = poplavnaNevarnost?.stopnja;
-  const hasFloodRisk = ctx.tveganja.poplavnaNevarnost || (floodStopnja != null && floodStopnja !== 'ni');
+  const hasFloodRisk = ctx.tveganja.poplavnaNevarnost;
   const hasSeismicRisk = ctx.tveganja.visokaSeizmicnost;
-  const hasAnyRisk = hasFloodRisk || hasSeismicRisk;
-
-  // Build dimension rows with key facts
-  const dimensions: { icon: string; name: string; score: number; keyFact: string; warning?: boolean }[] = [
-    {
-      icon: '📍',
-      name: 'Lokacija',
-      score: lokacijaScoreNum,
-      keyFact: lokacijaLabel || (lppLines > 0 ? `${lppLines} linij LPP` : 'Oddaljeno'),
-    },
-    {
-      icon: '🏗️',
-      name: 'Stavba',
-      score: stavbaScoreNum,
-      keyFact: stavbaLetoIzgradnje
-        ? `Leto ${stavbaLetoIzgradnje}${stavbaKategorija ? ` · ${stavbaKategorija}` : ''}`
-        : stavbaKategorija || 'Neznana starost',
-      warning: isOldBuilding,
-    },
-    {
-      icon: '📈',
-      name: 'Trg',
-      score: trgScoreNum,
-      keyFact: trgLikvidnost,
-    },
-  ];
-
-  // Sort by score ascending (worst first)
-  dimensions.sort((a, b) => a.score - b.score);
-
-  // Critical chips: max 3, only from slabosti, only if score < 5 or risk exists
-  const criticalChips = ctx.slabosti
-    .filter(s => {
-      // Filter to show only building-related issues when stavba score is low
-      const isBuildingIssue = s.toLowerCase().includes('fasad') ||
-        s.toLowerCase().includes('streh') ||
-        s.toLowerCase().includes('obnov') ||
-        s.toLowerCase().includes('star');
-      return isOldBuilding && isBuildingIssue;
-    })
-    .slice(0, 3);
+  const tveganjaValue = hasFloodRisk && hasSeismicRisk ? 'Poplava + potres'
+    : hasFloodRisk ? 'Poplavno ogroženo'
+    : hasSeismicRisk ? 'Visoka seizmičnost'
+    : 'Ni posebnih tveganj';
+  const tveganjaAlert = hasFloodRisk || hasSeismicRisk;
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">Kontekst nepremičnine</p>
-        <span className="text-xs font-medium px-2 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-600">
-          {tipLabel}
-        </span>
-      </div>
-
-      {/* Compact 4 Dimension Rows */}
-      <div className="rounded-lg border border-gray-100 bg-gray-50/50 divide-y divide-gray-100">
-        {dimensions.map((dim) => (
-          <div key={dim.name} className="flex items-center gap-3 px-3 py-2">
-            <span className="text-base">{dim.icon}</span>
-            <span className="text-sm text-gray-700 w-16 flex-shrink-0">{dim.name}</span>
-            <span className="text-xs text-gray-500 flex-1 truncate">{dim.keyFact}</span>
-            {dim.warning && <span className="text-amber-500 text-xs">⚠</span>}
-            <span className={`text-sm font-semibold tabular-nums ${getScoreColor(dim.score)}`}>
-              {dim.score.toFixed(1)}
-            </span>
-          </div>
-        ))}
-
-        {/* Tveganja row */}
-        <div className="flex items-center gap-3 px-3 py-2">
-          <span className="text-base">🚨</span>
-          <span className="text-sm text-gray-700 w-16 flex-shrink-0">Tveganja</span>
-          <span className="text-xs text-gray-500 flex-1 truncate">
-            {hasFloodRisk && floodStopnja && floodStopnja !== 'ni'
-              ? `Poplavno: ${floodStopnja}`
-              : hasFloodRisk
-                ? 'Poplavno ogroženo'
-                : hasSeismicRisk
-                  ? 'Visoka seizmičnost'
-                  : ''}
-          </span>
-          <span className={`text-sm font-semibold ${hasAnyRisk ? 'text-red-600' : 'text-green-600'}`}>
-            {hasAnyRisk ? '⚠ Srednje' : '✓ Nizko'}
-          </span>
-        </div>
-      </div>
-
-      {/* Critical chips only — max 3, only problems */}
-      {criticalChips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {criticalChips.map((s, i) => (
-            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs text-amber-800">
-              ⚠️ {s}
-            </span>
-          ))}
-        </div>
-      )}
+    <div>
+      <Label>Kontekst nepremičnine</Label>
+      <ContextRow label="Lokacija" value={lokacijaValue} />
+      <ContextRow label="Stavba" value={stavbaValue} alert={stavbaAlert} />
+      <ContextRow label="Trg" value={trgValue} />
+      <ContextRow label="Tveganja" value={tveganjaValue} alert={tveganjaAlert} />
     </div>
   );
 }
