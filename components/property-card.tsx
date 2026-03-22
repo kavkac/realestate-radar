@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { CreditCalculator } from "./credit-calculator";
-import EditPropertyForm from "./edit-property-form";
 import { izracunajVisinoStropov, izracunajStavbneKorekcije } from "@/lib/location-premium";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
 import { izracunajOcenaStanja } from "@/lib/gurs-api";
@@ -315,7 +314,11 @@ export function PropertyCard({
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [kreditOpen, setKreditOpen] = useState(false);
   const [showAllUnits, setShowAllUnits] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [corrections, setCorrections] = useState<Array<{ atribut: string; vrednost: string; trust_level: string }>>([]);
   const { isSignedIn } = useUser();
   const [isSaved, setIsSaved] = useState(false);
@@ -423,7 +426,7 @@ export function PropertyCard({
   const varstvoPodatki = jeVVarstveniConi(lat, lng);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-left text-gray-700 print:shadow-none print:border-0">
+    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden text-left text-gray-700 print:shadow-none print:border-0 ${editMode ? "ring-2 ring-brand-300" : ""}`}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -716,33 +719,197 @@ export function PropertyCard({
               </div>
             )}
 
-            {/* ── EDIT BUTTON (samo za prijavljene) ── */}
-            {isSignedIn && stavbaId && (
-              <div className="mt-4 border-t border-gray-100 pt-3">
-                <button
-                  onClick={() => setEditOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 text-xs text-gray-500 hover:text-brand-600 hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-lg py-2 transition-colors"
-                >
-                  ✏️ Uredi podatke o tej nepremičnini
-                </button>
+            {/* ── INLINE EDIT TRIGGER (samo za prijavljene) ── */}
+            {isSignedIn && stavbaId && !editMode && (
+              <button
+                onClick={() => { setEditMode(true); setSaveSuccess(false); setEditError(null); }}
+                className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer flex items-center gap-1 mt-2"
+              >
+                ✏️ Predlagaj popravek podatkov
+              </button>
+            )}
+
+            {/* ── INLINE EDIT FIELDS ── */}
+            {editMode && stavbaId && (
+              <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
+                <p className="text-xs font-medium text-gray-600 mb-3">Predlagaj popravke:</p>
+
+                {/* Fasada leto */}
+                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Fasada obnovljena:</span>
+                  <input
+                    type="number"
+                    placeholder="2018"
+                    value={editValues.fasada_leto ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, fasada_leto: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[120px]"
+                  />
+                </div>
+
+                {/* Streha leto */}
+                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Streha obnovljena:</span>
+                  <input
+                    type="number"
+                    placeholder="2015"
+                    value={editValues.streha_leto ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, streha_leto: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[120px]"
+                  />
+                </div>
+
+                {/* Okna leto */}
+                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Okna zamenjana:</span>
+                  <input
+                    type="number"
+                    placeholder="2020"
+                    value={editValues.okna_leto ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, okna_leto: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[120px]"
+                  />
+                </div>
+
+                {/* Dvigalo */}
+                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Dvigalo:</span>
+                  <select
+                    value={editValues.dvigalo ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, dvigalo: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[120px]"
+                  >
+                    <option value="">— izberite —</option>
+                    <option value="Da">Da</option>
+                    <option value="Ne">Ne</option>
+                    <option value="V gradnji">V gradnji</option>
+                  </select>
+                </div>
+
+                {/* Ogrevanje */}
+                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Ogrevanje:</span>
+                  <select
+                    value={editValues.ogrevanje ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, ogrevanje: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[120px]"
+                  >
+                    <option value="">— izberite —</option>
+                    <option value="Daljinsko">Daljinsko</option>
+                    <option value="Plin">Plin</option>
+                    <option value="Toplotna črpalka">Toplotna črpalka</option>
+                    <option value="Električno">Električno</option>
+                    <option value="Olje">Olje</option>
+                    <option value="Drva/Peleti">Drva/Peleti</option>
+                  </select>
+                </div>
+
+                {/* Stanje */}
+                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Stanje:</span>
+                  <select
+                    value={editValues.stanje ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, stanje: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[120px]"
+                  >
+                    <option value="">— izberite —</option>
+                    <option value="Odlično">Odlično</option>
+                    <option value="Dobro">Dobro</option>
+                    <option value="Povprečno">Povprečno</option>
+                    <option value="Potrebuje obnovo">Potrebuje obnovo</option>
+                  </select>
+                </div>
+
+                {/* Parkirišče */}
+                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Parkirišče:</span>
+                  <select
+                    value={editValues.parkirisce ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, parkirisce: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[120px]"
+                  >
+                    <option value="">— izberite —</option>
+                    <option value="Garaža">Garaža</option>
+                    <option value="Garažno mesto">Garažno mesto</option>
+                    <option value="Zunanji prostor">Zunanji prostor</option>
+                    <option value="Ni parkiranja">Ni parkiranja</option>
+                  </select>
+                </div>
+
+                {/* Opomba */}
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-xs text-gray-500 w-32 flex-shrink-0">Opomba:</span>
+                  <input
+                    type="text"
+                    placeholder="Npr: nova kopalnica 2022"
+                    value={editValues.opomba ?? ""}
+                    onChange={(e) => setEditValues({ ...editValues, opomba: e.target.value })}
+                    className="text-xs border border-gray-200 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-brand-400 focus:outline-none bg-white max-w-[180px]"
+                  />
+                </div>
+
+                {/* Legal disclaimer */}
+                <p className="text-xs text-gray-400 mt-2">
+                  Z oddajo potrjujem točnost podatkov in pooblaščenost za to nepremičnino.
+                </p>
+
+                {editError && <p className="text-xs text-red-600 mt-1">{editError}</p>}
+                {saveSuccess && <p className="text-xs text-green-600 mt-1">✅ Podatki shranjeni</p>}
               </div>
             )}
           </div>
         </div>
 
-        {/* Edit modal */}
-        {editOpen && stavbaId && (
-          <EditPropertyForm
-            stavbaId={stavbaId}
-            delStavbeId={delStavbeId}
-            onClose={() => setEditOpen(false)}
-            onSaved={() => {
-              fetch(`/api/corrections?stavba_id=${stavbaId}`)
-                .then(r => r.json())
-                .then(d => setCorrections(d.corrections ?? []))
-                .catch(() => {});
-            }}
-          />
+        {/* Sticky Action Bar (edit mode only) */}
+        {editMode && stavbaId && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex gap-3 justify-end z-40 shadow-lg">
+            <button
+              onClick={() => { setEditMode(false); setEditValues({}); setEditError(null); }}
+              className="border border-gray-200 text-gray-600 rounded-lg px-4 py-2 text-sm hover:bg-gray-50 transition-colors"
+            >
+              Prekliči
+            </button>
+            <button
+              onClick={async () => {
+                const corrections = Object.entries(editValues)
+                  .filter(([, v]) => v.trim() !== "")
+                  .map(([atribut, vrednost]) => ({ atribut, vrednost }));
+
+                if (corrections.length === 0) {
+                  setEditError("Izpolnite vsaj eno polje.");
+                  return;
+                }
+
+                setEditSaving(true);
+                setEditError(null);
+
+                try {
+                  const res = await fetch("/api/corrections", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ stavba_id: stavbaId, del_stavbe_id: delStavbeId, corrections }),
+                  });
+                  if (!res.ok) throw new Error("Napaka pri shranjevanju");
+
+                  // Refresh corrections
+                  const corrRes = await fetch(`/api/corrections?stavba_id=${stavbaId}`);
+                  const corrData = await corrRes.json();
+                  setCorrections(corrData.corrections ?? []);
+
+                  setSaveSuccess(true);
+                  setEditMode(false);
+                  setEditValues({});
+                } catch {
+                  setEditError("Napaka pri shranjevanju. Poskusite znova.");
+                } finally {
+                  setEditSaving(false);
+                }
+              }}
+              disabled={editSaving}
+              className="bg-brand-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-brand-600 transition-colors disabled:opacity-50"
+            >
+              {editSaving ? "Shranjujem..." : "Shrani spremembe"}
+            </button>
+          </div>
         )}
 
         {/* ── DESNI SIDEBAR — referenčni podatki ── */}
