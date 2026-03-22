@@ -226,6 +226,7 @@ interface PropertyCardProps {
   oglasneAnalize?: OglasneAnalize | null;
   koRentalYield?: KoRentalYield | null;
   saleToListRatio?: SaleToListRatio | null;
+  azbestRisk?: { hasRisk: boolean; level: string | null; note: string } | null;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   propertyContext?: PropertyContextData | null;
   placesData?: PlacesDataCard | null;
@@ -328,6 +329,7 @@ export function PropertyCard({
   oglasneAnalize,
   koRentalYield,
   saleToListRatio,
+  azbestRisk,
   tipProdaje,
   propertyContext,
   placesData,
@@ -782,6 +784,7 @@ export function PropertyCard({
                 stavbaLetoIzgradnje={stavba.letoIzgradnje}
                 stavbaTip={stavba.tip}
                 poplavnaNevarnost={poplavnaNevarnost}
+                azbestRisk={azbestRisk}
               />
             </div>
           )}
@@ -2274,6 +2277,7 @@ function PropertyContextSection({
   placesData,
   stavbaLetoIzgradnje,
   poplavnaNevarnost,
+  azbestRisk,
 }: {
   ctx: PropertyContextData;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
@@ -2281,6 +2285,7 @@ function PropertyContextSection({
   stavbaLetoIzgradnje?: number | null;
   stavbaTip?: string | null;
   poplavnaNevarnost?: PoplavnaNevarnost | null;
+  azbestRisk?: { hasRisk: boolean; level: string | null; note: string } | null;
 }) {
   // Lokacija
   const lokacijaKat = ctx.lokacija.kategorija;
@@ -2305,11 +2310,13 @@ function PropertyContextSection({
   // Tveganja
   const hasFloodRisk = ctx.tveganja.poplavnaNevarnost;
   const hasSeismicRisk = ctx.tveganja.visokaSeizmicnost;
-  const tveganjaValue = hasFloodRisk && hasSeismicRisk ? 'Poplava + potres'
-    : hasFloodRisk ? 'Poplavno ogroženo'
-    : hasSeismicRisk ? 'Visoka seizmičnost'
-    : 'Ni posebnih tveganj';
-  const tveganjaAlert = hasFloodRisk || hasSeismicRisk;
+  const hasAzbest = azbestRisk?.hasRisk ?? false;
+  const tveganjaValues = [
+    hasFloodRisk && hasSeismicRisk ? 'Poplava + potres' : hasFloodRisk ? 'Poplavno ogroženo' : hasSeismicRisk ? 'Visoka seizmičnost' : null,
+    hasAzbest ? (azbestRisk?.level === 'visoko' ? 'Azbest (visoko tveganje)' : 'Azbest (možno tveganje)') : null,
+  ].filter(Boolean);
+  const tveganjaValue = tveganjaValues.length > 0 ? tveganjaValues.join(' · ') : 'Ni posebnih tveganj';
+  const tveganjaAlert = hasFloodRisk || hasSeismicRisk || hasAzbest;
 
   return (
     <div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE, GursServiceUnavailableError } from "@/lib/gurs-api";
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
+import { getAzbestRisk } from "@/lib/azbest";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio } from "@/lib/etn-lookup";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
@@ -322,14 +323,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Re-run ETN with energy class if cert available (applies correction to value estimate)
+    // Lega v stavbi — iz ev_del_stavbe za selected unit
+    let idLega: string | null = null;
+    let stNadstropja: number | null = null;
+    if (selectedUnit && stavba.eidStavba) {
+      try {
+        const legaRow = await prisma.$queryRawUnsafe<{ id_lega: string; st_nadstropja: string }[]>(
+          `SELECT id_lega, st_nadstropja FROM ev_del_stavbe WHERE eid_stavba = $1 AND st_dela_stavbe = $2 LIMIT 1`,
+          stavba.eidStavba, String(selectedUnit.stDelaStavbe)
+        );
+        if (legaRow[0]) {
+          idLega = legaRow[0].id_lega ?? null;
+          stNadstropja = legaRow[0].st_nadstropja ? parseInt(legaRow[0].st_nadstropja) : null;
+        }
+      } catch { /* ignore */ }
+    }
+
     let etnAnalizaFinal = etnAnaliza;
     const certEnergyClass = energyCertResult?.cert?.energyClass;
+    const osmAmenitiesCount = osmData ? (Object.values(osmData as Record<string, unknown[]>).flat().length) : null;
     if (certEnergyClass && etnAnaliza && useableArea) {
-      const osmAmenitiesCount = osmData ? (Object.values(osmData as Record<string, unknown[]>).flat().length) : null;
-      const corrected = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe)
-        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe).catch(() => null))
+      const corrected = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja)
+        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja).catch(() => null))
         .catch(() => null);
       if (corrected) etnAnalizaFinal = corrected;
+    } else if (etnAnalizaFinal && (idLega || stNadstropja)) {
+      // Re-run with lega even without cert correction
+      const withLega = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass ?? null, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja).catch(() => null);
+      if (withLega) etnAnalizaFinal = withLega;
     }
 
     // Oglasne analize — dopolni z ETN mediano za razliko
@@ -456,6 +477,7 @@ export async function POST(request: NextRequest) {
       selectedUnitArea,
       seizmicniPodatki,
       poplavnaNevarnost,
+      azbestRisk: getAzbestRisk(stavba.letoIzgradnje),
       osmData: osmData ?? null,
       placesData,
       lppLines: lppLines ?? null,

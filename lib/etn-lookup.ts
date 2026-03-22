@@ -296,6 +296,8 @@ export interface EtnAnaliza {
   rangeLowM2: number | null;
   rangeHighM2: number | null;
   energetskaKorekcija: { razred: string; faktor: number } | null;
+  legaFaktor: number;
+  legaOpis: string | null;
   trendProcent: number | null;
   trend: "rast" | "padec" | "stabilno" | null;
   zadnjeLeto: number | null;
@@ -672,6 +674,19 @@ async function getNationalMedian(cutoffStr: string, tipFilter: string): Promise<
   }
 }
 
+// Lega faktor — vpliv lege v stavbi na vrednost
+function legaFaktorFn(idLega: string | null | undefined, stNadstropja: number | null | undefined): { faktor: number; opis: string | null } {
+  if (!idLega) return { faktor: 1, opis: null };
+  if (idLega === '1713') return { faktor: 0.85, opis: "Klet (−15%)" }; // klet
+  if (idLega === '1714') return { faktor: 0.95, opis: "Pritličje (−5%)" }; // pritličje
+  if (idLega === '1716') return { faktor: 1.08, opis: "Mansarda (+8%)" }; // mansarda
+  if (idLega === '1715' && stNadstropja != null) {
+    if (stNadstropja >= 4) return { faktor: 1.05, opis: `${stNadstropja}. nadstropje (+5%)` };
+    if (stNadstropja >= 2) return { faktor: 1.03, opis: `${stNadstropja}. nadstropje (+3%)` };
+  }
+  return { faktor: 1, opis: null };
+}
+
 export async function getEtnAnaliza(
   koId: number,
   area: number | null,
@@ -681,6 +696,8 @@ export async function getEtnAnaliza(
   lng?: number | null,
   osmAmenitiesCount?: number | null,
   stStavbe?: number | null,
+  idLega?: string | null,
+  stNadstropja?: number | null,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 2);
@@ -960,6 +977,8 @@ export async function getEtnAnaliza(
       rangeLowM2: null,
       rangeHighM2: null,
       energetskaKorekcija,
+      legaFaktor: 1,
+      legaOpis: null,
       lokacijskiPremium,
       trendProcent: null,
       trend: null,
@@ -1052,12 +1071,15 @@ export async function getEtnAnaliza(
   // Kalibrirana mediana
   const medKalibrirana = med * kalibracijskiFaktor;
 
-  // Ocenjena vrednost = median × površina × energetski faktor × lokacijski faktor × kalibracija, ±10%
+  // Lega faktor
+  const { faktor: legaFaktor, opis: legaOpis } = legaFaktorFn(idLega, stNadstropja);
+
+  // Ocenjena vrednost = median × površina × energetski faktor × lokacijski faktor × lega × kalibracija, ±10%
   let ocenjenaTrznaVrednost: number | null = null;
   let ocenaVrednostiMin: number | null = null;
   let ocenaVrednostiMax: number | null = null;
   if (area && area > 0) {
-    const base = medKalibrirana * area * energyFactor * lokacijskiFaktor;
+    const base = medKalibrirana * area * energyFactor * lokacijskiFaktor * legaFaktor;
     ocenjenaTrznaVrednost = Math.round(base);
     const rangeMultiplier = vir === 'regija' ? 0.12 : 0.10; // wider range for regional estimates
     ocenaVrednostiMin = Math.round(base * (1 - rangeMultiplier));
@@ -1083,6 +1105,8 @@ export async function getEtnAnaliza(
     rangeLowM2,
     rangeHighM2,
     energetskaKorekcija,
+    legaFaktor,
+    legaOpis,
     lokacijskiPremium,
     trendProcent,
     trend,
