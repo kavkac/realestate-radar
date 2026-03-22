@@ -976,7 +976,7 @@ function mergeValue(
 }
 
 // Subtle gray pill for user-provided data (private variant)
-function UserCorrectionPill({ value, variant = "private" }: { value: string | number; variant?: "public" | "private" }) {
+function UserCorrectionPill({ value, variant = "private" }: { value: string | number; variant?: "public" | "private"; }) {
   if (variant === "public") {
     return (
       <span
@@ -990,9 +990,9 @@ function UserCorrectionPill({ value, variant = "private" }: { value: string | nu
   return (
     <span
       className="inline-flex items-center text-[10px] text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5 ml-1.5 font-normal"
-      title="Podatek posredoval lastnik nepremičnine"
+      title="Vaša zasebna opomba — vidno samo vam"
     >
-      informacija lastnika: {value}
+      vaša opomba: {value}
     </span>
   );
 }
