@@ -443,7 +443,7 @@ export function PropertyCard({
             {isSignedIn && stavbaId && (
               <button
                 onClick={() => setEditDrawerOpen(true)}
-                className="text-white/70 hover:text-white text-xs border border-white/20 hover:border-white/40 rounded px-2.5 py-1 transition-colors"
+                className="rounded border border-white/30 bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs font-medium text-white/80 hover:text-white transition-colors whitespace-nowrap shadow-sm"
               >
                 Uredi podatke
               </button>
