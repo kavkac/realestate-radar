@@ -27,7 +27,7 @@ const PROGRAMS = [
     pogoji: { letoGradnje_max: 2013, namembnost: ["stanovanje", "stavba"] },
     max_znesek: 12000,
     max_delez: 50,
-    url: "https://www.ekosklad.si/programi/za-gospodinjstva/nepovratne-financne-spodbude/naravne-osebe/seznam-programov/produkt/EN-EKO-07"
+    url: "https://www.ekosklad.si/prebivalstvo/pridobite-spodbudo/seznam-spodbud?_s=s&ukrep%5B%5D=izolacija-in-okna&financiranje%5B%5D=subvencija"
   },
   {
     naziv: "Toplotna izolacija strehe ali stropa",
@@ -38,7 +38,7 @@ const PROGRAMS = [
     pogoji: { letoGradnje_max: 2013, namembnost: ["stanovanje", "stavba"] },
     max_znesek: 6000,
     max_delez: 50,
-    url: "https://www.ekosklad.si/programi/za-gospodinjstva/nepovratne-financne-spodbude/naravne-osebe/seznam-programov/produkt/EN-EKO-06"
+    url: "https://www.ekosklad.si/prebivalstvo/pridobite-spodbudo/seznam-spodbud?_s=s&ukrep%5B%5D=izolacija-in-okna&financiranje%5B%5D=subvencija"
   },
   {
     naziv: "Menjava oken in balkonskih vrat",
@@ -49,7 +49,7 @@ const PROGRAMS = [
     pogoji: { letoGradnje_max: 2013, namembnost: ["stanovanje", "stavba"] },
     max_znesek: 4000,
     max_delez: 30,
-    url: "https://www.ekosklad.si/programi/za-gospodinjstva/nepovratne-financne-spodbude/naravne-osebe/seznam-programov/produkt/EN-EKO-05"
+    url: "https://www.ekosklad.si/prebivalstvo/pridobite-spodbudo/seznam-spodbud?_s=s&ukrep%5B%5D=izolacija-in-okna&financiranje%5B%5D=subvencija"
   },
   {
     naziv: "Toplotna črpalka za ogrevanje",
@@ -60,7 +60,7 @@ const PROGRAMS = [
     pogoji: { letoGradnje_max: 2023, namembnost: ["stanovanje", "stavba"], energijskiRazred_max: "D" },
     max_znesek: 10000,
     max_delez: 50,
-    url: "https://www.ekosklad.si/programi/za-gospodinjstva/nepovratne-financne-spodbude/naravne-osebe/seznam-programov/produkt/EN-EKO-02"
+    url: "https://www.ekosklad.si/prebivalstvo/pridobite-spodbudo/seznam-spodbud?_s=s&ukrep%5B%5D=ogrevanje-in-prezracevanje&financiranje%5B%5D=subvencija"
   },
   {
     naziv: "Solarni fotovoltaični sistem",
@@ -71,7 +71,7 @@ const PROGRAMS = [
     pogoji: { namembnost: ["stanovanje", "stavba"] },
     max_znesek: 7500,
     max_delez: 50,
-    url: "https://www.ekosklad.si/programi/za-gospodinjstva/nepovratne-financne-spodbude/naravne-osebe/seznam-programov/produkt/EN-EKO-01"
+    url: "https://www.ekosklad.si/prebivalstvo/pridobite-spodbudo/seznam-spodbud?_s=s&ukrep%5B%5D=elektricna-samooskrba&financiranje%5B%5D=subvencija"
   },
   {
     naziv: "Prezračevanje z rekuperacijo",
@@ -82,7 +82,7 @@ const PROGRAMS = [
     pogoji: { letoGradnje_max: 2013, namembnost: ["stanovanje", "stavba"] },
     max_znesek: 3000,
     max_delez: 50,
-    url: "https://www.ekosklad.si/programi/za-gospodinjstva/nepovratne-financne-spodbude/naravne-osebe/seznam-programov"
+    url: "https://www.ekosklad.si/prebivalstvo/pridobite-spodbudo/seznam-spodbud?_s=s&ukrep%5B%5D=ogrevanje-in-prezracevanje&financiranje%5B%5D=subvencija"
   },
   // STANOVANJSKI SKLAD RS
   {
@@ -94,7 +94,7 @@ const PROGRAMS = [
     pogoji: { namembnost: ["stanovanje"] },
     max_znesek: 100000,
     max_delez: null,
-    url: "https://www.ssrs.si/ugodni-krediti/"
+    url: "https://ssrs.si"
   },
   {
     naziv: "Kredit za energetsko prenovo",
@@ -105,7 +105,7 @@ const PROGRAMS = [
     pogoji: { letoGradnje_max: 2013, namembnost: ["stanovanje", "stavba"] },
     max_znesek: 25000,
     max_delez: null,
-    url: "https://www.ssrs.si/ugodni-krediti/"
+    url: "https://ssrs.si"
   },
   // SID BANKA
   {
@@ -117,7 +117,7 @@ const PROGRAMS = [
     pogoji: { namembnost: ["stanovanje", "stavba"], energijskiRazred_max: "C" },
     max_znesek: 50000,
     max_delez: null,
-    url: "https://www.sid.si/posojila/za-podjetnike-in-obrtnike/energetska-ucinkovitost"
+    url: "https://www.sid.si"
   },
 ];
 
