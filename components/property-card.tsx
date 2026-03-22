@@ -958,7 +958,7 @@ function Field({
 // SOURCE-AWARE DATA MERGE (user corrections override registry)
 // ─────────────────────────────────────────────────────────────
 
-type Correction = { atribut: string; vrednost: string; trust_level: string; is_public: boolean; is_own: boolean };
+type Correction = { atribut: string; vrednost: string; trust_level: string; is_public: boolean; is_own: boolean; vloga?: string };
 type DataSource = "registry" | "user" | "verified";
 
 const CORRECTION_LABELS: Record<string, string> = {
@@ -1290,6 +1290,17 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
   const hasPublicOwnerInfo = ogrevanjeMergePublic.value || stanjeMergePublic.value || parkirisceMergePublic.value || opombaCorrectionPublic;
   const hasPrivateOwnerInfo = ogrevanjeMergePrivate.value || stanjeMergePrivate.value || parkirisceMergePrivate.value || opombaCorrectionPrivate;
 
+  // Derive public section label from vloga
+  const vlogaLabel: Record<string, string> = {
+    lastnik: "Lastnik",
+    solastnik: "Solastnik",
+    upravljavec: "Upravljavec",
+    agent: "Nepremičninski agent",
+    drugo: "Relevantna oseba",
+  };
+  const publicVloga = publicCorrections[0]?.vloga;
+  const publicLabel = publicVloga ? vlogaLabel[publicVloga] ?? "Relevantna oseba" : "Lastnik";
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
@@ -1329,35 +1340,35 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
         )}
       </div>
 
-      {/* Public owner info — verified corrections visible to everyone */}
+      {/* Public owner info — self-declared corrections visible to everyone */}
       {hasPublicOwnerInfo && (
         <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-[10px] text-green-600 font-semibold uppercase tracking-widest mb-1.5 flex items-center gap-1">
-            <span>✓</span> Lastnik poroča
+          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest mb-1.5 flex items-center gap-1">
+            <span>👤</span> {publicLabel} · izjava
           </p>
           <div className="flex flex-wrap gap-1.5">
             {ogrevanjeMergePublic.value && (
-              <span className="inline-flex items-center text-[11px] bg-green-50 text-green-800 rounded-full px-2.5 py-0.5 border border-green-100">
-                <span className="text-green-600 mr-1">Ogrevanje</span>
-                <span className="text-green-800">{ogrevanjeMergePublic.value}</span>
+              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-700 rounded-full px-2.5 py-0.5 border border-gray-200">
+                <span className="text-gray-500 mr-1">Ogrevanje</span>
+                <span className="text-gray-700">{ogrevanjeMergePublic.value}</span>
               </span>
             )}
             {stanjeMergePublic.value && (
-              <span className="inline-flex items-center text-[11px] bg-green-50 text-green-800 rounded-full px-2.5 py-0.5 border border-green-100">
-                <span className="text-green-600 mr-1">Stanje</span>
-                <span className="text-green-800">{stanjeMergePublic.value}</span>
+              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-700 rounded-full px-2.5 py-0.5 border border-gray-200">
+                <span className="text-gray-500 mr-1">Stanje</span>
+                <span className="text-gray-700">{stanjeMergePublic.value}</span>
               </span>
             )}
             {parkirisceMergePublic.value && (
-              <span className="inline-flex items-center text-[11px] bg-green-50 text-green-800 rounded-full px-2.5 py-0.5 border border-green-100">
-                <span className="text-green-600 mr-1">Parkirišče</span>
-                <span className="text-green-800">{parkirisceMergePublic.value}</span>
+              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-700 rounded-full px-2.5 py-0.5 border border-gray-200">
+                <span className="text-gray-500 mr-1">Parkirišče</span>
+                <span className="text-gray-700">{parkirisceMergePublic.value}</span>
               </span>
             )}
           </div>
           {opombaCorrectionPublic && (
-            <div className="mt-1.5 pl-2 border-l-2 border-green-200">
-              <p className="text-[11px] text-green-700 italic leading-snug">
+            <div className="mt-1.5 pl-2 border-l-2 border-gray-300">
+              <p className="text-[11px] text-gray-600 italic leading-snug">
                 {opombaCorrectionPublic.vrednost}
               </p>
             </div>

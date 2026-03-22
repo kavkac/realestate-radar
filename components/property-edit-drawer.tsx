@@ -22,14 +22,25 @@ export function PropertyEditDrawer({
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vloga, setVloga] = useState("");
 
   // Reset form when drawer opens
   useEffect(() => {
     if (isOpen) {
       setEditValues({});
       setError(null);
+      setVloga("");
     }
   }, [isOpen]);
+
+  // Fetch existing claim on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch(`/api/claims?stavba_id=${stavbaId}`)
+      .then(r => r.json())
+      .then(data => { if (data.claim) setVloga(data.claim.verification_tier); })
+      .catch(() => {});
+  }, [isOpen, stavbaId]);
 
   // ESC key closes drawer
   useEffect(() => {
@@ -58,7 +69,7 @@ export function PropertyEditDrawer({
       .filter(([, v]) => v.trim() !== "")
       .map(([atribut, vrednost]) => ({ atribut, vrednost }));
 
-    if (corrections.length === 0) {
+    if (corrections.length === 0 && !vloga) {
       setError("Izpolnite vsaj eno polje.");
       return;
     }
@@ -67,12 +78,25 @@ export function PropertyEditDrawer({
     setError(null);
 
     try {
-      const res = await fetch("/api/corrections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stavba_id: stavbaId, del_stavbe_id: delStavbeId, corrections }),
-      });
-      if (!res.ok) throw new Error("Napaka pri shranjevanju");
+      // Save corrections if any
+      if (corrections.length > 0) {
+        const res = await fetch("/api/corrections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stavba_id: stavbaId, del_stavbe_id: delStavbeId, corrections }),
+        });
+        if (!res.ok) throw new Error("Napaka pri shranjevanju");
+      }
+
+      // Save claim if vloga selected
+      if (vloga) {
+        const claimRes = await fetch("/api/claims", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stavba_id: stavbaId, del_stavbe_id: delStavbeId, vloga }),
+        });
+        if (!claimRes.ok) throw new Error("Napaka pri shranjevanju vloge");
+      }
 
       onSaved();
       onClose();
@@ -81,7 +105,7 @@ export function PropertyEditDrawer({
     } finally {
       setSaving(false);
     }
-  }, [editValues, stavbaId, delStavbeId, onSaved, onClose]);
+  }, [editValues, stavbaId, delStavbeId, vloga, onSaved, onClose]);
 
   if (!isOpen) return null;
 
@@ -138,8 +162,37 @@ export function PropertyEditDrawer({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 pb-4">
+          {/* Section: Vaša vloga */}
+          <div className="mb-4 pb-4 border-b border-gray-100 mt-4">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              Vaša vloga za to nepremičnino
+            </p>
+            <select
+              value={vloga}
+              onChange={e => setVloga(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400 outline-none"
+            >
+              <option value="">Izberite vlogo...</option>
+              <option value="lastnik">Lastnik</option>
+              <option value="solastnik">Solastnik</option>
+              <option value="upravljavec">Upravljavec</option>
+              <option value="agent">Nepremičninski agent</option>
+              <option value="drugo">Drugo relevantno razmerje</option>
+            </select>
+            {vloga && (
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                Z oddajo izjavljate, da imate navedeno razmerje s to nepremičnino. Vaše informacije bodo vidne vsem obiskovalcem.
+              </p>
+            )}
+            {!vloga && (
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                Brez navedene vloge so vaše informacije vidne samo vam.
+              </p>
+            )}
+          </div>
+
           {/* Section 1: Obnove */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
             Obnove
           </p>
 

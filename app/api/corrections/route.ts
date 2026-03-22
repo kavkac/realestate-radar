@@ -31,10 +31,11 @@ export async function GET(req: NextRequest) {
   // Return public corrections + own private corrections
   const rows = await prisma.$queryRawUnsafe<unknown[]>(
     `SELECT c.atribut, c.vrednost, c.trust_level, c.is_public, c.created_at,
-            u.verification_tier,
-            (c.user_id = $2) AS is_own
+            (c.user_id = $2) AS is_own,
+            cl.verification_tier AS vloga
      FROM user_corrections c
      JOIN users u ON u.id = c.user_id
+     LEFT JOIN user_property_claims cl ON cl.user_id = c.user_id AND cl.stavba_id = c.stavba_id
      WHERE c.stavba_id = $1
        AND (c.is_public = true OR c.user_id = $2)
      ORDER BY c.is_public DESC, c.created_at DESC`,
