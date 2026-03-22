@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     await prisma.$executeRawUnsafe(
       `INSERT INTO user_corrections (user_id, stavba_id, del_stavbe_id, atribut, vrednost, trust_level, is_public)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (user_id, stavba_id, atribut) DO UPDATE SET vrednost = EXCLUDED.vrednost, trust_level = EXCLUDED.trust_level, is_public = EXCLUDED.is_public`,
       dbUserId, body.stavba_id, body.del_stavbe_id ?? null,
       c.atribut, c.vrednost, trustLevel, isPublic
     );

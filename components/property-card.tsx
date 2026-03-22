@@ -1194,8 +1194,11 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
   const roofShapeMap: Record<string, string> = { flat: "Ravna", gabled: "Dvokapna", hipped: "Štirikapna", pyramidal: "Piramidna", dome: "Kupola", skillion: "Enokapna", gambrel: "Mansardna", half_hipped: "Pol-štirikapna" };
   const wallMaterialMap: Record<string, string> = { brick: "Opeka", concrete: "Beton", wood: "Les", stone: "Kamen", glass: "Steklo", metal: "Kovina", plaster: "Omet" };
 
-  // Only show public corrections inline (verified owner data)
-  const publicCorrections = corrections.filter(c => c.is_public);
+  // For inline pills: show public to everyone + own private to self
+  const displayCorrections = [
+    ...corrections.filter(c => c.is_public),
+    ...corrections.filter(c => !c.is_public && c.is_own),
+  ];
 
   return (
     <section>
@@ -1203,8 +1206,8 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
         <Field label="Tip stavbe" value={stavba.tip} />
         <Field label="Stanovanj" value={stavba.steviloStanovanj} />
         <Field label="Konstrukcija" value={stavba.konstrukcija} />
-        <MergedField label="Obnova fasade" registryValue={stavba.letoObnove.fasade} corrections={publicCorrections} atribut="fasada_leto" />
-        <MergedField label="Obnova strehe" registryValue={stavba.letoObnove.strehe} corrections={publicCorrections} atribut="streha_leto" />
+        <MergedField label="Obnova fasade" registryValue={stavba.letoObnove.fasade} corrections={displayCorrections} atribut="fasada_leto" />
+        <MergedField label="Obnova strehe" registryValue={stavba.letoObnove.strehe} corrections={displayCorrections} atribut="streha_leto" />
         {stavba.datumSys && (
           <Field label="Stanje registra" value={fmtDate(stavba.datumSys)} />
         )}
@@ -1230,13 +1233,13 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span>
           <Check on={stavba.prikljucki.elektrika} /> Elektrika
-          {publicCorrections.find(c => c.atribut === "elektrika") && (
-            <UserCorrectionPill value={publicCorrections.find(c => c.atribut === "elektrika")!.vrednost} variant="public" />
+          {displayCorrections.find(c => c.atribut === "elektrika") && (
+            <UserCorrectionPill value={displayCorrections.find(c => c.atribut === "elektrika")!.vrednost} variant="public" />
           )}
         </span>
         {(() => {
           const g = stavba.gasInfrastructure;
-          const plinCorrection = publicCorrections.find(c => c.atribut === "plin");
+          const plinCorrection = displayCorrections.find(c => c.atribut === "plin");
           const plinPill = plinCorrection ? <UserCorrectionPill value={plinCorrection.vrednost} variant="public" /> : null;
           if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin{plinPill}</span>;
           if (g?.confidence === "high") return <span className="text-[#2d6a4f]">≈ Plin<InfoTooltip text={`Verjetno priključen — plinovod oddaljen ~${g.distanceM}m. Uradnega priključka v katastru ni, to je ocena na podlagi ZK GJI infrastrukturnih podatkov.`} />{plinPill}</span>;
@@ -1246,14 +1249,14 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
         })()}
         <span>
           <Check on={stavba.prikljucki.vodovod} /> Vodovod
-          {publicCorrections.find(c => c.atribut === "vodovod") && (
-            <UserCorrectionPill value={publicCorrections.find(c => c.atribut === "vodovod")!.vrednost} variant="public" />
+          {displayCorrections.find(c => c.atribut === "vodovod") && (
+            <UserCorrectionPill value={displayCorrections.find(c => c.atribut === "vodovod")!.vrednost} variant="public" />
           )}
         </span>
         <span>
           <Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija
-          {publicCorrections.find(c => c.atribut === "kanalizacija") && (
-            <UserCorrectionPill value={publicCorrections.find(c => c.atribut === "kanalizacija")!.vrednost} variant="public" />
+          {displayCorrections.find(c => c.atribut === "kanalizacija") && (
+            <UserCorrectionPill value={displayCorrections.find(c => c.atribut === "kanalizacija")!.vrednost} variant="public" />
           )}
         </span>
       </div>
@@ -1265,9 +1268,11 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
   // Split corrections: public (verified) shown to everyone, private (own) shown only to author
   const publicCorrections = corrections.filter(c => c.is_public);
   const privateCorrections = corrections.filter(c => !c.is_public && c.is_own);
+  // For inline pills: show public to everyone + own private to self
+  const displayCorrections = [...publicCorrections, ...privateCorrections];
 
-  // Dvigalo: merge correction with registry (only public corrections for inline display)
-  const dvigaloMerge = mergeValue(part.dvigalo ? "Da" : "Ne", publicCorrections, "dvigalo");
+  // Dvigalo: merge correction with registry
+  const dvigaloMerge = mergeValue(part.dvigalo ? "Da" : "Ne", displayCorrections, "dvigalo");
   const showDvigalo = dvigaloMerge.value != null;
 
   // Public correction-only fields
@@ -1305,8 +1310,8 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
         <div className="col-span-2 sm:col-span-3 -mt-2">
           <p className="text-[10px] text-gray-400">Kataster nepremičnin, GURS</p>
         </div>
-        <MergedField label="Obnova instalacij" registryValue={part.letoObnoveInstalacij} corrections={publicCorrections} atribut="instalacije_leto" />
-        <MergedField label="Obnova oken" registryValue={part.letoObnoveOken} corrections={publicCorrections} atribut="okna_leto" />
+        <MergedField label="Obnova instalacij" registryValue={part.letoObnoveInstalacij} corrections={displayCorrections} atribut="instalacije_leto" />
+        <MergedField label="Obnova oken" registryValue={part.letoObnoveOken} corrections={displayCorrections} atribut="okna_leto" />
         {showDvigalo && (
           <div>
             <span className="text-xs text-gray-400">Dvigalo</span>
