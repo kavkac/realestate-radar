@@ -1173,6 +1173,7 @@ function ConditionScoreBar({ stavba }: { stavba: PropertyCardProps["stavba"] }) 
 
 function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: PropertyCardProps["stavba"]; osmData?: OsmBuildingData | null; corrections?: Correction[] }) {
   const roofShapeMap: Record<string, string> = { flat: "Ravna", gabled: "Dvokapna", hipped: "Štirikapna", pyramidal: "Piramidna", dome: "Kupola", skillion: "Enokapna", gambrel: "Mansardna", half_hipped: "Pol-štirikapna" };
+  const roofMaterialMap: Record<string, string> = { roof_tiles: "Opečna kritina", concrete: "Beton", metal: "Pločevina", slate: "Skrilavec", asphalt: "Asfaltni skodelnik", wood: "Les", glass: "Steklo", eternit: "Salonitne plošče", tar_paper: "Katraniran papir", thatch: "Slama", copper: "Baker", zinc: "Cink", aluminium: "Aluminij", gravel: "Gramoz", solar_panels: "Solarni paneli" };
   const wallMaterialMap: Record<string, string> = { brick: "Opeka", concrete: "Beton", wood: "Les", stone: "Kamen", glass: "Steklo", metal: "Kovina", plaster: "Omet" };
 
   // For inline pills: show public to everyone + own private to self
@@ -1208,7 +1209,7 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
           <Field label="Material sten" value={wallMaterialMap[osmData.wallMaterial] ?? osmData.wallMaterial} />
         )}
         {osmData?.roofMaterial && (
-          <Field label="Material strehe" value={osmData.roofMaterial} />
+          <Field label="Material strehe" value={roofMaterialMap[osmData.roofMaterial!] ?? osmData.roofMaterial} />
         )}
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
