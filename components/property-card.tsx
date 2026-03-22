@@ -3168,6 +3168,7 @@ function MaintenanceSection({
     borderColor: string;
     pillClass: string;
     jeOcena: boolean;
+    isFromUser: boolean;
   }[] = [];
 
 
@@ -3184,6 +3185,9 @@ function MaintenanceSection({
       letoObnove = getLetoObnove(part?.letoObnoveOken ?? null, corrections, "okna_leto");
     }
 
+    // Preveri ali vrednost prihaja od userja
+    const atributMap: Record<string, string> = { fasade: "fasada_leto", strehe: "streha_leto", instalacije: "instalacije_leto", okna: "okna_leto" };
+    const isFromUser = !!corrections.find(c => c.atribut === atributMap[m.key] && c.vrednost);
     // Ko ni podatka o obnovi, privzamemo leto izgradnje — komponenta je stara kolikor stavba
     const jeOcena = !letoObnove;
     const effLetoObnove = letoObnove ?? baseYear;
@@ -3197,6 +3201,7 @@ function MaintenanceSection({
         borderColor: "border-l-red-500",
         pillClass: "text-red-600 font-semibold",
         jeOcena,
+        isFromUser,
       });
     } else if (age >= m.lifespan * 0.85) {
       items.push({
@@ -3207,6 +3212,7 @@ function MaintenanceSection({
         borderColor: "border-l-amber-400",
         pillClass: "text-amber-600 font-semibold",
         jeOcena,
+        isFromUser,
       });
     } else if (age >= m.lifespan * 0.7) {
       items.push({
@@ -3217,6 +3223,7 @@ function MaintenanceSection({
         borderColor: "border-l-green-400",
         pillClass: "text-green-600 font-semibold",
         jeOcena,
+        isFromUser,
       });
     } else if (jeOcena) {
       // Ni podatka in ni urgentno — prikaži z nizko prioriteto
@@ -3228,6 +3235,7 @@ function MaintenanceSection({
         borderColor: "border-l-gray-200",
         pillClass: "text-gray-500 font-semibold",
         jeOcena,
+        isFromUser,
       });
     }
   }
@@ -3235,7 +3243,7 @@ function MaintenanceSection({
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Kdaj je potrebno vzdrževanje</Label>
-      <p className="text-xs text-gray-400 mb-3">Starost elementov je izračunana iz uradnih podatkov o obnovi. Kjer podatek ni vpisan v register, je starost ocenjena iz leta izgradnje stavbe.</p>
+      <p className="text-xs text-gray-400 mb-3">Starost elementov temelji na uradnih registrskih podatkih. Kjer ste vi vnesli leto obnove, ta podatek prevlada nad registrom (<span className="text-green-600">vaš vnos</span>). Kjer podatka ni, je starost ocenjena iz leta izgradnje.</p>
       {items.length === 0 ? (
         <p className="text-sm text-gray-400 italic">
           Ni nujnih vzdrževalnih posegov
@@ -3251,7 +3259,10 @@ function MaintenanceSection({
                 <span className="font-medium">{item.name}</span>
                 <span className="ml-2 text-xs text-gray-400">
                   ({item.age}/{item.lifespan} let
-                  {item.jeOcena && (
+                  {item.isFromUser && (
+                    <> · <span className="text-green-600">vaš vnos</span><InfoTooltip text="Izračun temelji na podatku, ki ste ga vnesli vi. Register nima tega podatka." /></>
+                  )}
+                  {!item.isFromUser && item.jeOcena && (
                     <> · ni podatka o obnovi<InfoTooltip text="Leto zadnje obnove ni vpisano v register nepremičnin. Starost elementa je ocenjena iz leta izgradnje stavbe in je lahko precej netočna." /></>
                   )})
                 </span>
