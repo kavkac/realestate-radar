@@ -1033,7 +1033,10 @@ function MergedField({
           isVerified ? (
             <VerifiedSourcePill value={value as string | number} />
           ) : (
-            <UserCorrectionPill value={value as string | number} />
+            <UserCorrectionPill
+              value={value as string | number}
+              variant={corrections.find(c => c.atribut === atribut)?.is_public ? "public" : "private"}
+            />
           )
         )}
       </p>
@@ -1314,7 +1317,7 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
                 dvigaloMerge.source === "verified" ? (
                   <VerifiedSourcePill value={dvigaloMerge.value as string} />
                 ) : (
-                  <UserCorrectionPill value={dvigaloMerge.value as string} />
+                  <UserCorrectionPill value={dvigaloMerge.value as string} variant={displayCorrections.find(c => c.atribut === "dvigalo")?.is_public ? "public" : "private"} />
                 )
               )}
             </p>
