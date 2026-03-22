@@ -3,7 +3,7 @@ import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE, GursServiceUnavailableError } from "@/lib/gurs-api";
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
-import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield } from "@/lib/etn-lookup";
+import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio } from "@/lib/etn-lookup";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
         : Promise.resolve(null);
 
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, KN namembnost, and rental yield in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, koRentalYield, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, koRentalYield, saleToListRatio, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -265,6 +265,7 @@ export async function POST(request: NextRequest) {
       osmDataPromise,
       lppLinesPromise,
       getKoRentalYield(stavba.koId).catch(() => null),
+      getSaleToListRatio(stavba.koId).catch(() => null),
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
@@ -460,6 +461,7 @@ export async function POST(request: NextRequest) {
       lppLines: lppLines ?? null,
       oglasneAnalize: oglasneAnalize ?? null,
       koRentalYield: koRentalYield ?? null,
+      saleToListRatio: saleToListRatio ?? null,
       propertyContext,
       // Tip prodaje: ločimo med prodajo enote in prodajo celotne stavbe
       tipProdaje: (() => {

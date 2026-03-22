@@ -243,6 +243,8 @@ export interface EtnAnaliza {
   ocenjenaTrznaVrednost: number | null;
   ocenaVrednostiMin: number | null;
   ocenaVrednostiMax: number | null;
+  rangeLowM2: number | null;
+  rangeHighM2: number | null;
   energetskaKorekcija: { razred: string; faktor: number } | null;
   trendProcent: number | null;
   trend: "rast" | "padec" | "stabilno" | null;
@@ -892,6 +894,8 @@ export async function getEtnAnaliza(
       ocenjenaTrznaVrednost,
       ocenaVrednostiMin,
       ocenaVrednostiMax,
+      rangeLowM2: null,
+      rangeHighM2: null,
       energetskaKorekcija,
       lokacijskiPremium,
       trendProcent: null,
@@ -986,6 +990,13 @@ export async function getEtnAnaliza(
     ocenaVrednostiMax = Math.round(base * (1 + rangeMultiplier));
   }
 
+  // P25/P75 confidence interval
+  const sortedPrices = [...prices].sort((a, b) => a - b);
+  const p25 = sortedPrices[Math.floor(sortedPrices.length * 0.25)];
+  const p75 = sortedPrices[Math.floor(sortedPrices.length * 0.75)];
+  const rangeLowM2 = p25 != null ? Math.round(p25 * kalibracijskiFaktor) : null;
+  const rangeHighM2 = p75 != null ? Math.round(p75 * kalibracijskiFaktor) : null;
+
   return {
     steviloTransakcij: selectedParsed.length,
     povprecnaCenaM2: Math.round(avg),
@@ -995,6 +1006,8 @@ export async function getEtnAnaliza(
     ocenjenaTrznaVrednost,
     ocenaVrednostiMin,
     ocenaVrednostiMax,
+    rangeLowM2,
+    rangeHighM2,
     energetskaKorekcija,
     lokacijskiPremium,
     trendProcent,
@@ -1006,4 +1019,36 @@ export async function getEtnAnaliza(
     vir,
     zaupanje,
   };
+}
+
+export interface SaleToListRatio {
+  avgRatio: number | null;
+  nMatched: number;
+}
+
+export async function getSaleToListRatio(koId: number): Promise<SaleToListRatio | null> {
+  const koStr = String(koId);
+
+  type Row = { avg_ratio: string | null; n_matched: string };
+
+  const rows = await prisma.$queryRawUnsafe<Row[]>(`
+    SELECT
+      AVG(etn.pogodbena_cena_odskodnina::float / NULLIF(og.cena::float, 0)) as avg_ratio,
+      COUNT(*) as n_matched
+    FROM etn_posli etn
+    JOIN listings_oglasi og ON og.ko_id = etn.sifra_ko::int
+      AND ABS(EXTRACT(EPOCH FROM (og.datum_objave - TO_DATE(etn.datum_sklenitve_pogodbe, 'DD.MM.YYYY')))/86400) < 180
+    WHERE etn.sifra_ko = $1
+      AND etn.trznost_posla IN ('1','2','5')
+  `, koStr);
+
+  if (!rows || rows.length === 0) return null;
+
+  const avgRatio = rows[0].avg_ratio ? parseFloat(rows[0].avg_ratio) : null;
+  const nMatched = parseInt(rows[0].n_matched, 10) || 0;
+
+  // Skip if too few matches
+  if (nMatched < 10) return null;
+
+  return { avgRatio, nMatched };
 }

@@ -117,6 +117,8 @@ interface EtnAnaliza {
   ocenjenaTrznaVrednost: number | null;
   ocenaVrednostiMin?: number | null;
   ocenaVrednostiMax?: number | null;
+  rangeLowM2?: number | null;
+  rangeHighM2?: number | null;
   energetskaKorekcija?: { razred: string; faktor: number } | null;
   lokacijskiPremium?: { skupniFaktor: number; faktorji: LokacijskiFaktor[] } | null;
   trendProcent?: number | null;
@@ -176,6 +178,11 @@ interface KoRentalYield {
   steviloNajemov: number;
 }
 
+interface SaleToListRatio {
+  avgRatio: number | null;
+  nMatched: number;
+}
+
 interface PropertyCardProps {
   naslov: string;
   enolicniId: { koId: number; stStavbe: number; stDelaStavbe: number | null };
@@ -218,6 +225,7 @@ interface PropertyCardProps {
   osmData?: OsmBuildingData | null;
   oglasneAnalize?: OglasneAnalize | null;
   koRentalYield?: KoRentalYield | null;
+  saleToListRatio?: SaleToListRatio | null;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   propertyContext?: PropertyContextData | null;
   placesData?: PlacesDataCard | null;
@@ -319,6 +327,7 @@ export function PropertyCard({
   osmData,
   oglasneAnalize,
   koRentalYield,
+  saleToListRatio,
   tipProdaje,
   propertyContext,
   placesData,
@@ -759,6 +768,7 @@ export function PropertyCard({
               osmWallMaterial={osmData?.wallMaterial}
               oglasneAnalize={oglasneAnalize}
               koRentalYield={koRentalYield}
+              saleToListRatio={saleToListRatio}
             />
           </div>
 
@@ -2477,6 +2487,7 @@ function OcenaVrednostiSection({
   osmWallMaterial,
   oglasneAnalize,
   koRentalYield,
+  saleToListRatio,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
@@ -2502,6 +2513,7 @@ function OcenaVrednostiSection({
   osmWallMaterial?: string | null;
   oglasneAnalize?: OglasneAnalize | null;
   koRentalYield?: KoRentalYield | null;
+  saleToListRatio?: SaleToListRatio | null;
 }) {
   const [showExplanation, setShowExplanation] = useState(false);
 
@@ -2552,12 +2564,24 @@ function OcenaVrednostiSection({
   const unitMin = unitValueBase ? Math.round(unitValueBase * 0.9) : null;
   const unitMax = unitValueBase ? Math.round(unitValueBase * 1.1) : null;
   // ETN tržna primerjava — prikaži pod uradnimi vrednostmi
+  const etnArea = selectedUnitArea ?? totalBuildingArea ?? null;
+  const etnRangeLow = etnAnaliza?.rangeLowM2 != null && etnArea ? Math.round(etnAnaliza.rangeLowM2 * etnArea) : null;
+  const etnRangeHigh = etnAnaliza?.rangeHighM2 != null && etnArea ? Math.round(etnAnaliza.rangeHighM2 * etnArea) : null;
   const etnBlock = etnAnaliza?.ocenaVrednostiMin != null && etnAnaliza?.ocenaVrednostiMax != null ? (
     <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 mt-3">
       <p className="text-xs text-gray-500 mb-0.5">Tržna ocena (ETN)</p>
       <p className="text-lg font-bold text-gray-800">
         {etnAnaliza.ocenaVrednostiMin!.toLocaleString("sl-SI")} – {etnAnaliza.ocenaVrednostiMax!.toLocaleString("sl-SI")} €
       </p>
+      {etnRangeLow != null && etnRangeHigh != null && etnAnaliza.ocenjenaTrznaVrednost != null && (
+        // Only show if range differs by >5% from point estimate
+        Math.abs(etnRangeLow - etnAnaliza.ocenjenaTrznaVrednost) / etnAnaliza.ocenjenaTrznaVrednost > 0.05 ||
+        Math.abs(etnRangeHigh - etnAnaliza.ocenjenaTrznaVrednost) / etnAnaliza.ocenjenaTrznaVrednost > 0.05
+      ) && (
+        <p className="text-xs text-gray-400 mt-0.5">
+          Razpon: {etnRangeLow.toLocaleString("sl-SI")} – {etnRangeHigh.toLocaleString("sl-SI")} €
+        </p>
+      )}
       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
         <span className="text-[10px] text-gray-400">
           {etnAnaliza.steviloTransakcij} prodaj v KO {etnAnaliza.imeKo ?? "isti KO"}
@@ -2649,6 +2673,14 @@ function OcenaVrednostiSection({
         </p>
       )}
     </div>
+  ) : null;
+
+  // Sale-to-list ratio block
+  const saleToListBlock = saleToListRatio?.avgRatio != null && saleToListRatio.avgRatio > 0.7 ? (
+    <p className="text-[11px] text-gray-400 mt-1.5">
+      Prodaja/oglas: <span className="font-medium text-gray-500">{Math.round(saleToListRatio.avgRatio * 100)}%</span>
+      <span className="ml-1">({saleToListRatio.nMatched} ujemanj)</span>
+    </p>
   ) : null;
 
   // Zaupanje indicator for ETN data source
@@ -2829,6 +2861,7 @@ function OcenaVrednostiSection({
         {najemBlock}
         {koYieldBlock}
         {oglasneAnalizBlock}
+        {saleToListBlock}
       </section>
     );
   }
@@ -2863,6 +2896,7 @@ function OcenaVrednostiSection({
         {najemBlock}
         {koYieldBlock}
         {oglasneAnalizBlock}
+        {saleToListBlock}
       </section>
     );
   }
@@ -2878,6 +2912,7 @@ function OcenaVrednostiSection({
         {najemBlock}
         {koYieldBlock}
         {oglasneAnalizBlock}
+        {saleToListBlock}
       </section>
     );
   }
