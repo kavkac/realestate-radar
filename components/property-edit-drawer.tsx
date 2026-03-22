@@ -33,12 +33,29 @@ export function PropertyEditDrawer({
     }
   }, [isOpen]);
 
-  // Fetch existing claim on mount
+  // Fetch existing claim and corrections on mount
   useEffect(() => {
     if (!isOpen) return;
+    // Fetch claim
     fetch(`/api/claims?stavba_id=${stavbaId}`)
       .then(r => r.json())
       .then(data => { if (data.claim) setVloga(data.claim.verification_tier); })
+      .catch(() => {});
+    // Fetch existing corrections and pre-fill form
+    fetch(`/api/corrections?stavba_id=${stavbaId}`)
+      .then(r => r.json())
+      .then(data => {
+        const corrs = data.corrections ?? [];
+        // Only use own corrections (is_own = true)
+        const ownCorrs = corrs.filter((c: { is_own: boolean }) => c.is_own);
+        const values: Record<string, string> = {};
+        for (const c of ownCorrs) {
+          values[c.atribut] = c.vrednost;
+        }
+        if (Object.keys(values).length > 0) {
+          setEditValues(values);
+        }
+      })
       .catch(() => {});
   }, [isOpen, stavbaId]);
 
@@ -63,6 +80,19 @@ export function PropertyEditDrawer({
       document.body.style.overflow = "";
     };
   }, [isOpen]);
+
+  const handleReset = useCallback(async () => {
+    if (!confirm("Res želiš izbrisati vse svoje vnose za to nepremičnino?")) return;
+    try {
+      await fetch(`/api/corrections?stavba_id=${stavbaId}`, { method: "DELETE" });
+      setEditValues({});
+      setVloga("");
+      onSaved();
+      onClose();
+    } catch {
+      // ignore
+    }
+  }, [stavbaId, onSaved, onClose]);
 
   const handleSave = useCallback(async () => {
     const corrections = Object.entries(editValues)
@@ -398,6 +428,16 @@ export function PropertyEditDrawer({
             className="flex-1 bg-brand-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-brand-600 transition-colors disabled:opacity-50"
           >
             {saving ? "Shranjujem..." : "Shrani"}
+          </button>
+        </div>
+
+        {/* Delete all link */}
+        <div className="px-5 pb-3 text-center">
+          <button
+            onClick={handleReset}
+            className="text-xs text-red-400 hover:text-red-600 transition-colors"
+          >
+            Izbriši vse moje podatke za to nepremičnino
           </button>
         </div>
       </div>

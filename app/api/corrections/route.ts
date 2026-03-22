@@ -84,3 +84,29 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, trustLevel });
 }
+
+// DELETE /api/corrections?stavba_id=KO-ST
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const stavbaId = req.nextUrl.searchParams.get("stavba_id");
+  if (!stavbaId) return NextResponse.json({ error: "Missing stavba_id" }, { status: 400 });
+
+  const rows = await prisma.$queryRawUnsafe<{ id: number }[]>(
+    `SELECT id FROM users WHERE clerk_id = $1 LIMIT 1`, userId
+  );
+  if (!rows.length) return NextResponse.json({ ok: true });
+  const dbUserId = rows[0].id;
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM user_corrections WHERE user_id = $1 AND stavba_id = $2`,
+    dbUserId, stavbaId
+  );
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM user_property_claims WHERE user_id = $1 AND stavba_id = $2`,
+    dbUserId, stavbaId
+  );
+
+  return NextResponse.json({ ok: true });
+}
