@@ -607,7 +607,7 @@ export function PropertyCard({
 
           {/* 3. Stanje — vedno odprto */}
           <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
-            <MaintenanceSection stavba={stavba} part={currentPart} />
+            <MaintenanceSection stavba={stavba} part={currentPart} corrections={corrections} />
           </div>
 
           {/* 4. Energetsko stanje — vedno odprto */}
@@ -1328,26 +1328,30 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
       {/* Public owner info — self-declared corrections visible to everyone */}
       {hasPublicOwnerInfo && (
         <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-widest mb-1.5 flex items-center gap-1">
-            <span>👤</span> {publicLabel} · izjava
+          <p className="text-[10px] font-semibold text-green-600 uppercase tracking-widest mb-2 flex items-center gap-1">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            {publicLabel} · Podatki
           </p>
           <div className="flex flex-wrap gap-1.5">
             {ogrevanjeMergePublic.value && (
-              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-700 rounded-full px-2.5 py-0.5 border border-gray-200">
-                <span className="text-gray-500 mr-1">Ogrevanje</span>
-                <span className="text-gray-700">{ogrevanjeMergePublic.value}</span>
+              <span className="inline-flex items-center text-[10px] bg-green-50 border border-green-100 text-green-800 rounded-full px-2.5 py-0.5">
+                <span className="mr-1">Ogrevanje</span>
+                <span className="font-semibold">{ogrevanjeMergePublic.value}</span>
               </span>
             )}
             {stanjeMergePublic.value && (
-              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-700 rounded-full px-2.5 py-0.5 border border-gray-200">
-                <span className="text-gray-500 mr-1">Stanje</span>
-                <span className="text-gray-700">{stanjeMergePublic.value}</span>
+              <span className="inline-flex items-center text-[10px] bg-green-50 border border-green-100 text-green-800 rounded-full px-2.5 py-0.5">
+                <span className="mr-1">Stanje</span>
+                <span className="font-semibold">{stanjeMergePublic.value}</span>
               </span>
             )}
             {parkirisceMergePublic.value && (
-              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-700 rounded-full px-2.5 py-0.5 border border-gray-200">
-                <span className="text-gray-500 mr-1">Parkirišče</span>
-                <span className="text-gray-700">{parkirisceMergePublic.value}</span>
+              <span className="inline-flex items-center text-[10px] bg-green-50 border border-green-100 text-green-800 rounded-full px-2.5 py-0.5">
+                <span className="mr-1">Parkirišče</span>
+                <span className="font-semibold">{parkirisceMergePublic.value}</span>
               </span>
             )}
           </div>
@@ -1364,8 +1368,8 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
       {/* Private owner info — unverified corrections visible only to author */}
       {hasPrivateOwnerInfo && (
         <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-            <span>👁</span> Vaše opombe · vidno samo vam
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
+            Vaše opombe
           </p>
           <div className="flex flex-wrap gap-1.5">
             {ogrevanjeMergePrivate.value && (
@@ -3127,12 +3131,30 @@ const MAINTENANCE_ITEMS = [
   { name: "Okna", lifespan: 25, key: "okna" as const },
 ];
 
+// Get the best letoObnove for maintenance calculations: user correction takes priority over registry
+function getLetoObnove(
+  registryValue: number | null | undefined,
+  corrections: Correction[],
+  atribut: string
+): number | null {
+  const correction = corrections.find(c => c.atribut === atribut);
+  if (correction?.vrednost) {
+    const parsed = parseInt(correction.vrednost);
+    if (!isNaN(parsed) && parsed > 1900 && parsed <= new Date().getFullYear()) {
+      return parsed;
+    }
+  }
+  return registryValue ?? null;
+}
+
 function MaintenanceSection({
   stavba,
   part,
+  corrections = [],
 }: {
   stavba: PropertyCardProps["stavba"];
   part: DelStavbe | null;
+  corrections?: Correction[];
 }) {
   const currentYear = 2026;
   const baseYear = stavba.letoIzgradnje;
@@ -3153,13 +3175,13 @@ function MaintenanceSection({
   for (const m of MAINTENANCE_ITEMS) {
     let letoObnove: number | null = null;
     if (m.key === "fasade") {
-      letoObnove = stavba.letoObnove.fasade;
+      letoObnove = getLetoObnove(stavba.letoObnove.fasade, corrections, "fasada_leto");
     } else if (m.key === "strehe") {
-      letoObnove = stavba.letoObnove.strehe;
+      letoObnove = getLetoObnove(stavba.letoObnove.strehe, corrections, "streha_leto");
     } else if (m.key === "instalacije") {
-      letoObnove = part?.letoObnoveInstalacij ?? null;
+      letoObnove = getLetoObnove(part?.letoObnoveInstalacij ?? null, corrections, "instalacije_leto");
     } else if (m.key === "okna") {
-      letoObnove = part?.letoObnoveOken ?? null;
+      letoObnove = getLetoObnove(part?.letoObnoveOken ?? null, corrections, "okna_leto");
     }
 
     // Ko ni podatka o obnovi, privzamemo leto izgradnje — komponenta je stara kolikor stavba
