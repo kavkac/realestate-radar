@@ -3225,15 +3225,15 @@ function MaintenanceSection({
         jeOcena,
         isFromUser,
       });
-    } else if (jeOcena) {
-      // Ni podatka in ni urgentno — prikaži z nizko prioriteto
+    } else {
+      // V redu — prikaži vse elemente
       items.push({
         name: m.name,
         age,
         lifespan: m.lifespan,
         urgency: "V redu",
         borderColor: "border-l-gray-200",
-        pillClass: "text-gray-500 font-semibold",
+        pillClass: "text-gray-400 font-medium",
         jeOcena,
         isFromUser,
       });
@@ -3243,11 +3243,8 @@ function MaintenanceSection({
   return (
     <section>
       <Label vir="Kataster nepremičnin · GURS">Kdaj je potrebno vzdrževanje</Label>
-      <p className="text-xs text-gray-400 mb-3">Starost elementov temelji na uradnih registrskih podatkih. Kjer ste vi vnesli leto obnove, ta podatek prevlada nad registrom (<span className="text-green-600">vaš vnos</span>). Kjer podatka ni, je starost ocenjena iz leta izgradnje.</p>
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400 italic">
-          Ni nujnih vzdrževalnih posegov
-        </p>
+        <p className="text-sm text-gray-400 italic">Ni podatkov</p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
@@ -3258,14 +3255,14 @@ function MaintenanceSection({
               <div className="text-gray-700 min-w-0">
                 <span className="font-medium">{item.name}</span>
                 <span className="ml-2 text-xs text-gray-400">
-                  ({item.age}/{item.lifespan} let
-                  {item.isFromUser && (
-                    <> · <span className="text-green-600">vaš vnos</span><InfoTooltip text="Izračun temelji na podatku, ki ste ga vnesli vi. Register nima tega podatka." /></>
-                  )}
-                  {!item.isFromUser && item.jeOcena && (
-                    <> · ni podatka o obnovi<InfoTooltip text="Leto zadnje obnove ni vpisano v register nepremičnin. Starost elementa je ocenjena iz leta izgradnje stavbe in je lahko precej netočna." /></>
-                  )})
+                  ({item.age}/{item.lifespan} let)
                 </span>
+                {item.isFromUser && (
+                  <span className="ml-1.5 text-[10px] text-green-600 bg-green-50 rounded px-1 py-0.5">vaš vnos</span>
+                )}
+                {!item.isFromUser && item.jeOcena && (
+                  <span className="ml-1.5 text-[10px] text-gray-400 bg-gray-50 rounded px-1 py-0.5">ocena<InfoTooltip text="Leto obnove ni v registru — starost ocenjena iz leta izgradnje." /></span>
+                )}
               </div>
               <span
                 className={`flex-shrink-0 text-xs ${item.pillClass}`}
