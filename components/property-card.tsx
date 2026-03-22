@@ -511,7 +511,7 @@ export function PropertyCard({
 
           {/* 2. O stavbi — zložljivo, privzeto ZAPRTO */}
           <CollapsibleSection title="O stavbi" vir="Kataster nepremičnin · GURS" defaultOpen={false}>
-            <BuildingSection stavba={stavba} osmData={osmData} />
+            <BuildingSection stavba={stavba} osmData={osmData} corrections={corrections} />
           </CollapsibleSection>
 
           {/* Stanovanja in prostori (multi-unit selector) */}
@@ -591,7 +591,7 @@ export function PropertyCard({
                   <span className="text-gray-500">Enota {activePart.stDela}</span>
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Enota {activePart.stDela}</h4>
-                <PartDetail part={activePart} />
+                <PartDetail part={activePart} corrections={corrections} />
               </section>
             </div>
           )}
@@ -605,7 +605,7 @@ export function PropertyCard({
                     : `Stanovanja in prostori (${filteredParts.length})`}
                 </Label>
                 {filteredParts.map((d) => (
-                  <PartDetail key={d.stDela} part={d} />
+                  <PartDetail key={d.stDela} part={d} corrections={corrections} />
                 ))}
               </section>
             </div>
@@ -703,29 +703,6 @@ export function PropertyCard({
             {kreditOpen && (
               <div className="border-l-4 border-[#2d6a4f] bg-gray-50 px-6 py-4">
                 <CreditCalculator />
-              </div>
-            )}
-
-            {/* ── USER CORRECTIONS ── */}
-            {corrections.length > 0 && (
-              <div className="mt-4 border-t border-gray-100 pt-3 space-y-1.5">
-                <p className="text-xs font-medium text-gray-500 mb-2">Podatki lastnika / posrednika</p>
-                {corrections.map((c, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 capitalize">{c.atribut.replace(/_/g, " ")}</span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-gray-800 font-medium">{c.vrednost}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                        c.trust_level === "bank" || c.trust_level === "agent"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}>
-                        {c.trust_level === "bank" ? "✅ Verificirano" :
-                         c.trust_level === "agent" ? "✅ Posrednik" : "👤 Lastnik poroča"}
-                      </span>
-                    </span>
-                  </div>
-                ))}
               </div>
             )}
 
@@ -977,6 +954,87 @@ function Field({
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// SOURCE-AWARE DATA MERGE (user corrections override registry)
+// ─────────────────────────────────────────────────────────────
+
+type Correction = { atribut: string; vrednost: string; trust_level: string };
+type DataSource = "registry" | "user" | "verified";
+
+const CORRECTION_LABELS: Record<string, string> = {
+  fasada_leto: "Fasada obnovljena",
+  streha_leto: "Streha obnovljena",
+  okna_leto: "Okna zamenjana",
+  instalacije_leto: "Instalacije obnovljene",
+  dvigalo: "Dvigalo",
+  ogrevanje: "Ogrevanje",
+  stanje: "Stanje",
+  parkirisce: "Parkirišče",
+  opomba: "Opomba",
+};
+
+function mergeValue(
+  registryValue: string | number | null | undefined,
+  corrections: Correction[],
+  atribut: string
+): { value: string | number | null; source: DataSource; registryOriginal?: string | number | null } {
+  const correction = corrections.find(c => c.atribut === atribut);
+  if (correction) {
+    return {
+      value: correction.vrednost,
+      source: correction.trust_level === "bank" || correction.trust_level === "agent" ? "verified" : "user",
+      registryOriginal: registryValue ?? null,
+    };
+  }
+  return { value: registryValue ?? null, source: "registry" };
+}
+
+function SourceBadge({ source, registryOriginal }: { source: DataSource; registryOriginal?: string | number | null }) {
+  if (source === "registry") return null; // No badge for registry-only data
+  if (source === "verified") {
+    return (
+      <span
+        className="text-[10px] text-green-500 ml-1 cursor-help"
+        title={registryOriginal ? `Verificiran vir (register: ${registryOriginal})` : "Verificiran vir"}
+      >
+        ✅
+      </span>
+    );
+  }
+  return (
+    <span
+      className="text-[10px] text-amber-400 ml-1 cursor-help"
+      title={registryOriginal ? `Lastnik poroča (register: ${registryOriginal})` : "Lastnik poroča"}
+    >
+      👤
+    </span>
+  );
+}
+
+function MergedField({
+  label,
+  registryValue,
+  corrections,
+  atribut,
+}: {
+  label: string;
+  registryValue: string | number | null | undefined;
+  corrections: Correction[];
+  atribut: string;
+}) {
+  const { value, source, registryOriginal } = mergeValue(registryValue, corrections, atribut);
+  if (value == null) return null;
+  return (
+    <div>
+      <span className="text-xs text-gray-400">{label}</span>
+      <p className="text-sm text-gray-800">
+        {value}
+        <SourceBadge source={source} registryOriginal={registryOriginal} />
+      </p>
+    </div>
+  );
+}
+
 function fmt(n: number): string {
   return Math.round(n).toLocaleString("sl-SI");
 }
@@ -1107,7 +1165,7 @@ function ConditionScoreBar({ stavba }: { stavba: PropertyCardProps["stavba"] }) 
   );
 }
 
-function BuildingSection({ stavba, osmData }: { stavba: PropertyCardProps["stavba"]; osmData?: OsmBuildingData | null }) {
+function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: PropertyCardProps["stavba"]; osmData?: OsmBuildingData | null; corrections?: Correction[] }) {
   const roofShapeMap: Record<string, string> = { flat: "Ravna", gabled: "Dvokapna", hipped: "Štirikapna", pyramidal: "Piramidna", dome: "Kupola", skillion: "Enokapna", gambrel: "Mansardna", half_hipped: "Pol-štirikapna" };
   const wallMaterialMap: Record<string, string> = { brick: "Opeka", concrete: "Beton", wood: "Les", stone: "Kamen", glass: "Steklo", metal: "Kovina", plaster: "Omet" };
 
@@ -1117,8 +1175,8 @@ function BuildingSection({ stavba, osmData }: { stavba: PropertyCardProps["stavb
         <Field label="Tip stavbe" value={stavba.tip} />
         <Field label="Stanovanj" value={stavba.steviloStanovanj} />
         <Field label="Konstrukcija" value={stavba.konstrukcija} />
-        <Field label="Obnova fasade" value={stavba.letoObnove.fasade} />
-        <Field label="Obnova strehe" value={stavba.letoObnove.strehe} />
+        <MergedField label="Obnova fasade" registryValue={stavba.letoObnove.fasade} corrections={corrections} atribut="fasada_leto" />
+        <MergedField label="Obnova strehe" registryValue={stavba.letoObnove.strehe} corrections={corrections} atribut="streha_leto" />
         {stavba.datumSys && (
           <Field label="Stanje registra" value={fmtDate(stavba.datumSys)} />
         )}
@@ -1158,7 +1216,17 @@ function BuildingSection({ stavba, osmData }: { stavba: PropertyCardProps["stavb
   );
 }
 
-function PartDetail({ part }: { part: DelStavbe }) {
+function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?: Correction[] }) {
+  // Dvigalo: merge correction with registry
+  const dvigaloMerge = mergeValue(part.dvigalo ? "Da" : null, corrections, "dvigalo");
+  const showDvigalo = dvigaloMerge.value != null;
+
+  // Correction-only fields
+  const ogrevanjeMerge = mergeValue(null, corrections, "ogrevanje");
+  const stanjeMerge = mergeValue(null, corrections, "stanje");
+  const parkirisceMerge = mergeValue(null, corrections, "parkirisce");
+  const opombaCorrection = corrections.find(c => c.atribut === "opomba");
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
@@ -1179,10 +1247,54 @@ function PartDetail({ part }: { part: DelStavbe }) {
         <div className="col-span-2 sm:col-span-3 -mt-2">
           <p className="text-[10px] text-gray-400">Kataster nepremičnin, GURS</p>
         </div>
-        <Field label="Obnova instalacij" value={part.letoObnoveInstalacij} />
-        <Field label="Obnova oken" value={part.letoObnoveOken} />
-        {part.dvigalo && <Field label="Dvigalo" value="Da" />}
+        <MergedField label="Obnova instalacij" registryValue={part.letoObnoveInstalacij} corrections={corrections} atribut="instalacije_leto" />
+        <MergedField label="Obnova oken" registryValue={part.letoObnoveOken} corrections={corrections} atribut="okna_leto" />
+        {showDvigalo && (
+          <div>
+            <span className="text-xs text-gray-400">Dvigalo</span>
+            <p className="text-sm text-gray-800">
+              {dvigaloMerge.value}
+              <SourceBadge source={dvigaloMerge.source} registryOriginal={dvigaloMerge.registryOriginal} />
+            </p>
+          </div>
+        )}
+        {/* Correction-only fields */}
+        {ogrevanjeMerge.value && (
+          <div>
+            <span className="text-xs text-gray-400">Ogrevanje</span>
+            <p className="text-sm text-gray-800">
+              {ogrevanjeMerge.value}
+              <SourceBadge source={ogrevanjeMerge.source} />
+            </p>
+          </div>
+        )}
+        {stanjeMerge.value && (
+          <div>
+            <span className="text-xs text-gray-400">Stanje</span>
+            <p className="text-sm text-gray-800">
+              {stanjeMerge.value}
+              <SourceBadge source={stanjeMerge.source} />
+            </p>
+          </div>
+        )}
+        {parkirisceMerge.value && (
+          <div>
+            <span className="text-xs text-gray-400">Parkirišče</span>
+            <p className="text-sm text-gray-800">
+              {parkirisceMerge.value}
+              <SourceBadge source={parkirisceMerge.source} />
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Opomba correction as italic note */}
+      {opombaCorrection && (
+        <p className="text-xs italic text-gray-400 mt-1">
+          &ldquo;{opombaCorrection.vrednost}&rdquo;
+          <SourceBadge source={opombaCorrection.trust_level === "bank" || opombaCorrection.trust_level === "agent" ? "verified" : "user"} />
+        </p>
+      )}
 
       {part.prostori.length > 0 && (
         <div>
