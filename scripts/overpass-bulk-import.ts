@@ -160,6 +160,21 @@ function aggregatePois(
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(poi);
   }
+  // Dedupliciraj bus_stop — OSM ima pogosto highway=bus_stop IN public_transport=stop_position
+  // za isti fizični stop (< 15m razdalja). Štejemo samo unikatne lokacije.
+  if (groups["bus_stop"]) {
+    const deduped: OsmNode[] = [];
+    for (const stop of groups["bus_stop"]) {
+      const sc = nodeCoords(stop);
+      if (!sc) continue;
+      const isDup = deduped.some(s => {
+        const ec = nodeCoords(s);
+        return ec && distM(sc.lat, sc.lon, ec.lat, ec.lon) < 15;
+      });
+      if (!isDup) deduped.push(stop);
+    }
+    groups["bus_stop"] = deduped;
+  }
   return groups;
 }
 
