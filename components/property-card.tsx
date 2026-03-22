@@ -1298,37 +1298,38 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
         )}
       </div>
 
-      {/* Owner info — horizontal chips */}
+      {/* Owner info — compact inline section */}
       {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value || opombaCorrection) && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1.5">
-            Lastnik poroča
-          </p>
-
-          {/* Horizontal chips row */}
-          <div className="flex flex-wrap gap-1.5">
+        <div className="mt-2.5 pt-2.5 border-t border-gray-100/80">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">
+              Lastnik
+            </span>
             {ogrevanjeMerge.value && (
-              <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2.5 py-1">
-                Ogrevanje: <span className="font-medium text-gray-800">{ogrevanjeMerge.value}</span>
+              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
+                <span className="text-gray-400 mr-1">Ogr.</span>
+                <span className="text-gray-700">{ogrevanjeMerge.value}</span>
               </span>
             )}
             {stanjeMerge.value && (
-              <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2.5 py-1">
-                Stanje: <span className="font-medium text-gray-800">{stanjeMerge.value}</span>
+              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
+                <span className="text-gray-400 mr-1">Stanje</span>
+                <span className="text-gray-700">{stanjeMerge.value}</span>
               </span>
             )}
             {parkirisceMerge.value && (
-              <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2.5 py-1">
-                Parkirišče: <span className="font-medium text-gray-800">{parkirisceMerge.value}</span>
+              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
+                <span className="text-gray-400 mr-1">Park.</span>
+                <span className="text-gray-700">{parkirisceMerge.value}</span>
               </span>
             )}
           </div>
-
-          {/* Opomba below chips if exists */}
           {opombaCorrection && (
-            <p className="text-xs text-gray-500 italic mt-1.5">
-              „{opombaCorrection.vrednost}"
-            </p>
+            <div className="mt-1.5 pl-2 border-l-2 border-gray-200">
+              <p className="text-[11px] text-gray-500 italic leading-snug">
+                {opombaCorrection.vrednost}
+              </p>
+            </div>
           )}
         </div>
       )}
