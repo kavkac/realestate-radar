@@ -989,32 +989,23 @@ function mergeValue(
   return { value: registryValue ?? null, source: "registry" };
 }
 
-function SourceBadge({ source, registryOriginal }: { source: DataSource; registryOriginal?: string | number | null }) {
-  const [show, setShow] = useState(false);
-
-  if (source === "registry") return null; // No badge for registry-only data
-
-  const label = source === "verified"
-    ? "✅ Verificiran vir"
-    : "👤 Lastnik poroča";
-  const tooltip = registryOriginal
-    ? `${label}\nRegister: ${registryOriginal}`
-    : label;
-
+// Amber chip for user-provided data
+function UserCorrectionChip({ value }: { value: string | number }) {
   return (
-    <span className="relative inline-block ml-1">
-      <span
-        className={`text-[11px] cursor-help ${source === "verified" ? "text-green-500" : "text-amber-500"}`}
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-      >
-        {source === "verified" ? "✅" : "👤"}
-      </span>
-      {show && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 bg-gray-800 text-white text-[10px] rounded px-2 py-1 whitespace-pre pointer-events-none shadow-lg">
-          {tooltip}
-        </span>
-      )}
+    <span
+      className="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded px-2 py-0.5 mt-0.5"
+      title="Podatek posredoval lastnik nepremičnine. Ni uradno verificiran."
+    >
+      👤 Lastnik poroča: {value}
+    </span>
+  );
+}
+
+// Green chip for verified sources (bank, agent)
+function VerifiedSourceChip({ value }: { value: string | number }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] bg-green-50 border border-green-200 text-green-800 rounded px-2 py-0.5 mt-0.5">
+      ✅ Verificiran vir: {value}
     </span>
   );
 }
@@ -1033,27 +1024,23 @@ function MergedField({
   const { value, source, registryOriginal } = mergeValue(registryValue, corrections, atribut);
   if (value == null && registryOriginal == null) return null;
 
-  // Show both registry and user value when correction exists
+  // User correction exists alongside registry value
   const hasCorrection = source !== "registry" && registryOriginal != null;
+  const isVerified = source === "verified";
 
   return (
     <div>
       <span className="text-xs text-gray-400">{label}</span>
-      <p className="text-sm text-gray-800">
-        {hasCorrection ? (
-          <>
-            <span className="font-medium">{registryOriginal}</span>
-            <span className="text-gray-400 mx-1">→</span>
-            <span className="font-medium text-gray-700">{value}</span>
-            <SourceBadge source={source} registryOriginal={registryOriginal} />
-          </>
-        ) : (
-          <>
-            {value}
-            <SourceBadge source={source} registryOriginal={registryOriginal} />
-          </>
-        )}
-      </p>
+      <p className="text-sm text-gray-800">{registryOriginal ?? value}</p>
+      {hasCorrection && (
+        <div className="mt-0.5">
+          {isVerified ? (
+            <VerifiedSourceChip value={value as string | number} />
+          ) : (
+            <UserCorrectionChip value={value as string | number} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1275,59 +1262,56 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
         {showDvigalo && (
           <div>
             <span className="text-xs text-gray-400">Dvigalo</span>
-            <p className="text-sm text-gray-800">
-              {dvigaloMerge.source !== "registry" && dvigaloMerge.registryOriginal != null ? (
-                <>
-                  <span className="font-medium">{dvigaloMerge.registryOriginal}</span>
-                  <span className="text-gray-400 mx-1">→</span>
-                  <span className="font-medium text-gray-700">{dvigaloMerge.value}</span>
-                  <SourceBadge source={dvigaloMerge.source} registryOriginal={dvigaloMerge.registryOriginal} />
-                </>
-              ) : (
-                <>
-                  {dvigaloMerge.value}
-                  <SourceBadge source={dvigaloMerge.source} registryOriginal={dvigaloMerge.registryOriginal} />
-                </>
-              )}
-            </p>
-          </div>
-        )}
-        {/* Correction-only fields */}
-        {ogrevanjeMerge.value && (
-          <div>
-            <span className="text-xs text-gray-400">Ogrevanje</span>
-            <p className="text-sm text-gray-800">
-              {ogrevanjeMerge.value}
-              <SourceBadge source={ogrevanjeMerge.source} />
-            </p>
-          </div>
-        )}
-        {stanjeMerge.value && (
-          <div>
-            <span className="text-xs text-gray-400">Stanje</span>
-            <p className="text-sm text-gray-800">
-              {stanjeMerge.value}
-              <SourceBadge source={stanjeMerge.source} />
-            </p>
-          </div>
-        )}
-        {parkirisceMerge.value && (
-          <div>
-            <span className="text-xs text-gray-400">Parkirišče</span>
-            <p className="text-sm text-gray-800">
-              {parkirisceMerge.value}
-              <SourceBadge source={parkirisceMerge.source} />
-            </p>
+            <p className="text-sm text-gray-800">{dvigaloMerge.registryOriginal ?? dvigaloMerge.value}</p>
+            {dvigaloMerge.source !== "registry" && dvigaloMerge.registryOriginal != null && (
+              <div className="mt-0.5">
+                {dvigaloMerge.source === "verified" ? (
+                  <VerifiedSourceChip value={dvigaloMerge.value as string} />
+                ) : (
+                  <UserCorrectionChip value={dvigaloMerge.value as string} />
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Opomba correction as italic note */}
+      {/* User-only fields grouped in dedicated section */}
+      {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value) && (
+        <div className="mt-3 pt-3 border-t border-amber-100 bg-amber-50/50 rounded-lg px-3 py-2">
+          <p className="text-[11px] font-medium text-amber-700 mb-2">👤 Dodatne informacije · Posredoval lastnik</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            {ogrevanjeMerge.value && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Ogrevanje</span>
+                <span className="text-gray-800">{ogrevanjeMerge.value}</span>
+              </div>
+            )}
+            {stanjeMerge.value && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Stanje</span>
+                <span className="text-gray-800">{stanjeMerge.value}</span>
+              </div>
+            )}
+            {parkirisceMerge.value && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Parkirišče</span>
+                <span className="text-gray-800">{parkirisceMerge.value}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Opomba as styled quote card */}
       {opombaCorrection && (
-        <p className="text-xs italic text-gray-400 mt-1">
-          &ldquo;{opombaCorrection.vrednost}&rdquo;
-          <SourceBadge source={opombaCorrection.trust_level === "bank" || opombaCorrection.trust_level === "agent" ? "verified" : "user"} />
-        </p>
+        <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <span className="text-amber-400 text-base leading-none mt-0.5">&ldquo;</span>
+          <div>
+            <p className="text-sm text-gray-700 italic">{opombaCorrection.vrednost}</p>
+            <p className="text-[10px] text-amber-600 mt-1">👤 Opomba lastnika</p>
+          </div>
+        </div>
       )}
 
       {part.prostori.length > 0 && (
