@@ -12,7 +12,6 @@
 
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const RADIUS_M = 500;
-const DELTA_DEG = 0.0045; // ~500m in degrees at Slovenia's latitude
 
 // In-memory cache (24h TTL)
 const cache = new Map<string, { data: LppLinesResult; ts: number }>();
@@ -30,6 +29,19 @@ function gridKey(lat: number, lng: number): string {
   return `${latGrid},${lngGrid}`;
 }
 
+// Haversine bounding box — točen krog, ne kvadrat
+function haversineBbox(lat: number, lng: number, radiusM: number) {
+  const R = 6371000; // Earth radius in meters
+  const dLat = (radiusM / R) * (180 / Math.PI);
+  const dLng = (radiusM / (R * Math.cos((lat * Math.PI) / 180))) * (180 / Math.PI);
+  return {
+    south: lat - dLat,
+    north: lat + dLat,
+    west: lng - dLng,
+    east: lng + dLng,
+  };
+}
+
 export async function getLppLineCount(
   lat: number,
   lng: number
@@ -42,8 +54,9 @@ export async function getLppLineCount(
     return cached.data;
   }
 
-  // Build bounding box: south,west,north,east
-  const bbox = `${lat - DELTA_DEG},${lng - DELTA_DEG},${lat + DELTA_DEG},${lng + DELTA_DEG}`;
+  // Haversine bounding box (točen krog, ne kvadrat)
+  const { south, west, north, east } = haversineBbox(lat, lng, RADIUS_M);
+  const bbox = `${south},${west},${north},${east}`;
 
   const query = `
 [out:json][timeout:20];
