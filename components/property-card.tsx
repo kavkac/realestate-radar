@@ -1328,12 +1328,12 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
       {/* Public owner info — self-declared corrections visible to everyone */}
       {hasPublicOwnerInfo && (
         <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-[10px] font-semibold text-green-600 uppercase tracking-widest mb-2 flex items-center gap-1">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
-            {publicLabel} · Podatki
+            Potrjeni podatki {publicLabel.toLowerCase()}a
           </p>
           <div className="flex flex-wrap gap-1.5">
             {ogrevanjeMergePublic.value && (
