@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const VALID_ROLES = ["lastnik", "solastnik", "upravljavec", "agent", "drugo"];
+const VALID_ROLES = ["lastnik", "solastnik", "upravljalec", "agent"];
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -26,8 +26,12 @@ export async function POST(req: NextRequest) {
   await prisma.$executeRawUnsafe(
     `INSERT INTO user_property_claims (user_id, stavba_id, del_stavbe_id, verification_tier, verified_at)
      VALUES ($1, $2, $3, $4, NOW())
-     ON CONFLICT (user_id, stavba_id, del_stavbe_id)
-     DO UPDATE SET verification_tier = EXCLUDED.verification_tier, verified_at = NOW()`,
+     ON CONFLICT DO NOTHING`,
+    dbUserId, body.stavba_id, body.del_stavbe_id ?? null, body.vloga
+  );
+  await prisma.$executeRawUnsafe(
+    `UPDATE user_property_claims SET verification_tier = $4, verified_at = NOW()
+     WHERE user_id = $1 AND stavba_id = $2 AND ($3::text IS NULL AND del_stavbe_id IS NULL OR del_stavbe_id = $3)`,
     dbUserId, body.stavba_id, body.del_stavbe_id ?? null, body.vloga
   );
 

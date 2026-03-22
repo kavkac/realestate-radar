@@ -202,12 +202,11 @@ export function PropertyEditDrawer({
               onChange={e => setVloga(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400 outline-none"
             >
-              <option value="">Izberite vlogo...</option>
+              <option value="">Brez vloge (zasebno)</option>
               <option value="lastnik">Lastnik</option>
               <option value="solastnik">Solastnik</option>
-              <option value="upravljavec">Upravljavec</option>
+              <option value="upravljalec">Upravljalec</option>
               <option value="agent">Nepremičninski agent</option>
-              <option value="drugo">Drugo relevantno razmerje</option>
             </select>
             {vloga && (
               <p className="text-[10px] text-gray-400 mt-1.5">
