@@ -233,6 +233,56 @@ const ENERGY_CORRECTION: Record<string, number> = {
   G: -0.12,
 };
 
+// === SEZONSKA KOREKCIJA (seasonal adjustment) ===
+// Transakcije v Sloveniji imajo sezonski vzorec:
+// - Zima (jan-feb): nižje cene (-4%)
+// - Pomlad (mar-apr): baseline (0%)
+// - Pozna pomlad (maj-jun): +3%
+// - Poletje (jul-avg): vrhunec (+5%)
+// - Jesen (sep-okt): +2%
+// - Pozna jesen (nov-dec): -3%
+const SEZONSKI_FAKTORJI = [0.96, 0.96, 1.00, 1.00, 1.03, 1.03, 1.05, 1.05, 1.02, 1.02, 0.97, 0.97];
+
+function sezonskiFaktor(mesec: number): number {
+  return SEZONSKI_FAKTORJI[mesec - 1] ?? 1.00;
+}
+
+/** Parse DD.MM.YYYY date string and return { month, ageMonths } */
+function parseDatumTransakcije(datum: string): { mesec: number; starostMesecev: number } | null {
+  const parts = datum?.split(".");
+  if (!parts || parts.length !== 3) return null;
+  const dan = parseInt(parts[0], 10);
+  const mesec = parseInt(parts[1], 10);
+  const leto = parseInt(parts[2], 10);
+  if (!isFinite(dan) || !isFinite(mesec) || !isFinite(leto)) return null;
+  if (mesec < 1 || mesec > 12) return null;
+
+  const now = new Date();
+  const txDate = new Date(leto, mesec - 1, dan);
+  const starostMesecev = Math.floor((now.getTime() - txDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000));
+  return { mesec, starostMesecev };
+}
+
+/** Apply seasonal adjustment: normalize price to current month equivalent */
+function sezonskaNormalizacija(cena: number, txMesec: number): number {
+  const trenutniMesec = new Date().getMonth() + 1; // 1-12
+  const txFaktor = sezonskiFaktor(txMesec);
+  const trenutniFaktor = sezonskiFaktor(trenutniMesec);
+  // Normalize: remove tx seasonality, apply current month seasonality
+  return cena / txFaktor * trenutniFaktor;
+}
+
+/** Time-weighting: returns multiplier for how many times to count this transaction
+ *  - < 6 months: 3x (high weight)
+ *  - 6-12 months: 2x
+ *  - > 12 months: 1x
+ */
+function casovnaUtez(starostMesecev: number): number {
+  if (starostMesecev < 6) return 3;
+  if (starostMesecev < 12) return 2;
+  return 1;
+}
+
 export interface EtnAnaliza {
   steviloTransakcij: number;
   povprecnaCenaM2: number;
@@ -637,8 +687,8 @@ export async function getEtnAnaliza(
   const cutoffStr = cutoff.toISOString().split("T")[0];
   const koStr = String(koId);
 
-  type Row = { cena: number; povrsina: number; leto: string; ime_ko: string | null };
-  type Parsed = { cenaM2: number; leto: number };
+  type Row = { cena: number; povrsina: number; leto: string; ime_ko: string | null; datum: string };
+  type Parsed = { cenaM2: number; cenaM2Adjusted: number; leto: number; starostMesecev: number };
 
   const tipFilter = etnTipFilter(dejanskaRaba ?? null);
 
@@ -650,7 +700,16 @@ export async function getEtnAnaliza(
         if (!isFinite(cena) || !isFinite(povrsina) || povrsina <= 0) return null;
         const cenaM2 = cena / povrsina;
         const leto = parseInt(r.leto ?? "0");
-        return { cenaM2, leto };
+
+        // Parse date for seasonal adjustment and time-weighting
+        const datumInfo = parseDatumTransakcije(r.datum);
+        const mesec = datumInfo?.mesec ?? 6; // default to June (neutral)
+        const starostMesecev = datumInfo?.starostMesecev ?? 12;
+
+        // Apply seasonal normalization
+        const cenaM2Adjusted = sezonskaNormalizacija(cenaM2, mesec);
+
+        return { cenaM2, cenaM2Adjusted, leto, starostMesecev };
       })
       .filter((r): r is Parsed => r !== null && r.cenaM2 >= 500 && r.cenaM2 <= 25000);
   }
@@ -706,7 +765,8 @@ export async function getEtnAnaliza(
           p.pogodbena_cena_odskodnina::float AS cena,
           d.povrsina_dela_stavbe::float AS povrsina,
           COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
-          d.ime_ko
+          d.ime_ko,
+          p.datum_sklenitve_pogodbe AS datum
         FROM etn_posli p
         JOIN etn_delistavb d ON d.id_posla = p.id_posla
         JOIN ev_stavba ev ON ev.ko_sifko = d.sifra_ko AND ev.stev_st = d.stevilka_stavbe
@@ -737,7 +797,8 @@ export async function getEtnAnaliza(
             p.pogodbena_cena_odskodnina::float AS cena,
             d.povrsina_dela_stavbe::float AS povrsina,
             COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
-            d.ime_ko
+            d.ime_ko,
+            p.datum_sklenitve_pogodbe AS datum
           FROM etn_posli p
           JOIN etn_delistavb d ON d.id_posla = p.id_posla
           JOIN ev_stavba ev ON ev.ko_sifko = d.sifra_ko AND ev.stev_st = d.stevilka_stavbe
@@ -780,7 +841,8 @@ export async function getEtnAnaliza(
         p.pogodbena_cena_odskodnina::float AS cena,
         COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe)::float AS povrsina,
         COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY'))::text) AS leto,
-        d.ime_ko
+        d.ime_ko,
+        p.datum_sklenitve_pogodbe AS datum
       FROM etn_posli p
       JOIN etn_delistavb d ON d.id_posla = p.id_posla
       WHERE
@@ -823,7 +885,8 @@ export async function getEtnAnaliza(
           p.pogodbena_cena_odskodnina::float AS cena,
           d.povrsina_dela_stavbe::float AS povrsina,
           COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY'))::text) AS leto,
-          d.ime_ko
+          d.ime_ko,
+          p.datum_sklenitve_pogodbe AS datum
         FROM etn_posli p
         JOIN etn_delistavb d ON d.id_posla = p.id_posla
         JOIN ev_stavba ev ON ev.ko_sifko = d.sifra_ko AND ev.stev_st = d.stevilka_stavbe
@@ -910,13 +973,24 @@ export async function getEtnAnaliza(
   }
 
   // ── Common processing for levels 1-3 ──
-  const prices = selectedParsed.map((r) => r.cenaM2);
-  const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-  const med = smartMedian(prices);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
+  // Raw prices for stats (min/max/avg)
+  const rawPrices = selectedParsed.map((r) => r.cenaM2);
+  const avg = rawPrices.reduce((a, b) => a + b, 0) / rawPrices.length;
+  const min = Math.min(...rawPrices);
+  const max = Math.max(...rawPrices);
 
-  // Per-year breakdown
+  // Time-weighted, seasonally-adjusted prices for median
+  // Recent transactions count more: <6mo=3x, 6-12mo=2x, >12mo=1x
+  const weightedPrices: number[] = [];
+  for (const r of selectedParsed) {
+    const weight = casovnaUtez(r.starostMesecev);
+    for (let i = 0; i < weight; i++) {
+      weightedPrices.push(r.cenaM2Adjusted);
+    }
+  }
+  const med = smartMedian(weightedPrices);
+
+  // Per-year breakdown (use raw prices for historical accuracy)
   const byYear = new Map<number, number[]>();
   for (const r of selectedParsed) {
     if (!byYear.has(r.leto)) byYear.set(r.leto, []);
@@ -990,10 +1064,10 @@ export async function getEtnAnaliza(
     ocenaVrednostiMax = Math.round(base * (1 + rangeMultiplier));
   }
 
-  // P25/P75 confidence interval
-  const sortedPrices = [...prices].sort((a, b) => a - b);
-  const p25 = sortedPrices[Math.floor(sortedPrices.length * 0.25)];
-  const p75 = sortedPrices[Math.floor(sortedPrices.length * 0.75)];
+  // P25/P75 confidence interval (use weighted, adjusted prices for consistency with median)
+  const sortedWeightedPrices = [...weightedPrices].sort((a, b) => a - b);
+  const p25 = sortedWeightedPrices[Math.floor(sortedWeightedPrices.length * 0.25)];
+  const p75 = sortedWeightedPrices[Math.floor(sortedWeightedPrices.length * 0.75)];
   const rangeLowM2 = p25 != null ? Math.round(p25 * kalibracijskiFaktor) : null;
   const rangeHighM2 = p75 != null ? Math.round(p75 * kalibracijskiFaktor) : null;
 

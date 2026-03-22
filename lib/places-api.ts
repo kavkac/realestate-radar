@@ -122,16 +122,17 @@ interface HerePlace {
   distance: number;
 }
 
-async function hereBrowse(
+async function hereDiscover(
   lat: number,
   lng: number,
   categories: string[],
   radius: number
 ): Promise<HerePlace[]> {
   if (!HERE_API_KEY) return [];
-  const url = new URL("https://browse.search.hereapi.com/v1/browse");
+  // Use Discover API for better transit coverage outside Ljubljana
+  const url = new URL("https://discover.search.hereapi.com/v1/discover");
   url.searchParams.set("at", `${lat},${lng}`);
-  url.searchParams.set("circle", `${lat},${lng};r=${radius}`);
+  url.searchParams.set("in", `circle:${lat},${lng};r=${radius}`);
   url.searchParams.set("categories", categories.join(","));
   url.searchParams.set("limit", "50");
   url.searchParams.set("apiKey", HERE_API_KEY);
@@ -203,7 +204,7 @@ export async function getPlacesData(lat: number, lng: number): Promise<PlacesDat
     }
     // Enrichment: OSM storitve + HERE transit
     try {
-      const herePlaces = await hereBrowse(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT);
+      const herePlaces = await hereDiscover(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT);
       if (herePlaces.length > 0) {
         const enriched: PlacesData = {
           ...dbHit,
@@ -231,7 +232,7 @@ export async function getPlacesData(lat: number, lng: number): Promise<PlacesDat
   if (!HERE_API_KEY) return null;
 
   try {
-    const herePlaces = await hereBrowse(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT);
+    const herePlaces = await hereDiscover(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT);
     const transit = hereBuildTransit(herePlaces, lat, lng);
 
     // Osnovna services struktura (bo enrichana z Overpass bulk importom)
