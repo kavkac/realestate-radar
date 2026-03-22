@@ -9,15 +9,24 @@ const L = Link as any;
 export default function HomePage() {
   return (
     <main className="min-h-screen flex flex-col">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-100">
+        <div className="container mx-auto px-4 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-brand-500">🏠 RealEstateRadar</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="text-brand-600">
+              <rect x="3" y="10" width="18" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M3 10L12 3l9 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="9" y="14" width="6" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+            <span className="font-semibold text-gray-900 text-sm tracking-tight">
+              RealEstate<span className="text-brand-600">Radar</span>
+            </span>
           </div>
           <nav className="flex items-center gap-3 text-sm">
             <SignedIn>
               <HeaderSavedButton />
-              <UserButton afterSignOutUrl="/" />
+              <div className="[&_.cl-userButtonAvatarBox]:w-7 [&_.cl-userButtonAvatarBox]:h-7">
+                <UserButton afterSignOutUrl="/" />
+              </div>
             </SignedIn>
             <SignedOut>
               <L href="/sign-in" className="text-muted-foreground hover:text-foreground transition-colors">
