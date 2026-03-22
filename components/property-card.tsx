@@ -1022,18 +1022,23 @@ function MergedField({
   atribut: string;
 }) {
   const { value, source, registryOriginal } = mergeValue(registryValue, corrections, atribut);
-  if (value == null && registryOriginal == null) return null;
 
-  // User correction exists alongside registry value
-  const hasCorrection = source !== "registry" && registryOriginal != null;
+  // User correction exists (regardless of whether registry value exists)
+  const hasCorrection = source !== "registry";
   const isVerified = source === "verified";
+
+  // If no registry value AND no correction, don't render
+  if (registryOriginal == null && !hasCorrection) return null;
+
+  // Always show registry value (or "—" if null), with pill inline if correction exists
+  const displayValue = registryOriginal ?? "—";
 
   return (
     <div>
       <span className="text-xs text-gray-400">{label}</span>
       <p className="text-sm text-gray-800">
-        {registryOriginal ?? value}
-        {hasCorrection && (
+        {displayValue}
+        {hasCorrection && value != null && (
           isVerified ? (
             <VerifiedSourcePill value={value as string | number} />
           ) : (
@@ -1295,7 +1300,7 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
 
       {/* Dedicated owner info section */}
       {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value || opombaCorrection) && (
-        <div className="mt-4 pt-3 border-t border-gray-100">
+        <div className="mt-4 rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
             Informacije lastnika
           </p>
