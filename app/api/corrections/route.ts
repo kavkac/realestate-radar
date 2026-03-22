@@ -28,17 +28,26 @@ export async function GET(req: NextRequest) {
     if (rows.length) dbUserId = rows[0].id;
   }
 
-  // Return public corrections + own private corrections
+  // Hierarchy: lastnik=solastnik(4) > upravljalec(3) > agent(2) > own private(1)
+  // DISTINCT ON (atribut) returns only the highest-ranked correction per field
   const rows = await prisma.$queryRawUnsafe<unknown[]>(
-    `SELECT c.atribut, c.vrednost, c.trust_level, c.is_public, c.created_at,
+    `SELECT DISTINCT ON (c.atribut)
+            c.atribut, c.vrednost, c.trust_level, c.is_public, c.created_at,
             (c.user_id = $2) AS is_own,
-            cl.verification_tier AS vloga
+            cl.verification_tier AS vloga,
+            CASE cl.verification_tier
+              WHEN 'lastnik'     THEN 4
+              WHEN 'solastnik'   THEN 4
+              WHEN 'upravljalec' THEN 3
+              WHEN 'agent'       THEN 2
+              ELSE 1
+            END AS vloga_rank
      FROM user_corrections c
      JOIN users u ON u.id = c.user_id
      LEFT JOIN user_property_claims cl ON cl.user_id = c.user_id AND cl.stavba_id = c.stavba_id
      WHERE c.stavba_id = $1
        AND (c.is_public = true OR c.user_id = $2)
-     ORDER BY c.is_public DESC, c.created_at DESC`,
+     ORDER BY c.atribut, vloga_rank DESC, c.created_at DESC`,
     stavbaId, dbUserId ?? -1
   );
   return NextResponse.json({ corrections: rows });
