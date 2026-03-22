@@ -220,7 +220,7 @@ interface PropertyCardProps {
   koRentalYield?: KoRentalYield | null;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   propertyContext?: PropertyContextData | null;
-  placesData?: unknown | null;
+  placesData?: PlacesDataCard | null;
 }
 
 export interface PropertyContextData {
@@ -770,7 +770,7 @@ export function PropertyCard({
               <PropertyContextSection
                 ctx={propertyContext}
                 tipProdaje={tipProdaje}
-                placesData={(placesData as unknown as PlacesDataCard | null) ?? null}
+                placesData={placesData ?? null}
                 stavbaLetoIzgradnje={stavba.letoIzgradnje}
                 stavbaTip={stavba.tip}
                 poplavnaNevarnost={poplavnaNevarnost}
@@ -780,7 +780,7 @@ export function PropertyCard({
 
           {placesData && (
             <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <OkolicaSection placesData={(placesData as unknown as PlacesDataCard)} />
+              <OkolicaSection placesData={placesData!} />
             </div>
           )}
 
@@ -2209,7 +2209,7 @@ interface PlacesServices {
   banks: number; postOffices: number;
   restaurants: number; doctors: number;
 }
-interface PlacesDataCard { transit: PlacesTransit; services: PlacesServices }
+export interface PlacesDataCard { transit: PlacesTransit; services: PlacesServices }
 
 function OkolicaSection({ placesData }: { placesData: PlacesDataCard }) {
   const t = placesData.transit;
