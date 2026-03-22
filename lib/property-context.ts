@@ -363,10 +363,10 @@ function computeAmenityScore(places: BuildPropertyContextParams["placesData"]): 
     score += 15;
   }
   if (busCount >= 5) {
-    prednosti.push(`Odlična dostopnost z JPP (${busCount} postaj)`);
+    prednosti.push(`Odlična dostopnost z LPP (${busCount} postaj)`);
     score += 10;
   } else if (busCount >= 2) {
-    prednosti.push(`Dobra dostopnost z JPP (${busCount} postaj)`);
+    prednosti.push(`Dobra dostopnost z LPP (${busCount} postaj)`);
     score += 5;
   } else if (busCount === 0 && nearestBus === null) {
     slabosti.push("Ni javnega prevoza v bližini");

@@ -169,7 +169,7 @@ function aggregatePois(
       if (!sc) continue;
       const isDup = deduped.some(s => {
         const ec = nodeCoords(s);
-        return ec && distM(sc.lat, sc.lon, ec.lat, ec.lon) < 15;
+        return ec && distM(sc.lat, sc.lon, ec.lat, ec.lon) < 30;
       });
       if (!isDup) deduped.push(stop);
     }
