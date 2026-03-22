@@ -989,23 +989,23 @@ function mergeValue(
   return { value: registryValue ?? null, source: "registry" };
 }
 
-// Amber chip for user-provided data
-function UserCorrectionChip({ value }: { value: string | number }) {
+// Subtle gray pill for user-provided data
+function UserCorrectionPill({ value }: { value: string | number }) {
   return (
     <span
-      className="inline-flex items-center gap-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded px-2 py-0.5 mt-0.5"
-      title="Podatek posredoval lastnik nepremičnine. Ni uradno verificiran."
+      className="inline-flex items-center text-[10px] text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5 ml-1.5 font-normal"
+      title="Podatek posredoval lastnik nepremičnine"
     >
-      👤 Lastnik poroča: {value}
+      lastnik: {value}
     </span>
   );
 }
 
-// Green chip for verified sources (bank, agent)
-function VerifiedSourceChip({ value }: { value: string | number }) {
+// Subtle green pill for verified sources (bank, agent)
+function VerifiedSourcePill({ value }: { value: string | number }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] bg-green-50 border border-green-200 text-green-800 rounded px-2 py-0.5 mt-0.5">
-      ✅ Verificiran vir: {value}
+    <span className="inline-flex items-center text-[10px] text-green-600 bg-green-50 rounded-full px-1.5 py-0.5 ml-1.5">
+      verificirano: {value}
     </span>
   );
 }
@@ -1031,16 +1031,16 @@ function MergedField({
   return (
     <div>
       <span className="text-xs text-gray-400">{label}</span>
-      <p className="text-sm text-gray-800">{registryOriginal ?? value}</p>
-      {hasCorrection && (
-        <div className="mt-0.5">
-          {isVerified ? (
-            <VerifiedSourceChip value={value as string | number} />
+      <p className="text-sm text-gray-800">
+        {registryOriginal ?? value}
+        {hasCorrection && (
+          isVerified ? (
+            <VerifiedSourcePill value={value as string | number} />
           ) : (
-            <UserCorrectionChip value={value as string | number} />
-          )}
-        </div>
-      )}
+            <UserCorrectionPill value={value as string | number} />
+          )
+        )}
+      </p>
     </div>
   );
 }
@@ -1262,56 +1262,44 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
         {showDvigalo && (
           <div>
             <span className="text-xs text-gray-400">Dvigalo</span>
-            <p className="text-sm text-gray-800">{dvigaloMerge.registryOriginal ?? dvigaloMerge.value}</p>
-            {dvigaloMerge.source !== "registry" && dvigaloMerge.registryOriginal != null && (
-              <div className="mt-0.5">
-                {dvigaloMerge.source === "verified" ? (
-                  <VerifiedSourceChip value={dvigaloMerge.value as string} />
+            <p className="text-sm text-gray-800">
+              {dvigaloMerge.registryOriginal ?? dvigaloMerge.value}
+              {dvigaloMerge.source !== "registry" && dvigaloMerge.registryOriginal != null && (
+                dvigaloMerge.source === "verified" ? (
+                  <VerifiedSourcePill value={dvigaloMerge.value as string} />
                 ) : (
-                  <UserCorrectionChip value={dvigaloMerge.value as string} />
-                )}
-              </div>
-            )}
+                  <UserCorrectionPill value={dvigaloMerge.value as string} />
+                )
+              )}
+            </p>
+          </div>
+        )}
+        {/* User-only fields integrated into grid */}
+        {ogrevanjeMerge.value && (
+          <div>
+            <span className="text-xs text-gray-400">Ogrevanje <span className="text-gray-300">(lastnik)</span></span>
+            <p className="text-sm font-medium text-gray-800">{ogrevanjeMerge.value}</p>
+          </div>
+        )}
+        {stanjeMerge.value && (
+          <div>
+            <span className="text-xs text-gray-400">Stanje <span className="text-gray-300">(lastnik)</span></span>
+            <p className="text-sm font-medium text-gray-800">{stanjeMerge.value}</p>
+          </div>
+        )}
+        {parkirisceMerge.value && (
+          <div>
+            <span className="text-xs text-gray-400">Parkirišče <span className="text-gray-300">(lastnik)</span></span>
+            <p className="text-sm font-medium text-gray-800">{parkirisceMerge.value}</p>
           </div>
         )}
       </div>
 
-      {/* User-only fields grouped in dedicated section */}
-      {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value) && (
-        <div className="mt-3 pt-3 border-t border-amber-100 bg-amber-50/50 rounded-lg px-3 py-2">
-          <p className="text-[11px] font-medium text-amber-700 mb-2">👤 Dodatne informacije · Posredoval lastnik</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            {ogrevanjeMerge.value && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Ogrevanje</span>
-                <span className="text-gray-800">{ogrevanjeMerge.value}</span>
-              </div>
-            )}
-            {stanjeMerge.value && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Stanje</span>
-                <span className="text-gray-800">{stanjeMerge.value}</span>
-              </div>
-            )}
-            {parkirisceMerge.value && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Parkirišče</span>
-                <span className="text-gray-800">{parkirisceMerge.value}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Opomba as styled quote card */}
+      {/* Opomba as subtle italic line */}
       {opombaCorrection && (
-        <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <span className="text-amber-400 text-base leading-none mt-0.5">&ldquo;</span>
-          <div>
-            <p className="text-sm text-gray-700 italic">{opombaCorrection.vrednost}</p>
-            <p className="text-[10px] text-amber-600 mt-1">👤 Opomba lastnika</p>
-          </div>
-        </div>
+        <p className="text-xs text-gray-400 italic mt-2">
+          &ldquo;{opombaCorrection.vrednost}&rdquo; <span className="not-italic text-gray-300">· lastnik</span>
+        </p>
       )}
 
       {part.prostori.length > 0 && (
