@@ -1300,40 +1300,43 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
 
       {/* Dedicated owner info section */}
       {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value || opombaCorrection) && (
-        <div className="mt-4 rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
+        <div className="mt-3 rounded-lg bg-gray-50 border border-gray-100 px-4 pt-3 pb-3">
+          {/* Header */}
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">
             Informacije lastnika
           </p>
 
-          {/* Opomba FIRST (highest priority per UX) */}
+          {/* Opomba — if exists, shown first */}
           {opombaCorrection && (
-            <p className="text-sm text-gray-700 italic mb-3">
+            <p className="text-sm italic text-gray-700 mb-3">
               „{opombaCorrection.vrednost}"
-              <span className="text-[10px] text-gray-300 not-italic ml-1">· lastnik</span>
+              <span className="text-xs text-gray-400 not-italic font-normal ml-1.5">· lastnik</span>
             </p>
           )}
 
-          {/* User-only fields grid */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-            {ogrevanjeMerge.value && (
-              <div>
-                <p className="text-xs text-gray-400">Ogrevanje</p>
-                <p className="text-sm font-medium text-gray-800">{ogrevanjeMerge.value}</p>
-              </div>
-            )}
-            {stanjeMerge.value && (
-              <div>
-                <p className="text-xs text-gray-400">Stanje</p>
-                <p className="text-sm font-medium text-gray-800">{stanjeMerge.value}</p>
-              </div>
-            )}
-            {parkirisceMerge.value && (
-              <div>
-                <p className="text-xs text-gray-400">Parkirišče</p>
-                <p className="text-sm font-medium text-gray-800">{parkirisceMerge.value}</p>
-              </div>
-            )}
-          </div>
+          {/* Fields grid — 2 columns */}
+          {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value) && (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {ogrevanjeMerge.value && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Ogrevanje</p>
+                  <p className="text-sm font-semibold text-gray-800">{ogrevanjeMerge.value}</p>
+                </div>
+              )}
+              {stanjeMerge.value && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Stanje</p>
+                  <p className="text-sm font-semibold text-gray-800">{stanjeMerge.value}</p>
+                </div>
+              )}
+              {parkirisceMerge.value && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Parkirišče</p>
+                  <p className="text-sm font-semibold text-gray-800">{parkirisceMerge.value}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
