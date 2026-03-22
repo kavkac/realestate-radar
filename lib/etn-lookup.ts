@@ -263,21 +263,39 @@ function median(values: number[]): number {
     : sorted[mid];
 }
 
-/** Trimmed median: removes values outside [p10, p95] then computes median.
- *  Falls back to plain median if trimmed.length < 8. */
-function trimmedMedian(values: number[], lo = 0.10, hi = 0.95): number {
+/** Trimmed median with adaptive percentiles based on sample size:
+ *  - n >= 20: P10-P95 (standard)
+ *  - n >= 5 and n < 20: P15-P90 (stricter for small samples)
+ *  - n < 5: no trim (use all values)
+ */
+function trimmedMedian(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
-  const p10 = sorted[Math.floor(sorted.length * lo)];
-  const p95 = sorted[Math.floor(sorted.length * hi)];
-  const trimmed = sorted.filter(v => v >= p10 && v <= p95);
-  if (trimmed.length < 8) return median(sorted);
+  const n = sorted.length;
+
+  let lo = 0;
+  let hi = n;
+
+  if (n >= 20) {
+    // Standard: P10-P95
+    lo = Math.floor(n * 0.10);
+    hi = Math.ceil(n * 0.95);
+  } else if (n >= 5) {
+    // Stricter for small samples: P15-P90
+    lo = Math.floor(n * 0.15);
+    hi = Math.ceil(n * 0.90);
+  }
+  // n < 5: no trim, use all values (lo=0, hi=n)
+
+  const trimmed = sorted.slice(lo, hi);
+  if (trimmed.length === 0) return median(sorted);
+
   const mid = Math.floor(trimmed.length / 2);
   return trimmed.length % 2 ? trimmed[mid] : (trimmed[mid - 1] + trimmed[mid]) / 2;
 }
 
-/** Use trimmed median for n≥15, plain median otherwise. */
+/** Use trimmed median for n>=5, plain median otherwise. */
 function smartMedian(values: number[]): number {
-  return values.length >= 15 ? trimmedMedian(values) : median(values);
+  return values.length >= 5 ? trimmedMedian(values) : median(values);
 }
 
 export interface EtnNajemAnaliza {
@@ -429,6 +447,102 @@ export async function getEtnNajemAnaliza(
     imeKo,
     letniPodatki,
   };
+}
+
+export interface KoRentalYield {
+  avgCenaM2: number | null;
+  avgNajemninaM2: number | null;
+  brutoYieldPct: number | null;
+  steviloProdaj: number;
+  steviloNajemov: number;
+}
+
+/**
+ * Izračuna bruto donosnost (rental yield) za katastrsko občino.
+ * Primerja povprečno prodajno ceno in povprečno najemnino za zadnji 2 leti.
+ */
+export async function getKoRentalYield(koId: number): Promise<KoRentalYield | null> {
+  const koStr = String(koId);
+
+  type YieldRow = {
+    avg_cena_m2: string | null;
+    avg_najemnina_m2: string | null;
+    bruto_yield_pct: string | null;
+    st_prodaj: string;
+    st_najemov: string;
+  };
+
+  try {
+    const rows = await prisma.$queryRawUnsafe<YieldRow[]>(
+      `
+      WITH prodajne AS (
+        SELECT
+          AVG(p.pogodbena_cena_odskodnina::float / NULLIF(d.povrsina_dela_stavbe::float, 0)) as avg_cena_m2,
+          COUNT(*) as st_poslov
+        FROM etn_posli p
+        JOIN etn_delistavb d ON d.id_posla = p.id_posla
+        WHERE p.sifra_ko = $1
+          AND p.trznost_posla IN ('1','2','5')
+          AND TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') >= NOW() - INTERVAL '2 years'
+          AND d.tip_dela_stavbe = '2'
+          AND p.pogodbena_cena_odskodnina ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND p.pogodbena_cena_odskodnina::float > 0
+          AND d.povrsina_dela_stavbe ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND d.povrsina_dela_stavbe::float > 0
+      ),
+      najemnine AS (
+        SELECT
+          AVG(p."POGODBENA_NAJEMNINA"::float / NULLIF(COALESCE(d."UPORABNA_POVRSINA_ODDANIH_PROSTOROV", d."POVRSINA_ODDANIH_PROSTOROV")::float, 0)) as avg_najemnina_m2,
+          COUNT(*) as st_poslov
+        FROM etn_np_posli p
+        JOIN etn_np_delistavb d ON d."ID_POSLA" = p."ID_POSLA"
+        WHERE d."SIFRA_KO" = $1
+          AND TO_DATE(p."DATUM_SKLENITVE_POGODBE", 'DD.MM.YYYY') >= NOW() - INTERVAL '2 years'
+          AND p."POGODBENA_NAJEMNINA" ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND p."POGODBENA_NAJEMNINA"::float > 0
+          AND COALESCE(d."UPORABNA_POVRSINA_ODDANIH_PROSTOROV", d."POVRSINA_ODDANIH_PROSTOROV") ~ '^[0-9]+(\\.[0-9]+)?$'
+          AND COALESCE(d."UPORABNA_POVRSINA_ODDANIH_PROSTOROV", d."POVRSINA_ODDANIH_PROSTOROV")::float > 0
+      )
+      SELECT
+        prodajne.avg_cena_m2::text,
+        najemnine.avg_najemnina_m2::text,
+        ROUND((najemnine.avg_najemnina_m2 * 12 / NULLIF(prodajne.avg_cena_m2, 0) * 100)::numeric, 1)::text as bruto_yield_pct,
+        prodajne.st_poslov::text as st_prodaj,
+        najemnine.st_poslov::text as st_najemov
+      FROM prodajne, najemnine
+      `,
+      koStr,
+    );
+
+    if (!rows || rows.length === 0) return null;
+
+    const row = rows[0];
+    const avgCenaM2 = row.avg_cena_m2 ? parseFloat(row.avg_cena_m2) : null;
+    const avgNajemninaM2 = row.avg_najemnina_m2 ? parseFloat(row.avg_najemnina_m2) : null;
+    const brutoYieldPct = row.bruto_yield_pct ? parseFloat(row.bruto_yield_pct) : null;
+    const steviloProdaj = parseInt(row.st_prodaj, 10) || 0;
+    const steviloNajemov = parseInt(row.st_najemov, 10) || 0;
+
+    // Filter outliers: yield should be between 1% and 15%
+    if (brutoYieldPct != null && (brutoYieldPct < 1 || brutoYieldPct > 15)) {
+      return null;
+    }
+
+    // Require at least some data
+    if (steviloProdaj < 3 || steviloNajemov < 3) {
+      return null;
+    }
+
+    return {
+      avgCenaM2: avgCenaM2 ? Math.round(avgCenaM2) : null,
+      avgNajemninaM2: avgNajemninaM2 ? Math.round(avgNajemninaM2 * 100) / 100 : null,
+      brutoYieldPct,
+      steviloProdaj,
+      steviloNajemov,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Map GURS vrsta/raba to ETN dejanska_raba filter

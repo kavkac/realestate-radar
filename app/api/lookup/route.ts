@@ -3,7 +3,7 @@ import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE, GursServiceUnavailableError } from "@/lib/gurs-api";
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
-import { getEtnAnaliza, getEtnNajemAnaliza } from "@/lib/etn-lookup";
+import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield } from "@/lib/etn-lookup";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
@@ -239,13 +239,13 @@ export async function POST(request: NextRequest) {
     // Oglasne cene — vzporedno z ostalimi klici
     const oglasneAnalizePromise = getOglasneAnalize(stavba.koId, null).catch(() => null);
 
-    // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, and KN namembnost in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, KN namembnost, and rental yield in parallel
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, koRentalYield, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
         stDelaStavbe,
-      }).catch(() => null),
+      }).catch(() => ({ cert: null, source: null as "stanovanje" | "stavba" | null })),
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
       getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba, lat, lng, null, stavba.stStavbe)
@@ -256,6 +256,7 @@ export async function POST(request: NextRequest) {
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
       lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
       osmDataPromise,
+      getKoRentalYield(stavba.koId).catch(() => null),
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
@@ -293,8 +294,8 @@ export async function POST(request: NextRequest) {
     }
 
     let energetskaIzkaznica = null;
-    if (energyCertResult) {
-      const cert = energyCertResult;
+    if (energyCertResult?.cert) {
+      const cert = energyCertResult.cert;
       energetskaIzkaznica = {
         razred: cert.energyClass,
         tip: cert.type,
@@ -307,15 +308,17 @@ export async function POST(request: NextRequest) {
         primaryEnergy: cert.primaryEnergy,
         co2: cert.co2Emissions,
         kondicionirana: cert.conditionedArea,
+        source: energyCertResult.source,
       };
     }
 
     // Re-run ETN with energy class if cert available (applies correction to value estimate)
     let etnAnalizaFinal = etnAnaliza;
-    if (energyCertResult?.energyClass && etnAnaliza && useableArea) {
+    const certEnergyClass = energyCertResult?.cert?.energyClass;
+    if (certEnergyClass && etnAnaliza && useableArea) {
       const osmAmenitiesCount = osmData ? (Object.values(osmData as Record<string, unknown[]>).flat().length) : null;
-      const corrected = await getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe)
-        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, energyCertResult.energyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe).catch(() => null))
+      const corrected = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe)
+        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe).catch(() => null))
         .catch(() => null);
       if (corrected) etnAnalizaFinal = corrected;
     }
@@ -445,6 +448,7 @@ export async function POST(request: NextRequest) {
       osmData: osmData ?? null,
       placesData,
       oglasneAnalize: oglasneAnalize ?? null,
+      koRentalYield: koRentalYield ?? null,
       propertyContext,
       // Tip prodaje: ločimo med prodajo enote in prodajo celotne stavbe
       tipProdaje: (() => {

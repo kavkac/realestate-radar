@@ -98,6 +98,7 @@ interface EnergyData {
   primaryEnergy: number | null;
   co2: number | null;
   kondicionirana: number | null;
+  source?: "stanovanje" | "stavba" | null;
 }
 
 interface LokacijskiFaktor {
@@ -167,6 +168,14 @@ interface OsmBuildingData {
   tramStopsCount?: number;
 }
 
+interface KoRentalYield {
+  avgCenaM2: number | null;
+  avgNajemninaM2: number | null;
+  brutoYieldPct: number | null;
+  steviloProdaj: number;
+  steviloNajemov: number;
+}
+
 interface PropertyCardProps {
   naslov: string;
   enolicniId: { koId: number; stStavbe: number; stDelaStavbe: number | null };
@@ -208,6 +217,7 @@ interface PropertyCardProps {
   poplavnaNevarnost?: PoplavnaNevarnost | null;
   osmData?: OsmBuildingData | null;
   oglasneAnalize?: OglasneAnalize | null;
+  koRentalYield?: KoRentalYield | null;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   propertyContext?: PropertyContextData | null;
   placesData?: unknown | null;
@@ -308,6 +318,7 @@ export function PropertyCard({
   poplavnaNevarnost,
   osmData,
   oglasneAnalize,
+  koRentalYield,
   tipProdaje,
   propertyContext,
   placesData,
@@ -749,6 +760,7 @@ export function PropertyCard({
               osmTramStops={osmData?.tramStopsCount}
               osmWallMaterial={osmData?.wallMaterial}
               oglasneAnalize={oglasneAnalize}
+              koRentalYield={koRentalYield}
             />
           </div>
 
@@ -2080,7 +2092,14 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
         <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
         <div className="space-y-4">
           <div>
-            <EnergyMeter razred={data.razred} />
+            <div className="flex items-center gap-2">
+              <EnergyMeter razred={data.razred} />
+              {data.source === "stavba" && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
+                  stavba
+                </span>
+              )}
+            </div>
             <div className="text-sm text-gray-500 mt-1">
               <p>Veljavna do {data.veljaDo}</p>
               {data.tip && <p className="mt-0.5">Tip: {data.tip}</p>}
@@ -2483,6 +2502,7 @@ function OcenaVrednostiSection({
   osmTramStops,
   osmWallMaterial,
   oglasneAnalize,
+  koRentalYield,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
@@ -2507,7 +2527,10 @@ function OcenaVrednostiSection({
   osmTramStops?: number;
   osmWallMaterial?: string | null;
   oglasneAnalize?: OglasneAnalize | null;
+  koRentalYield?: KoRentalYield | null;
 }) {
+  const [showExplanation, setShowExplanation] = useState(false);
+
   // Višina stropov
   const visinaStropov = izracunajVisinoStropov(
     stavbaVisina ?? null,
@@ -2598,6 +2621,19 @@ function OcenaVrednostiSection({
           {etnNajemAnaliza.brutoDonosLetni}% bruto donos letno
         </p>
       )}
+    </div>
+  ) : null;
+
+  // KO rental yield blok — prikaži bruto donosnost v katastrski občini
+  const koYieldBlock = koRentalYield?.brutoYieldPct != null ? (
+    <div className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 mt-3">
+      <p className="text-xs text-gray-500 mb-0.5">Bruto donosnost v KO</p>
+      <p className={`text-lg font-bold ${koRentalYield.brutoYieldPct >= 5 ? "text-green-700" : koRentalYield.brutoYieldPct >= 3 ? "text-yellow-700" : "text-red-600"}`}>
+        {koRentalYield.brutoYieldPct}%
+      </p>
+      <p className="text-[10px] text-gray-400 mt-0.5">
+        povprečje prodajnih ({koRentalYield.steviloProdaj}) in najemnih ({koRentalYield.steviloNajemov}) poslov v zadnjih 2 letih
+      </p>
     </div>
   ) : null;
 
@@ -2755,6 +2791,43 @@ function OcenaVrednostiSection({
       {!hasSelectedUnit && !unitMin && totalBuildingArea && (
         <p className="text-[10px] text-gray-400 mt-1.5 italic">Izberite enoto za vrednost posamezne enote</p>
       )}
+
+      {/* Collapsible explanation */}
+      <div className="mt-2 pt-2 border-t border-blue-200">
+        <button
+          type="button"
+          onClick={() => setShowExplanation(!showExplanation)}
+          className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+        >
+          <span>{showExplanation ? "▼" : "▶"}</span>
+          Kako je izračunano?
+        </button>
+        {showExplanation && (
+          <div className="mt-2 text-xs text-gray-500 space-y-1">
+            <p>
+              Ocena temelji na <strong>{etnAnaliza.steviloTransakcij}</strong> transakcijah
+              {etnAnaliza.vir === 'proximity' ? ' v radiju 500m od nepremičnine' :
+               etnAnaliza.vir === 'ko' ? ` v KO ${etnAnaliza.imeKo ?? ''}` :
+               etnAnaliza.vir === 'regija' ? ' v regiji' : ' na nacionalni ravni'}.
+            </p>
+            <p>
+              Mediana cena: <strong>{etnAnaliza.medianaCenaM2.toLocaleString("sl-SI")} €/m²</strong>
+              {(etnAnaliza.energetskaKorekcija || etnAnaliza.lokacijskiPremium || visinaStropov.korekcija !== 0) && (
+                <> · Prilagojena za: {[
+                  etnAnaliza.energetskaKorekcija && `EIZ ${etnAnaliza.energetskaKorekcija.razred}`,
+                  etnAnaliza.lokacijskiPremium && 'lokacijo',
+                  visinaStropov.korekcija !== 0 && 'višino stropov',
+                  stavbneKorekcije.faktorji.length > 0 && 'stanje stavbe',
+                ].filter(Boolean).join(', ')}</>
+              )}
+            </p>
+            <p>
+              ETN podatki do: <strong>{etnAnaliza.zadnjeLeto ?? new Date().getFullYear()}</strong> ·
+              Zaupanje: <strong>{etnAnaliza.zaupanje ?? 4}/5</strong>
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   ) : null;
 
@@ -2780,6 +2853,7 @@ function OcenaVrednostiSection({
         </div>
         {etnCenaBlock ?? etnBlock}
         {najemBlock}
+        {koYieldBlock}
         {oglasneAnalizBlock}
       </section>
     );
@@ -2813,6 +2887,7 @@ function OcenaVrednostiSection({
         </div>
         {etnBlock}
         {najemBlock}
+        {koYieldBlock}
         {oglasneAnalizBlock}
       </section>
     );
@@ -2827,6 +2902,7 @@ function OcenaVrednostiSection({
         <Label vir="ETN GURS · tržne transakcije">Ocenjena vrednost</Label>
         {etnCenaBlock ?? etnBlock}
         {najemBlock}
+        {koYieldBlock}
         {oglasneAnalizBlock}
       </section>
     );
