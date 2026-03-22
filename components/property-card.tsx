@@ -316,7 +316,7 @@ export function PropertyCard({
   const [kreditOpen, setKreditOpen] = useState(false);
   const [showAllUnits, setShowAllUnits] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
-  const [corrections, setCorrections] = useState<Array<{ atribut: string; vrednost: string; trust_level: string }>>([]);
+  const [corrections, setCorrections] = useState<Correction[]>([]);
   const { isSignedIn } = useUser();
   const [isSaved, setIsSaved] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
@@ -958,7 +958,7 @@ function Field({
 // SOURCE-AWARE DATA MERGE (user corrections override registry)
 // ─────────────────────────────────────────────────────────────
 
-type Correction = { atribut: string; vrednost: string; trust_level: string };
+type Correction = { atribut: string; vrednost: string; trust_level: string; is_public: boolean; is_own: boolean };
 type DataSource = "registry" | "user" | "verified";
 
 const CORRECTION_LABELS: Record<string, string> = {
@@ -989,8 +989,18 @@ function mergeValue(
   return { value: registryValue ?? null, source: "registry" };
 }
 
-// Subtle gray pill for user-provided data
-function UserCorrectionPill({ value }: { value: string | number }) {
+// Subtle gray pill for user-provided data (private variant)
+function UserCorrectionPill({ value, variant = "private" }: { value: string | number; variant?: "public" | "private" }) {
+  if (variant === "public") {
+    return (
+      <span
+        className="inline-flex items-center text-[10px] text-green-600 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 ml-1.5 font-normal"
+        title="Verificiran podatek lastnika"
+      >
+        lastnik poroča: {value}
+      </span>
+    );
+  }
   return (
     <span
       className="inline-flex items-center text-[10px] text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5 ml-1.5 font-normal"
@@ -1184,14 +1194,17 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
   const roofShapeMap: Record<string, string> = { flat: "Ravna", gabled: "Dvokapna", hipped: "Štirikapna", pyramidal: "Piramidna", dome: "Kupola", skillion: "Enokapna", gambrel: "Mansardna", half_hipped: "Pol-štirikapna" };
   const wallMaterialMap: Record<string, string> = { brick: "Opeka", concrete: "Beton", wood: "Les", stone: "Kamen", glass: "Steklo", metal: "Kovina", plaster: "Omet" };
 
+  // Only show public corrections inline (verified owner data)
+  const publicCorrections = corrections.filter(c => c.is_public);
+
   return (
     <section>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
         <Field label="Tip stavbe" value={stavba.tip} />
         <Field label="Stanovanj" value={stavba.steviloStanovanj} />
         <Field label="Konstrukcija" value={stavba.konstrukcija} />
-        <MergedField label="Obnova fasade" registryValue={stavba.letoObnove.fasade} corrections={corrections} atribut="fasada_leto" />
-        <MergedField label="Obnova strehe" registryValue={stavba.letoObnove.strehe} corrections={corrections} atribut="streha_leto" />
+        <MergedField label="Obnova fasade" registryValue={stavba.letoObnove.fasade} corrections={publicCorrections} atribut="fasada_leto" />
+        <MergedField label="Obnova strehe" registryValue={stavba.letoObnove.strehe} corrections={publicCorrections} atribut="streha_leto" />
         {stavba.datumSys && (
           <Field label="Stanje registra" value={fmtDate(stavba.datumSys)} />
         )}
@@ -1217,14 +1230,14 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
         <span>
           <Check on={stavba.prikljucki.elektrika} /> Elektrika
-          {corrections.find(c => c.atribut === "elektrika") && (
-            <UserCorrectionPill value={corrections.find(c => c.atribut === "elektrika")!.vrednost} />
+          {publicCorrections.find(c => c.atribut === "elektrika") && (
+            <UserCorrectionPill value={publicCorrections.find(c => c.atribut === "elektrika")!.vrednost} variant="public" />
           )}
         </span>
         {(() => {
           const g = stavba.gasInfrastructure;
-          const plinCorrection = corrections.find(c => c.atribut === "plin");
-          const plinPill = plinCorrection ? <UserCorrectionPill value={plinCorrection.vrednost} /> : null;
+          const plinCorrection = publicCorrections.find(c => c.atribut === "plin");
+          const plinPill = plinCorrection ? <UserCorrectionPill value={plinCorrection.vrednost} variant="public" /> : null;
           if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin{plinPill}</span>;
           if (g?.confidence === "high") return <span className="text-[#2d6a4f]">≈ Plin<InfoTooltip text={`Verjetno priključen — plinovod oddaljen ~${g.distanceM}m. Uradnega priključka v katastru ni, to je ocena na podlagi ZK GJI infrastrukturnih podatkov.`} />{plinPill}</span>;
           if (g?.confidence === "medium") return <span className="text-gray-400">≈ Plin<InfoTooltip text={`Plinovod v bližini (~${g.distanceM}m), a priključek ni potrjen v registru.`} />{plinPill}</span>;
@@ -1233,14 +1246,14 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
         })()}
         <span>
           <Check on={stavba.prikljucki.vodovod} /> Vodovod
-          {corrections.find(c => c.atribut === "vodovod") && (
-            <UserCorrectionPill value={corrections.find(c => c.atribut === "vodovod")!.vrednost} />
+          {publicCorrections.find(c => c.atribut === "vodovod") && (
+            <UserCorrectionPill value={publicCorrections.find(c => c.atribut === "vodovod")!.vrednost} variant="public" />
           )}
         </span>
         <span>
           <Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija
-          {corrections.find(c => c.atribut === "kanalizacija") && (
-            <UserCorrectionPill value={corrections.find(c => c.atribut === "kanalizacija")!.vrednost} />
+          {publicCorrections.find(c => c.atribut === "kanalizacija") && (
+            <UserCorrectionPill value={publicCorrections.find(c => c.atribut === "kanalizacija")!.vrednost} variant="public" />
           )}
         </span>
       </div>
@@ -1249,15 +1262,28 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
 }
 
 function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?: Correction[] }) {
-  // Dvigalo: merge correction with registry
-  const dvigaloMerge = mergeValue(part.dvigalo ? "Da" : "Ne", corrections, "dvigalo");
+  // Split corrections: public (verified) shown to everyone, private (own) shown only to author
+  const publicCorrections = corrections.filter(c => c.is_public);
+  const privateCorrections = corrections.filter(c => !c.is_public && c.is_own);
+
+  // Dvigalo: merge correction with registry (only public corrections for inline display)
+  const dvigaloMerge = mergeValue(part.dvigalo ? "Da" : "Ne", publicCorrections, "dvigalo");
   const showDvigalo = dvigaloMerge.value != null;
 
-  // Correction-only fields
-  const ogrevanjeMerge = mergeValue(null, corrections, "ogrevanje");
-  const stanjeMerge = mergeValue(null, corrections, "stanje");
-  const parkirisceMerge = mergeValue(null, corrections, "parkirisce");
-  const opombaCorrection = corrections.find(c => c.atribut === "opomba");
+  // Public correction-only fields
+  const ogrevanjeMergePublic = mergeValue(null, publicCorrections, "ogrevanje");
+  const stanjeMergePublic = mergeValue(null, publicCorrections, "stanje");
+  const parkirisceMergePublic = mergeValue(null, publicCorrections, "parkirisce");
+  const opombaCorrectionPublic = publicCorrections.find(c => c.atribut === "opomba");
+
+  // Private correction-only fields
+  const ogrevanjeMergePrivate = mergeValue(null, privateCorrections, "ogrevanje");
+  const stanjeMergePrivate = mergeValue(null, privateCorrections, "stanje");
+  const parkirisceMergePrivate = mergeValue(null, privateCorrections, "parkirisce");
+  const opombaCorrectionPrivate = privateCorrections.find(c => c.atribut === "opomba");
+
+  const hasPublicOwnerInfo = ogrevanjeMergePublic.value || stanjeMergePublic.value || parkirisceMergePublic.value || opombaCorrectionPublic;
+  const hasPrivateOwnerInfo = ogrevanjeMergePrivate.value || stanjeMergePrivate.value || parkirisceMergePrivate.value || opombaCorrectionPrivate;
 
   return (
     <div className="space-y-5">
@@ -1279,8 +1305,8 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
         <div className="col-span-2 sm:col-span-3 -mt-2">
           <p className="text-[10px] text-gray-400">Kataster nepremičnin, GURS</p>
         </div>
-        <MergedField label="Obnova instalacij" registryValue={part.letoObnoveInstalacij} corrections={corrections} atribut="instalacije_leto" />
-        <MergedField label="Obnova oken" registryValue={part.letoObnoveOken} corrections={corrections} atribut="okna_leto" />
+        <MergedField label="Obnova instalacij" registryValue={part.letoObnoveInstalacij} corrections={publicCorrections} atribut="instalacije_leto" />
+        <MergedField label="Obnova oken" registryValue={part.letoObnoveOken} corrections={publicCorrections} atribut="okna_leto" />
         {showDvigalo && (
           <div>
             <span className="text-xs text-gray-400">Dvigalo</span>
@@ -1298,36 +1324,72 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
         )}
       </div>
 
-      {/* Owner info — compact inline section */}
-      {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value || opombaCorrection) && (
-        <div className="mt-2.5 pt-2.5 border-t border-gray-100/80">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-gray-400 uppercase tracking-widest">
-              Informacije lastnika
-            </span>
-            {ogrevanjeMerge.value && (
-              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
-                <span className="text-gray-400 mr-1">Ogrevanje</span>
-                <span className="text-gray-700">{ogrevanjeMerge.value}</span>
+      {/* Public owner info — verified corrections visible to everyone */}
+      {hasPublicOwnerInfo && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <p className="text-[10px] text-green-600 font-semibold uppercase tracking-widest mb-1.5 flex items-center gap-1">
+            <span>✓</span> Lastnik poroča
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {ogrevanjeMergePublic.value && (
+              <span className="inline-flex items-center text-[11px] bg-green-50 text-green-800 rounded-full px-2.5 py-0.5 border border-green-100">
+                <span className="text-green-600 mr-1">Ogrevanje</span>
+                <span className="text-green-800">{ogrevanjeMergePublic.value}</span>
               </span>
             )}
-            {stanjeMerge.value && (
-              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
-                <span className="text-gray-400 mr-1">Stanje</span>
-                <span className="text-gray-700">{stanjeMerge.value}</span>
+            {stanjeMergePublic.value && (
+              <span className="inline-flex items-center text-[11px] bg-green-50 text-green-800 rounded-full px-2.5 py-0.5 border border-green-100">
+                <span className="text-green-600 mr-1">Stanje</span>
+                <span className="text-green-800">{stanjeMergePublic.value}</span>
               </span>
             )}
-            {parkirisceMerge.value && (
-              <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
-                <span className="text-gray-400 mr-1">Parkirišče</span>
-                <span className="text-gray-700">{parkirisceMerge.value}</span>
+            {parkirisceMergePublic.value && (
+              <span className="inline-flex items-center text-[11px] bg-green-50 text-green-800 rounded-full px-2.5 py-0.5 border border-green-100">
+                <span className="text-green-600 mr-1">Parkirišče</span>
+                <span className="text-green-800">{parkirisceMergePublic.value}</span>
               </span>
             )}
           </div>
-          {opombaCorrection && (
+          {opombaCorrectionPublic && (
+            <div className="mt-1.5 pl-2 border-l-2 border-green-200">
+              <p className="text-[11px] text-green-700 italic leading-snug">
+                {opombaCorrectionPublic.vrednost}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Private owner info — unverified corrections visible only to author */}
+      {hasPrivateOwnerInfo && (
+        <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
+          <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+            <span>👁</span> Vaše opombe · vidno samo vam
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {ogrevanjeMergePrivate.value && (
+              <span className="inline-flex items-center text-[11px] bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                <span className="text-gray-400 mr-1">Ogrevanje</span>
+                <span className="text-gray-600">{ogrevanjeMergePrivate.value}</span>
+              </span>
+            )}
+            {stanjeMergePrivate.value && (
+              <span className="inline-flex items-center text-[11px] bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                <span className="text-gray-400 mr-1">Stanje</span>
+                <span className="text-gray-600">{stanjeMergePrivate.value}</span>
+              </span>
+            )}
+            {parkirisceMergePrivate.value && (
+              <span className="inline-flex items-center text-[11px] bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                <span className="text-gray-400 mr-1">Parkirišče</span>
+                <span className="text-gray-600">{parkirisceMergePrivate.value}</span>
+              </span>
+            )}
+          </div>
+          {opombaCorrectionPrivate && (
             <div className="mt-1.5 pl-2 border-l-2 border-gray-200">
               <p className="text-[11px] text-gray-500 italic leading-snug">
-                {opombaCorrection.vrednost}
+                {opombaCorrectionPrivate.vrednost}
               </p>
             </div>
           )}

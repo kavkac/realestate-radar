@@ -15,17 +15,30 @@ async function getOrCreateUser(clerkId: string) {
 
 // GET /api/corrections?stavba_id=KO-ST
 export async function GET(req: NextRequest) {
+  const { userId } = await auth();
   const stavbaId = req.nextUrl.searchParams.get("stavba_id");
   if (!stavbaId) return NextResponse.json({ corrections: [] });
 
+  // Get current user DB id (null if not logged in)
+  let dbUserId: number | null = null;
+  if (userId) {
+    const rows = await prisma.$queryRawUnsafe<{ id: number }[]>(
+      `SELECT id FROM users WHERE clerk_id = $1 LIMIT 1`, userId
+    );
+    if (rows.length) dbUserId = rows[0].id;
+  }
+
+  // Return public corrections + own private corrections
   const rows = await prisma.$queryRawUnsafe<unknown[]>(
-    `SELECT c.atribut, c.vrednost, c.trust_level, c.created_at,
-            u.verification_tier
+    `SELECT c.atribut, c.vrednost, c.trust_level, c.is_public, c.created_at,
+            u.verification_tier,
+            (c.user_id = $2) AS is_own
      FROM user_corrections c
      JOIN users u ON u.id = c.user_id
      WHERE c.stavba_id = $1
-     ORDER BY c.created_at DESC`,
-    stavbaId
+       AND (c.is_public = true OR c.user_id = $2)
+     ORDER BY c.is_public DESC, c.created_at DESC`,
+    stavbaId, dbUserId ?? -1
   );
   return NextResponse.json({ corrections: rows });
 }
@@ -49,13 +62,14 @@ export async function POST(req: NextRequest) {
   );
   const trustLevel = userRows[0]?.verification_tier ?? "none";
 
+  const isPublic = ["bank", "agent"].includes(trustLevel);
   for (const c of body.corrections) {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO user_corrections (user_id, stavba_id, del_stavbe_id, atribut, vrednost, trust_level)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO user_corrections (user_id, stavba_id, del_stavbe_id, atribut, vrednost, trust_level, is_public)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT DO NOTHING`,
       dbUserId, body.stavba_id, body.del_stavbe_id ?? null,
-      c.atribut, c.vrednost, trustLevel
+      c.atribut, c.vrednost, trustLevel, isPublic
     );
   }
 
