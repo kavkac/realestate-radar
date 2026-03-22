@@ -1250,7 +1250,7 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
 
 function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?: Correction[] }) {
   // Dvigalo: merge correction with registry
-  const dvigaloMerge = mergeValue(part.dvigalo ? "Da" : null, corrections, "dvigalo");
+  const dvigaloMerge = mergeValue(part.dvigalo ? "Da" : "Ne", corrections, "dvigalo");
   const showDvigalo = dvigaloMerge.value != null;
 
   // Correction-only fields
@@ -1302,12 +1302,12 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
       {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value || opombaCorrection) && (
         <div className="mt-2.5 pt-2.5 border-t border-gray-100/80">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-gray-400 uppercase tracking-wide shrink-0">
-              Lastnik
+            <span className="text-[10px] text-gray-400 uppercase tracking-widest">
+              Informacije lastnika
             </span>
             {ogrevanjeMerge.value && (
               <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
-                <span className="text-gray-400 mr-1">Ogr.</span>
+                <span className="text-gray-400 mr-1">Ogrevanje</span>
                 <span className="text-gray-700">{ogrevanjeMerge.value}</span>
               </span>
             )}
@@ -1319,7 +1319,7 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
             )}
             {parkirisceMerge.value && (
               <span className="inline-flex items-center text-[11px] bg-gray-50 text-gray-500 rounded px-1.5 py-0.5 border border-gray-100">
-                <span className="text-gray-400 mr-1">Park.</span>
+                <span className="text-gray-400 mr-1">Parkirišče</span>
                 <span className="text-gray-700">{parkirisceMerge.value}</span>
               </span>
             )}
