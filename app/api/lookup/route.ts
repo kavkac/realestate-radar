@@ -8,6 +8,7 @@ import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
 import { getPlacesData } from "@/lib/places-api";
+import { getLppLineCount } from "@/lib/lpp-lines";
 import { prisma } from "@/lib/prisma";
 
 const LookupSchema = z.object({
@@ -239,8 +240,14 @@ export async function POST(request: NextRequest) {
     // Oglasne cene — vzporedno z ostalimi klici
     const oglasneAnalizePromise = getOglasneAnalize(stavba.koId, null).catch(() => null);
 
+    // LPP bus lines via Overpass relations (non-blocking)
+    const lppLinesPromise =
+      lat != null && lng != null
+        ? getLppLineCount(lat, lng).catch(() => null)
+        : Promise.resolve(null);
+
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, KN namembnost, and rental yield in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, koRentalYield, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, koRentalYield, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -256,6 +263,7 @@ export async function POST(request: NextRequest) {
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
       lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
       osmDataPromise,
+      lppLinesPromise,
       getKoRentalYield(stavba.koId).catch(() => null),
       Promise.all(
         deliStavbe.map((d) =>
@@ -357,6 +365,8 @@ export async function POST(request: NextRequest) {
           trainStations: placesData.transit?.trainStations,
           nearestBusM: placesData.transit?.nearestBusM,
           nearestTrainM: placesData.transit?.nearestTrainM,
+          lppLineCount: lppLines?.lineCount ?? null,
+          lppLines: lppLines?.lines ?? null,
         },
         services: {
           supermarkets: placesData.services?.supermarkets,
@@ -447,6 +457,7 @@ export async function POST(request: NextRequest) {
       poplavnaNevarnost,
       osmData: osmData ?? null,
       placesData,
+      lppLines: lppLines ?? null,
       oglasneAnalize: oglasneAnalize ?? null,
       koRentalYield: koRentalYield ?? null,
       propertyContext,

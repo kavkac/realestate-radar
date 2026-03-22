@@ -2192,6 +2192,7 @@ interface PlacesTransit {
   busStops: number; tramStops: number; trainStations: number;
   nearestBusM: number | null; nearestTrainM: number | null;
   kvaliteta: 'odlicna'|'dobra'|'srednja'|'slaba'; opis: string;
+  lppLineCount?: number | null; lppLines?: string[] | null;
 }
 interface PlacesServices {
   supermarkets: number; nearestSupermarketM: number | null;
@@ -2283,13 +2284,17 @@ function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot, placesD
 
           {/* Javni prevoz */}
           <div>
-            <p className="text-xs text-gray-400 mb-1">Javni prevoz (600m)</p>
+            <p className="text-xs text-gray-400 mb-1">Javni prevoz (500m)</p>
             <span className={`text-xs font-medium ${
               placesData.transit.kvaliteta === 'odlicna' ? 'text-green-700' :
               placesData.transit.kvaliteta === 'dobra' ? 'text-blue-700' :
               placesData.transit.kvaliteta === 'srednja' ? 'text-amber-600' : 'text-red-600'
             }`}>
-              🚌 {placesData.transit.opis}
+              {placesData.transit.lppLineCount != null && placesData.transit.lppLineCount > 0 ? (
+                <>🚌 {placesData.transit.lppLineCount} linij LPP{placesData.transit.busStops > 0 ? ` · ${placesData.transit.busStops} postajališč` : ''}</>
+              ) : (
+                <>🚌 {placesData.transit.opis}</>
+              )}
             </span>
             {placesData.transit.trainStations > 0 && (
               <span className="ml-2 text-xs text-gray-600">

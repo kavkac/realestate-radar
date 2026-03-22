@@ -353,7 +353,8 @@ function computeAmenityScore(places: BuildPropertyContextParams["placesData"]): 
 
   const { transit, services } = places;
 
-  // Transit
+  // Transit — prefer line count (number of different bus lines) over stop count
+  const lineCount = transit?.lppLineCount ?? null;
   const busCount = transit?.busStops ?? 0;
   const trainCount = transit?.trainStations ?? 0;
   const nearestBus = transit?.nearestBusM ?? null;
@@ -362,15 +363,30 @@ function computeAmenityScore(places: BuildPropertyContextParams["placesData"]): 
     prednosti.push(`Železniška postaja v bližini (${transit?.nearestTrainM ?? "?"}m)`);
     score += 15;
   }
-  if (busCount >= 5) {
+
+  // Use line count if available, otherwise fall back to stop count
+  if (lineCount !== null && lineCount > 0) {
+    if (lineCount >= 5) {
+      prednosti.push(`Odlična dostopnost z LPP (${lineCount} linij)`);
+      score += 10;
+    } else if (lineCount >= 2) {
+      prednosti.push(`Dobra dostopnost z LPP (${lineCount} linij)`);
+      score += 5;
+    } else {
+      // 1 line — basic access
+      prednosti.push(`Dostop do LPP (${lineCount} linija)`);
+      score += 2;
+    }
+  } else if (lineCount === 0 || (busCount === 0 && nearestBus === null)) {
+    slabosti.push("Ni javnega prevoza v bližini");
+    score -= 10;
+  } else if (busCount >= 5) {
+    // Fallback to stop count if no line data
     prednosti.push(`Odlična dostopnost z LPP (${busCount} postajališč)`);
     score += 10;
   } else if (busCount >= 2) {
     prednosti.push(`Dobra dostopnost z LPP (${busCount} postajališč)`);
     score += 5;
-  } else if (busCount === 0 && nearestBus === null) {
-    slabosti.push("Ni javnega prevoza v bližini");
-    score -= 10;
   }
 
   // Supermarket
@@ -503,7 +519,7 @@ export interface BuildPropertyContextParams {
   kulturnoVarstvo?: boolean;
   // Places/amenity data
   placesData?: {
-    transit?: { busStops?: number; trainStations?: number; nearestBusM?: number | null; nearestTrainM?: number | null };
+    transit?: { busStops?: number; trainStations?: number; nearestBusM?: number | null; nearestTrainM?: number | null; lppLineCount?: number | null; lppLines?: string[] | null };
     services?: { supermarkets?: number; supermarketDistM?: number | null; banks?: number; parks?: number; restaurants?: number };
   } | null;
 }
