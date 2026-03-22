@@ -996,7 +996,7 @@ function UserCorrectionPill({ value }: { value: string | number }) {
       className="inline-flex items-center text-[10px] text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5 ml-1.5 font-normal"
       title="Podatek posredoval lastnik nepremičnine"
     >
-      lastnik: {value}
+      informacija lastnika: {value}
     </span>
   );
 }
@@ -1210,17 +1210,34 @@ function BuildingSection({ stavba, osmData, corrections = [] }: { stavba: Proper
         )}
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mt-4">
-        <span><Check on={stavba.prikljucki.elektrika} /> Elektrika</span>
+        <span>
+          <Check on={stavba.prikljucki.elektrika} /> Elektrika
+          {corrections.find(c => c.atribut === "elektrika") && (
+            <UserCorrectionPill value={corrections.find(c => c.atribut === "elektrika")!.vrednost} />
+          )}
+        </span>
         {(() => {
           const g = stavba.gasInfrastructure;
-          if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin</span>;
-          if (g?.confidence === "high") return <span className="text-[#2d6a4f]">≈ Plin<InfoTooltip text={`Verjetno priključen — plinovod oddaljen ~${g.distanceM}m. Uradnega priključka v katastru ni, to je ocena na podlagi ZK GJI infrastrukturnih podatkov.`} /></span>;
-          if (g?.confidence === "medium") return <span className="text-gray-400">≈ Plin<InfoTooltip text={`Plinovod v bližini (~${g.distanceM}m), a priključek ni potrjen v registru.`} /></span>;
-          if (g?.confidence === "low") return <span><Check on={false} /> Plin</span>;
-          return <span><Check on={false} /> Plin</span>;
+          const plinCorrection = corrections.find(c => c.atribut === "plin");
+          const plinPill = plinCorrection ? <UserCorrectionPill value={plinCorrection.vrednost} /> : null;
+          if (stavba.prikljucki.plin) return <span><Check on={true} /> Plin{plinPill}</span>;
+          if (g?.confidence === "high") return <span className="text-[#2d6a4f]">≈ Plin<InfoTooltip text={`Verjetno priključen — plinovod oddaljen ~${g.distanceM}m. Uradnega priključka v katastru ni, to je ocena na podlagi ZK GJI infrastrukturnih podatkov.`} />{plinPill}</span>;
+          if (g?.confidence === "medium") return <span className="text-gray-400">≈ Plin<InfoTooltip text={`Plinovod v bližini (~${g.distanceM}m), a priključek ni potrjen v registru.`} />{plinPill}</span>;
+          if (g?.confidence === "low") return <span><Check on={false} /> Plin{plinPill}</span>;
+          return <span><Check on={false} /> Plin{plinPill}</span>;
         })()}
-        <span><Check on={stavba.prikljucki.vodovod} /> Vodovod</span>
-        <span><Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija</span>
+        <span>
+          <Check on={stavba.prikljucki.vodovod} /> Vodovod
+          {corrections.find(c => c.atribut === "vodovod") && (
+            <UserCorrectionPill value={corrections.find(c => c.atribut === "vodovod")!.vrednost} />
+          )}
+        </span>
+        <span>
+          <Check on={stavba.prikljucki.kanalizacija} /> Kanalizacija
+          {corrections.find(c => c.atribut === "kanalizacija") && (
+            <UserCorrectionPill value={corrections.find(c => c.atribut === "kanalizacija")!.vrednost} />
+          )}
+        </span>
       </div>
     </section>
   );
@@ -1274,32 +1291,45 @@ function PartDetail({ part, corrections = [] }: { part: DelStavbe; corrections?:
             </p>
           </div>
         )}
-        {/* User-only fields integrated into grid */}
-        {ogrevanjeMerge.value && (
-          <div>
-            <span className="text-xs text-gray-400">Ogrevanje <span className="text-gray-300">(lastnik)</span></span>
-            <p className="text-sm font-medium text-gray-800">{ogrevanjeMerge.value}</p>
-          </div>
-        )}
-        {stanjeMerge.value && (
-          <div>
-            <span className="text-xs text-gray-400">Stanje <span className="text-gray-300">(lastnik)</span></span>
-            <p className="text-sm font-medium text-gray-800">{stanjeMerge.value}</p>
-          </div>
-        )}
-        {parkirisceMerge.value && (
-          <div>
-            <span className="text-xs text-gray-400">Parkirišče <span className="text-gray-300">(lastnik)</span></span>
-            <p className="text-sm font-medium text-gray-800">{parkirisceMerge.value}</p>
-          </div>
-        )}
       </div>
 
-      {/* Opomba as subtle italic line */}
-      {opombaCorrection && (
-        <p className="text-xs text-gray-400 italic mt-2">
-          &ldquo;{opombaCorrection.vrednost}&rdquo; <span className="not-italic text-gray-300">· lastnik</span>
-        </p>
+      {/* Dedicated owner info section */}
+      {(ogrevanjeMerge.value || stanjeMerge.value || parkirisceMerge.value || opombaCorrection) && (
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
+            Informacije lastnika
+          </p>
+
+          {/* Opomba FIRST (highest priority per UX) */}
+          {opombaCorrection && (
+            <p className="text-sm text-gray-700 italic mb-3">
+              „{opombaCorrection.vrednost}"
+              <span className="text-[10px] text-gray-300 not-italic ml-1">· lastnik</span>
+            </p>
+          )}
+
+          {/* User-only fields grid */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+            {ogrevanjeMerge.value && (
+              <div>
+                <p className="text-xs text-gray-400">Ogrevanje</p>
+                <p className="text-sm font-medium text-gray-800">{ogrevanjeMerge.value}</p>
+              </div>
+            )}
+            {stanjeMerge.value && (
+              <div>
+                <p className="text-xs text-gray-400">Stanje</p>
+                <p className="text-sm font-medium text-gray-800">{stanjeMerge.value}</p>
+              </div>
+            )}
+            {parkirisceMerge.value && (
+              <div>
+                <p className="text-xs text-gray-400">Parkirišče</p>
+                <p className="text-sm font-medium text-gray-800">{parkirisceMerge.value}</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {part.prostori.length > 0 && (

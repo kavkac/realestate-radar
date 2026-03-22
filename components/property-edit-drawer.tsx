@@ -176,7 +176,68 @@ export function PropertyEditDrawer({
             />
           </div>
 
-          {/* Section 2: Sistemi */}
+          {/* Section 2: Instalacije */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
+            🔌 Instalacije
+          </p>
+
+          <div className="flex flex-col gap-1 mb-3">
+            <label className="text-xs text-gray-500">Plin</label>
+            <select
+              value={editValues.plin ?? ""}
+              onChange={(e) => setEditValues({ ...editValues, plin: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400 focus:border-transparent outline-none bg-white"
+            >
+              <option value="">— izberite —</option>
+              <option value="Da">Da</option>
+              <option value="Ne">Ne</option>
+              <option value="V gradnji">V gradnji</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1 mb-3">
+            <label className="text-xs text-gray-500">Elektrika</label>
+            <select
+              value={editValues.elektrika ?? ""}
+              onChange={(e) => setEditValues({ ...editValues, elektrika: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400 focus:border-transparent outline-none bg-white"
+            >
+              <option value="">— izberite —</option>
+              <option value="Da">Da</option>
+              <option value="Ne">Ne</option>
+              <option value="V gradnji">V gradnji</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1 mb-3">
+            <label className="text-xs text-gray-500">Vodovod</label>
+            <select
+              value={editValues.vodovod ?? ""}
+              onChange={(e) => setEditValues({ ...editValues, vodovod: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400 focus:border-transparent outline-none bg-white"
+            >
+              <option value="">— izberite —</option>
+              <option value="Da">Da</option>
+              <option value="Ne">Ne</option>
+              <option value="V gradnji">V gradnji</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1 mb-3">
+            <label className="text-xs text-gray-500">Kanalizacija</label>
+            <select
+              value={editValues.kanalizacija ?? ""}
+              onChange={(e) => setEditValues({ ...editValues, kanalizacija: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-400 focus:border-transparent outline-none bg-white"
+            >
+              <option value="">— izberite —</option>
+              <option value="Da">Da</option>
+              <option value="Ne">Ne</option>
+              <option value="V gradnji">V gradnji</option>
+            </select>
+          </div>
+
+          {/* Section 3: Sistemi */}
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-4">
             Sistemi
           </p>
