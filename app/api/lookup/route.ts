@@ -331,6 +331,9 @@ export async function POST(request: NextRequest) {
       return r;
     }).catch(() => null);
 
+    // Await placesData for context engine
+    const placesData = await placesDataPromise;
+
     // Property Context Engine — deterministični kontekst iz vseh virov
     const propertyContext = buildPropertyContext({
       lat,
@@ -345,6 +348,21 @@ export async function POST(request: NextRequest) {
       poplavnaNevarnost: poplavnaNevarnost?.stopnja === "visoka" || poplavnaNevarnost?.stopnja === "srednja",
       seizmicnaCona: seizmicniPodatki?.cona ?? null,
       kulturnoVarstvo: false, // TODO: iz GURS REN
+      placesData: placesData ? {
+        transit: {
+          busStops: placesData.transit?.busStops,
+          trainStations: placesData.transit?.trainStations,
+          nearestBusM: placesData.transit?.nearestBusM,
+          nearestTrainM: placesData.transit?.nearestTrainM,
+        },
+        services: {
+          supermarkets: placesData.services?.supermarkets,
+          supermarketDistM: placesData.services?.nearestSupermarketM,
+          banks: placesData.services?.banks,
+          parks: placesData.services?.parks,
+          restaurants: placesData.services?.restaurants,
+        },
+      } : null,
     });
 
     // Re-run najemnina with prodajna vrednost for bruto donos calculation
@@ -425,7 +443,7 @@ export async function POST(request: NextRequest) {
       seizmicniPodatki,
       poplavnaNevarnost,
       osmData: osmData ?? null,
-      placesData: await placesDataPromise,
+      placesData,
       oglasneAnalize: oglasneAnalize ?? null,
       propertyContext,
       // Tip prodaje: ločimo med prodajo enote in prodajo celotne stavbe

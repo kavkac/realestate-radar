@@ -338,6 +338,79 @@ function computeRiskPenalty(params: {
   };
 }
 
+// ─── AMENITY SCORE ────────────────────────────────────────────────────────────
+
+function computeAmenityScore(places: BuildPropertyContextParams["placesData"]): {
+  score: number; // 0-100
+  prednosti: string[];
+  slabosti: string[];
+} {
+  if (!places) return { score: 50, prednosti: [], slabosti: [] };
+
+  const prednosti: string[] = [];
+  const slabosti: string[] = [];
+  let score = 50;
+
+  const { transit, services } = places;
+
+  // Transit
+  const busCount = transit?.busStops ?? 0;
+  const trainCount = transit?.trainStations ?? 0;
+  const nearestBus = transit?.nearestBusM ?? null;
+
+  if (trainCount >= 1) {
+    prednosti.push(`Železniška postaja v bližini (${transit?.nearestTrainM ?? "?"}m)`);
+    score += 15;
+  }
+  if (busCount >= 5) {
+    prednosti.push(`Odlična dostopnost z JPP (${busCount} postaj)`);
+    score += 10;
+  } else if (busCount >= 2) {
+    prednosti.push(`Dobra dostopnost z JPP (${busCount} postaj)`);
+    score += 5;
+  } else if (busCount === 0 && nearestBus === null) {
+    slabosti.push("Ni javnega prevoza v bližini");
+    score -= 10;
+  }
+
+  // Supermarket
+  const supermarkets = services?.supermarkets ?? 0;
+  const supermarketDist = services?.supermarketDistM ?? null;
+  if (supermarkets >= 1 && supermarketDist !== null && supermarketDist <= 300) {
+    prednosti.push(`Trgovina v neposredni bližini (${supermarketDist}m)`);
+    score += 5;
+  } else if (supermarkets === 0) {
+    slabosti.push("Ni trgovine v bližini");
+    score -= 5;
+  }
+
+  // Parks
+  const parks = services?.parks ?? 0;
+  if (parks >= 2) {
+    prednosti.push(`${parks} parkov v bližini`);
+    score += 5;
+  }
+
+  // Banks
+  const banks = services?.banks ?? 0;
+  if (banks >= 1) {
+    prednosti.push("Bančne storitve v bližini");
+    score += 3;
+  }
+
+  // Restaurants
+  const restaurants = services?.restaurants ?? 0;
+  if (restaurants >= 5) {
+    prednosti.push(`Živahno okolje (${restaurants} restavracij)`);
+    score += 3;
+  }
+
+  // Clamp 0-100
+  score = Math.max(0, Math.min(100, score));
+
+  return { score, prednosti, slabosti };
+}
+
 // ─── PREDNOSTI / SLABOSTI ─────────────────────────────────────────────────────
 
 function buildProsConsLists(ctx: {
@@ -345,6 +418,7 @@ function buildProsConsLists(ctx: {
   stavba: BuildingScore;
   trg: MarketScore;
   tveganja: RiskPenalty;
+  placesData?: BuildPropertyContextParams["placesData"];
 }): { prednosti: string[]; slabosti: string[] } {
   const prednosti: string[] = [];
   const slabosti: string[] = [];
@@ -358,6 +432,11 @@ function buildProsConsLists(ctx: {
     slabosti.push("Obrobna lokacija — daljša pot do centra");
   else if (ctx.lokacija.kategorija === "ruralno")
     slabosti.push("Ruralna lokacija — omejena infrastruktura");
+
+  // Amenity (dostopnost storitev)
+  const amenity = computeAmenityScore(ctx.placesData);
+  prednosti.push(...amenity.prednosti);
+  slabosti.push(...amenity.slabosti);
 
   // Stavba
   if (ctx.stavba.starostKategorija === "novo")
@@ -422,6 +501,11 @@ export interface BuildPropertyContextParams {
   poplavnaNevarnost: boolean;
   seizmicnaCona?: string | null;
   kulturnoVarstvo?: boolean;
+  // Places/amenity data
+  placesData?: {
+    transit?: { busStops?: number; trainStations?: number; nearestBusM?: number | null; nearestTrainM?: number | null };
+    services?: { supermarkets?: number; supermarketDistM?: number | null; banks?: number; parks?: number; restaurants?: number };
+  } | null;
 }
 
 export function buildPropertyContext(
@@ -449,6 +533,7 @@ export function buildPropertyContext(
     stavba,
     trg,
     tveganja,
+    placesData: params.placesData,
   });
 
   // Weighted composite score
@@ -457,8 +542,12 @@ export function buildPropertyContext(
   const weights = { lokacija: 0.50, stavba: 0.20, trg: 0.20, tveganja: 0.10 };
   const riskPenaltyNorm = tveganja.penalty; // 0–50 točk odbitka
 
+  // Blend amenity score into lokacija (15% amenity, 85% base lokacija)
+  const amenity = computeAmenityScore(params.placesData);
+  const lokacijaBlended = Math.round(lokacija.score * 0.85 + amenity.score * 0.15);
+
   const weightedRaw =
-    lokacija.score * weights.lokacija +
+    lokacijaBlended * weights.lokacija +
     stavba.score * weights.stavba +
     trg.score * weights.trg +
     (100 - riskPenaltyNorm * 2) * weights.tveganja;
