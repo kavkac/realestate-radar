@@ -496,7 +496,7 @@ def scrape(max_pages: int = MAX_PAGES, dry_run: bool = False, use_playwright: bo
                 current_url = f"{base_path.rstrip('/')}/stran-{page_num}/"
 
             log.info(f"[{path}][{page_num}/{max_pages}] Scraping: {current_url}")
-            html = fetch_page(session, current_url)
+            html = fetcher(current_url)
 
             if html is None:
                 log.warning(f"Stran ni dostopna: {current_url}")
@@ -533,13 +533,17 @@ def scrape(max_pages: int = MAX_PAGES, dry_run: bool = False, use_playwright: bo
         log.info("\n--- Fallback: bolha.com ---")
         bolha_url = urljoin(BOLHA_BASE, BOLHA_PATHS[0])
         for page_i in range(min(max_pages, 3)):
-            html = fetch_page(session, bolha_url if page_i == 0 else f"{bolha_url}?page={page_i + 1}")
+            html = fetcher(bolha_url if page_i == 0 else f"{bolha_url}?page={page_i + 1}")
             if html is None:
                 log.warning("Bolha.com prav tako blokiran")
                 break
             listings = parse_bolha_listing(html, bolha_url)
             all_listings.extend(listings)
             log.info(f"  Bolha stran {page_i + 1}: {len(listings)} oglasov")
+
+    # Cleanup Playwright
+    if pw_fetcher:
+        pw_fetcher.close()
 
     # Statistike
     valid = [l for l in all_listings if l["cena_eur"] and l["povrsina_m2"]]
@@ -589,8 +593,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RealEstateRadar Portal Scraper")
     parser.add_argument("--max-pages", type=int, default=MAX_PAGES, help=f"Max strani (default: {MAX_PAGES})")
     parser.add_argument("--dry-run", action="store_true", help="Ne shrani v DB")
+    parser.add_argument("--playwright", action="store_true", help="Uporabi Playwright za bypass Cloudflare")
     args = parser.parse_args()
 
-    result = scrape(max_pages=args.max_pages, dry_run=args.dry_run)
+    result = scrape(max_pages=args.max_pages, dry_run=args.dry_run, use_playwright=args.playwright)
     mediana = f"{result['mediana_cena_m2']:.0f}" if result['mediana_cena_m2'] else "N/A"
     print(f"\n✅ Scraping zaključen: {result['total_scraped']} oglasov, {result['valid_with_price']} veljavnih, mediana {mediana} €/m²")
