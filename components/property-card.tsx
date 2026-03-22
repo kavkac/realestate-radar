@@ -2235,7 +2235,7 @@ function PropertyContextSection({ ctx, tipProdaje, parcele, steviloEnot, placesD
           <p className={`text-sm font-semibold ${scoreColor}`}>
             {score >= 70 ? 'Dobra nepremičnina' : score >= 50 ? 'Povprečna lokacija' : 'Slabša lokacija'}
           </p>
-          <p className="text-xs text-gray-500">Skupni indeks · {Math.round(ctx.confidence * 100)}% zaupanje</p>
+          <p className="text-xs text-gray-500">Skupni indeks lokacije in stavbe</p>
         </div>
       </div>
 
