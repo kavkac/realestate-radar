@@ -3169,6 +3169,8 @@ function MaintenanceSection({
     pillClass: string;
     jeOcena: boolean;
     isFromUser: boolean;
+    isPublicUser: boolean; // true = public/verified (green pill), false = private (gray pill)
+    userValue: string | null; // the actual user-entered year for display in pill
   }[] = [];
 
 
@@ -3187,7 +3189,10 @@ function MaintenanceSection({
 
     // Preveri ali vrednost prihaja od userja
     const atributMap: Record<string, string> = { fasade: "fasada_leto", strehe: "streha_leto", instalacije: "instalacije_leto", okna: "okna_leto" };
-    const isFromUser = !!corrections.find(c => c.atribut === atributMap[m.key] && c.vrednost);
+    const userCorrection = corrections.find(c => c.atribut === atributMap[m.key] && c.vrednost);
+    const isFromUser = !!userCorrection;
+    const isPublicUser = !!(userCorrection?.is_public);
+    const userValue = userCorrection?.vrednost ?? null;
     // Ko ni podatka o obnovi, privzamemo leto izgradnje — komponenta je stara kolikor stavba
     const jeOcena = !letoObnove;
     const effLetoObnove = letoObnove ?? baseYear;
@@ -3202,6 +3207,8 @@ function MaintenanceSection({
         pillClass: "text-red-600 font-semibold",
         jeOcena,
         isFromUser,
+        isPublicUser,
+        userValue,
       });
     } else if (age >= m.lifespan * 0.85) {
       items.push({
@@ -3213,6 +3220,8 @@ function MaintenanceSection({
         pillClass: "text-amber-600 font-semibold",
         jeOcena,
         isFromUser,
+        isPublicUser,
+        userValue,
       });
     } else if (age >= m.lifespan * 0.7) {
       items.push({
@@ -3224,6 +3233,8 @@ function MaintenanceSection({
         pillClass: "text-green-600 font-semibold",
         jeOcena,
         isFromUser,
+        isPublicUser,
+        userValue,
       });
     } else {
       // V redu — prikaži vse elemente
@@ -3236,6 +3247,8 @@ function MaintenanceSection({
         pillClass: "text-gray-400 font-medium",
         jeOcena,
         isFromUser,
+        isPublicUser,
+        userValue,
       });
     }
   }
@@ -3257,11 +3270,14 @@ function MaintenanceSection({
                 <span className="ml-2 text-xs text-gray-400">
                   ({item.age}/{item.lifespan} let)
                 </span>
-                {item.isFromUser && (
-                  <span className="ml-1.5 text-[10px] text-green-600 bg-green-50 rounded px-1 py-0.5">vaš vnos</span>
+                {item.isFromUser && item.userValue && (
+                  <UserCorrectionPill
+                    value={item.userValue}
+                    variant={item.isPublicUser ? "public" : "private"}
+                  />
                 )}
                 {!item.isFromUser && item.jeOcena && (
-                  <span className="ml-1.5 text-[10px] text-gray-400 bg-gray-50 rounded px-1 py-0.5">ocena<InfoTooltip text="Leto obnove ni v registru — starost ocenjena iz leta izgradnje." /></span>
+                  <InfoTooltip text="Leto obnove ni v registru — starost ocenjena iz leta izgradnje." />
                 )}
               </div>
               <span
