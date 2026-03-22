@@ -2216,9 +2216,10 @@ function OkolicaSection({ placesData }: { placesData: PlacesDataCard }) {
   const rows: { label: string; value: string }[] = [];
 
   // Javni prevoz
-  const lppLines = Math.min(t.lppLineCount ?? 0, 20);
-  if (lppLines > 0) rows.push({ label: "Avtobusne linije", value: `${lppLines} linij LPP${t.nearestBusM != null ? ` · najbližja ${t.nearestBusM}m` : ''}` });
-  else if (t.busStops > 0) rows.push({ label: "Avtobusna postajališča", value: `${t.busStops}${t.nearestBusM != null ? ` · najbližje ${t.nearestBusM}m` : ''}` });
+  const lppLines = t.lppLineCount ?? 0;
+  // Prikaži samo LPP linije (live Overpass, točno) — busStops iz cache je nezanesljiv (star bulk import)
+  if (lppLines > 0) rows.push({ label: "Avtobusne linije LPP", value: `${lppLines} linij${t.nearestBusM != null ? ` · najbližja postaja ${t.nearestBusM}m` : ''}` });
+  else if (t.busStops > 0 && t.busStops <= 15) rows.push({ label: "Avtobusna postajališča", value: `${t.busStops}${t.nearestBusM != null ? ` · najbližje ${t.nearestBusM}m` : ''}` });
   if (t.trainStations > 0) rows.push({ label: "Železnica", value: `${t.trainStations} postaja${t.nearestTrainM != null ? ` · ${t.nearestTrainM}m` : ''}` });
 
   // Storitve
