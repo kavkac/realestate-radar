@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   await prisma.$executeRawUnsafe(
     `INSERT INTO user_property_claims (user_id, stavba_id, del_stavbe_id, verification_tier, verified_at)
      VALUES ($1, $2, $3, $4, NOW())
-     ON CONFLICT (user_id, stavba_id, del_stavbe_id) DO NOTHING`,
+     ON CONFLICT DO NOTHING`,
     dbUserId, body.stavba_id, body.del_stavbe_id ?? null, trustLevel
   );
 
