@@ -42,6 +42,14 @@ except ImportError:
     print("Namesti odvisnosti: pip install requests beautifulsoup4 psycopg2-binary")
     raise
 
+# Playwright (optional - za bypass Cloudflare)
+PLAYWRIGHT_AVAILABLE = False
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    pass
+
 # ── Konfiguracija ───────────────────────────────────────────────────────────
 
 DB_URL = "postgresql://postgres:BXevJxzMDrFQUvjwDkZunQdpNHSJgdTz@switchback.proxy.rlwy.net:31940/railway"
@@ -57,7 +65,8 @@ ALLOWED_PATHS = [
 
 USER_AGENT = "RealEstateRadar/1.0 research@realestate-radar.si"
 RATE_LIMIT_SEC = 2.0  # min 1 req / 2 sek kot zahtevano
-MAX_PAGES = 5  # testni run = ~50-100 oglasov (20 na stran)
+MAX_PAGES = 100  # scale to 1000+ oglasov (20 na stran)
+MIN_RESULTS_PER_PAGE = 10  # stop when page returns fewer than this
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,6 +74,57 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
+
+# ── Playwright browser context ────────────────────────────────────────────────
+
+class PlaywrightFetcher:
+    """Playwright-based fetcher za bypass Cloudflare."""
+    def __init__(self):
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
+
+    def start(self):
+        if not PLAYWRIGHT_AVAILABLE:
+            raise RuntimeError("Playwright ni nameščen: pip install playwright && playwright install chromium")
+        self.playwright = sync_playwright().start()
+        self.browser = self.playwright.chromium.launch(headless=True)
+        self.context = self.browser.new_context(
+            user_agent=USER_AGENT,
+            locale="sl-SI",
+        )
+        self.page = self.context.new_page()
+        log.info("Playwright browser zagnan")
+
+    def fetch(self, url: str) -> Optional[str]:
+        """Prenese stran s Playwright. Vrne HTML ali None ob napaki."""
+        try:
+            time.sleep(RATE_LIMIT_SEC + random.uniform(0, 0.5))
+            self.page.goto(url, wait_until="networkidle", timeout=30000)
+            # Počakaj da se vsebina naloži
+            self.page.wait_for_timeout(1000)
+            html = self.page.content()
+            # Check for Cloudflare challenge
+            if "just a moment" in html.lower() or "cf-challenge" in html.lower():
+                log.warning(f"Cloudflare challenge na {url} — čakam 5s")
+                self.page.wait_for_timeout(5000)
+                html = self.page.content()
+                if "just a moment" in html.lower():
+                    log.warning(f"Cloudflare challenge ni uspelo obiti")
+                    return None
+            return html
+        except Exception as e:
+            log.error(f"Playwright napaka pri {url}: {e}")
+            return None
+
+    def close(self):
+        if self.browser:
+            self.browser.close()
+        if self.playwright:
+            self.playwright.stop()
+        log.info("Playwright browser zaprt")
+
 
 # ── HTTP session ─────────────────────────────────────────────────────────────
 
@@ -262,6 +322,13 @@ def get_db_connection():
     return psycopg2.connect(DB_URL)
 
 
+def get_existing_urls(conn) -> set[str]:
+    """Vrne set vseh URL-jev že v bazi za resume support."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT url FROM listings_oglasi")
+        return {row[0] for row in cur.fetchall()}
+
+
 def upsert_listings(conn, listings: list[dict]) -> int:
     """Vstavi ali posodobi oglase. Vrne število vstavljenih."""
     if not listings:
@@ -379,39 +446,87 @@ def parse_bolha_listing(html: str, page_url: str) -> list[dict]:
 
 # ── Glavni scraper ────────────────────────────────────────────────────────────
 
-def scrape(max_pages: int = MAX_PAGES, dry_run: bool = False) -> dict:
+def scrape(max_pages: int = MAX_PAGES, dry_run: bool = False, use_playwright: bool = False) -> dict:
     """Glavni scraper. Vrne statistike."""
     log.info("=== RealEstateRadar Scraper ===")
     log.info(f"Portal: {PORTAL}")
     log.info(f"Max strani: {max_pages}")
     log.info(f"Rate limit: {RATE_LIMIT_SEC}s med zahtevki")
     log.info(f"User-Agent: {USER_AGENT}")
+    log.info(f"Playwright: {'DA' if use_playwright else 'NE'}")
 
-    session = make_session()
+    # Setup fetcher
+    pw_fetcher = None
+    session = None
+    if use_playwright:
+        pw_fetcher = PlaywrightFetcher()
+        pw_fetcher.start()
+        fetcher = pw_fetcher.fetch
+    else:
+        session = make_session()
+        fetcher = lambda url: fetch_page(session, url)
+
     all_listings: list[dict] = []
     blocked_urls: list[str] = []
+    skipped_existing = 0
 
-    # Scrape nepremicnine.net
-    start_url = urljoin(BASE_URL, ALLOWED_PATHS[0])
-    current_url = start_url
-    page_num = 0
+    # Resume support: load existing URLs
+    existing_urls: set[str] = set()
+    if not dry_run:
+        try:
+            conn = get_db_connection()
+            existing_urls = get_existing_urls(conn)
+            conn.close()
+            log.info(f"Resume: {len(existing_urls)} oglasov že v bazi")
+        except Exception as e:
+            log.warning(f"Ni mogoče prebrati obstoječih URL: {e}")
 
-    while current_url and page_num < max_pages:
-        log.info(f"[{page_num + 1}/{max_pages}] Scraping: {current_url}")
-        html = fetch_page(session, current_url)
+    # Scrape nepremicnine.net - paginate through all pages
+    for path in ALLOWED_PATHS:
+        base_path = urljoin(BASE_URL, path)
+        page_num = 1
+        consecutive_empty = 0
 
-        if html is None:
-            log.warning(f"Stran ni dostopna: {current_url}")
-            blocked_urls.append(current_url)
-            # Poskusi bolha.com kot fallback
-            break
+        while page_num <= max_pages:
+            # Pagination: append /stran-N/ or use existing pattern
+            if page_num == 1:
+                current_url = base_path
+            else:
+                # nepremicnine.net uses /stran-N/ pagination
+                current_url = f"{base_path.rstrip('/')}/stran-{page_num}/"
 
-        listings = parse_listing_page(html, current_url)
-        log.info(f"  Parsiranih {len(listings)} oglasov")
-        all_listings.extend(listings)
+            log.info(f"[{path}][{page_num}/{max_pages}] Scraping: {current_url}")
+            html = fetch_page(session, current_url)
 
-        current_url = get_next_page_url(html, current_url)
-        page_num += 1
+            if html is None:
+                log.warning(f"Stran ni dostopna: {current_url}")
+                blocked_urls.append(current_url)
+                break
+
+            listings = parse_listing_page(html, current_url)
+
+            # Filter out already existing URLs (resume support)
+            new_listings = []
+            for l in listings:
+                if l["url"] in existing_urls:
+                    skipped_existing += 1
+                else:
+                    new_listings.append(l)
+                    existing_urls.add(l["url"])  # prevent duplicates within run
+
+            log.info(f"  Parsiranih {len(listings)} oglasov, {len(new_listings)} novih, {len(listings) - len(new_listings)} že v bazi")
+            all_listings.extend(new_listings)
+
+            # Stop conditions: less than MIN_RESULTS_PER_PAGE results
+            if len(listings) < MIN_RESULTS_PER_PAGE:
+                consecutive_empty += 1
+                if consecutive_empty >= 2:
+                    log.info(f"  Konec rezultatov za {path} (2 zaporedni strani z < {MIN_RESULTS_PER_PAGE} oglasi)")
+                    break
+            else:
+                consecutive_empty = 0
+
+            page_num += 1
 
     # Če nepremicnine.net ne deluje, poskusi bolha.com
     if not all_listings and blocked_urls:
@@ -432,7 +547,8 @@ def scrape(max_pages: int = MAX_PAGES, dry_run: bool = False) -> dict:
     mediana_cena_m2 = sorted(cene_m2)[len(cene_m2) // 2] if cene_m2 else None
 
     log.info(f"\n=== Rezultati ===")
-    log.info(f"Skupaj scraped: {len(all_listings)} oglasov")
+    log.info(f"Skupaj novih scraped: {len(all_listings)} oglasov")
+    log.info(f"Preskočenih (že v bazi): {skipped_existing}")
     log.info(f"Z veljavno ceno in površino: {len(valid)}")
     if mediana_cena_m2:
         log.info(f"Mediana cena/m²: {mediana_cena_m2:.0f} €/m²")
@@ -476,4 +592,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     result = scrape(max_pages=args.max_pages, dry_run=args.dry_run)
-    print(f"\n✅ Scraping zaključen: {result['total_scraped']} oglasov, {result['valid_with_price']} veljavnih, mediana {result['mediana_cena_m2']:.0f if result['mediana_cena_m2'] else 'N/A'} €/m²")
+    mediana = f"{result['mediana_cena_m2']:.0f}" if result['mediana_cena_m2'] else "N/A"
+    print(f"\n✅ Scraping zaključen: {result['total_scraped']} oglasov, {result['valid_with_price']} veljavnih, mediana {mediana} €/m²")

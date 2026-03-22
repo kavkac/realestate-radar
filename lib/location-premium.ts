@@ -23,7 +23,32 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Key Ljubljana landmarks (can expand to other cities later)
+// Slovenian city centers with premium radii
+const CITY_CENTERS = [
+  { name: "Ljubljana", lat: 46.0569, lng: 14.5058, radiusPremium: 2000, radiusCenter: 500 },
+  { name: "Maribor", lat: 46.5547, lng: 15.6459, radiusPremium: 2000, radiusCenter: 500 },
+  { name: "Celje", lat: 46.2311, lng: 15.2686, radiusPremium: 1500, radiusCenter: 400 },
+  { name: "Koper", lat: 45.5480, lng: 13.7301, radiusPremium: 1500, radiusCenter: 400 },
+  { name: "Kranj", lat: 46.2392, lng: 14.3556, radiusPremium: 1500, radiusCenter: 400 },
+  { name: "Novo Mesto", lat: 45.8011, lng: 15.1696, radiusPremium: 1200, radiusCenter: 300 },
+  { name: "Velenje", lat: 46.3592, lng: 15.1112, radiusPremium: 1200, radiusCenter: 300 },
+  { name: "Nova Gorica", lat: 45.9560, lng: 13.6480, radiusPremium: 1200, radiusCenter: 300 },
+];
+
+function findNearestCity(lat: number, lng: number): { city: typeof CITY_CENTERS[0]; distanceKm: number } {
+  let nearest = CITY_CENTERS[0];
+  let minDist = haversineKm(lat, lng, nearest.lat, nearest.lng);
+  for (const city of CITY_CENTERS.slice(1)) {
+    const dist = haversineKm(lat, lng, city.lat, city.lng);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = city;
+    }
+  }
+  return { city: nearest, distanceKm: minDist };
+}
+
+// Key Ljubljana landmarks (Ljubljana-specific premium factors)
 const LANDMARKS = {
   ljubljanica: [
     // Polyline approximation: key points along Ljubljanica through city center
@@ -66,12 +91,14 @@ export function izracunajLokacijskiPremium(
     faktorji.push({ naziv: "Blizu Gradu", opis: `${Math.round(distGrad * 1000)}m od Ljubljanskega gradu`, korekcija: 0.02, ikona: "🏰" });
   }
 
-  // 3. Mestno jedro (Kongresni trg / staro mesto)
-  const distCenter = haversineKm(lat, lng, LANDMARKS.kongresniTrg[0], LANDMARKS.kongresniTrg[1]);
-  if (distCenter < 0.3) {
-    faktorji.push({ naziv: "Strogo mestno jedro", opis: "Center Ljubljane — visoka vrednost lokacije", korekcija: 0.07, ikona: "🏛️" });
-  } else if (distCenter < 0.8) {
-    faktorji.push({ naziv: "Mestno jedro", opis: `${Math.round(distCenter * 1000)}m od centra`, korekcija: 0.03, ikona: "🏛️" });
+  // 3. Mestno jedro — nearest city center (generalized for all Slovenian cities)
+  const { city: nearestCity, distanceKm: distCenter } = findNearestCity(lat, lng);
+  const centerThreshold = nearestCity.radiusCenter / 1000; // convert m to km
+  const premiumThreshold = nearestCity.radiusPremium / 1000;
+  if (distCenter < centerThreshold) {
+    faktorji.push({ naziv: "Strogo mestno jedro", opis: `Center ${nearestCity.name} — visoka vrednost lokacije`, korekcija: 0.07, ikona: "🏛️" });
+  } else if (distCenter < premiumThreshold / 2) {
+    faktorji.push({ naziv: "Mestno jedro", opis: `${Math.round(distCenter * 1000)}m od centra ${nearestCity.name}`, korekcija: 0.03, ikona: "🏛️" });
   }
 
   // 4. Bližina parka (Tivoli)
@@ -93,11 +120,13 @@ export function izracunajLokacijskiPremium(
     }
   }
 
-  // 6. Periferija / oddaljenost od centra (malus)
-  if (distCenter > 3.0) {
-    faktorji.push({ naziv: "Oddaljena lokacija", opis: `${Math.round(distCenter * 1000)}m od centra`, korekcija: -0.05, ikona: "📍" });
-  } else if (distCenter > 5.0) {
-    faktorji.push({ naziv: "Periferna lokacija", opis: `${(distCenter).toFixed(1)}km od centra`, korekcija: -0.10, ikona: "📍" });
+  // 6. Periferija / oddaljenost od centra (malus) — scaled by city size
+  const peripheryThreshold = premiumThreshold * 1.5; // 1.5x premium radius = periphery start
+  const remoteThreshold = premiumThreshold * 2.5;    // 2.5x premium radius = remote
+  if (distCenter > remoteThreshold) {
+    faktorji.push({ naziv: "Periferna lokacija", opis: `${(distCenter).toFixed(1)}km od centra ${nearestCity.name}`, korekcija: -0.10, ikona: "📍" });
+  } else if (distCenter > peripheryThreshold) {
+    faktorji.push({ naziv: "Oddaljena lokacija", opis: `${Math.round(distCenter * 1000)}m od centra ${nearestCity.name}`, korekcija: -0.05, ikona: "📍" });
   }
 
   // Composite factor — additive corrections, capped at ±25%
