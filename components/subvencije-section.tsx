@@ -49,26 +49,26 @@ export function SubvencijeSection({ letoGradnje, energijskiRazred, tipStavbe }: 
   }, {} as Record<string, Subvencija[]>);
 
   return (
-    <div>
-      {/* Header — matches Label style with green left border */}
+    <div className="border-b border-gray-100">
       <button
+        className="w-full flex items-center justify-between px-3 sm:px-5 py-4 text-left hover:bg-gray-50 transition-colors"
         onClick={() => setOpen(o => !o)}
-        className="w-full text-left border-b border-gray-100 pb-1 mb-3 flex items-center justify-between"
       >
-        <h4 className="border-l-[3px] border-[#2d6a4f] pl-2 text-sm font-semibold text-gray-800">
-          Razpoložljive spodbude
-          <span className="ml-2 text-xs font-normal text-gray-400">{items.length}</span>
-        </h4>
-        <svg
-          className={`w-3.5 h-3.5 text-gray-400 transition-transform mr-0.5 ${open ? "rotate-180" : ""}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        <div className="flex items-center gap-2">
+          <span className="border-l-[3px] border-[#2d6a4f] pl-2 text-sm font-semibold text-gray-800">
+            Razpoložljive spodbude
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">
+            {items.length}
+          </span>
+        </div>
+        <span className="text-gray-400 text-xs flex items-center gap-1">
+          {open ? "Skrij" : "Prikaži"} <span className="text-sm">{open ? "▲" : "▼"}</span>
+        </span>
       </button>
 
       {open && (
-        <div className="space-y-4">
+        <div className="px-3 sm:px-5 pt-4 pb-5 space-y-4">
           {Object.entries(grouped).map(([vir, subs]) => (
             <div key={vir}>
               <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1.5">

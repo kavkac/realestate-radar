@@ -692,13 +692,11 @@ export function PropertyCard({
           {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
           {/* 9. Razpoložljive spodbude */}
-          <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
-            <SubvencijeSection
-              letoGradnje={stavba?.letoIzgradnje}
-              energijskiRazred={energetskaIzkaznica?.razred}
-              tipStavbe={tipProdaje === "enota" ? "stanovanje" : tipProdaje === "stavba" ? "stavba" : "parcela"}
-            />
-          </div>
+          <SubvencijeSection
+            letoGradnje={stavba?.letoIzgradnje}
+            energijskiRazred={energetskaIzkaznica?.razred}
+            tipStavbe={tipProdaje === "enota" ? "stanovanje" : tipProdaje === "stavba" ? "stavba" : "parcela"}
+          />
         </div>
 
         {/* ── DESNI SIDEBAR — referenčni podatki ── */}
