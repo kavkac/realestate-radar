@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { AddressSearch } from "@/components/address-search";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
+import { HeaderSavedButton } from "@/components/header-saved-button";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const L = Link as any;
 
@@ -15,9 +16,7 @@ export default function HomePage() {
           </div>
           <nav className="flex items-center gap-3 text-sm">
             <SignedIn>
-              <L href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
-                Moj profil
-              </L>
+              <HeaderSavedButton />
               <UserButton afterSignOutUrl="/" />
             </SignedIn>
             <SignedOut>

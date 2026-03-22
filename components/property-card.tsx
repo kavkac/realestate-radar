@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { CreditCalculator } from "./credit-calculator";
@@ -318,8 +318,62 @@ export function PropertyCard({
   const [editOpen, setEditOpen] = useState(false);
   const [corrections, setCorrections] = useState<Array<{ atribut: string; vrednost: string; trust_level: string }>>([]);
   const { isSignedIn } = useUser();
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   const stavbaId = enolicniId ? `${enolicniId.koId}-${enolicniId.stStavbe}` : null;
+
+  // Fetch saved status on mount
+  useEffect(() => {
+    if (!isSignedIn || !stavbaId) return;
+    fetch("/api/saved?type=watchlist")
+      .then((r) => r.ok ? r.json() : { items: [] })
+      .then((d) => {
+        const saved = (d.items || []).some((item: { stavba_id: string }) => item.stavba_id === stavbaId);
+        setIsSaved(saved);
+      })
+      .catch(() => {});
+  }, [isSignedIn, stavbaId]);
+
+  const toggleSave = useCallback(async () => {
+    if (!isSignedIn) {
+      window.location.href = "/sign-in";
+      return;
+    }
+    if (!stavbaId || saveLoading) return;
+
+    setSaveLoading(true);
+    const wasIsSaved = isSaved;
+    setIsSaved(!wasIsSaved); // Optimistic
+
+    try {
+      if (wasIsSaved) {
+        await fetch("/api/saved", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "watchlist", stavba_id: stavbaId }),
+        });
+      } else {
+        const vrednostMin = etnAnaliza?.ocenaVrednostiMin ?? etnAnaliza?.ocenjenaTrznaVrednost ?? undefined;
+        const vrednostMax = etnAnaliza?.ocenaVrednostiMax ?? etnAnaliza?.ocenjenaTrznaVrednost ?? undefined;
+        await fetch("/api/saved", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "watchlist",
+            stavba_id: stavbaId,
+            data: { naslov, vrednostMin, vrednostMax },
+          }),
+        });
+      }
+      // Notify header to refresh count
+      window.dispatchEvent(new CustomEvent("saved-properties-changed"));
+    } catch {
+      setIsSaved(wasIsSaved); // Revert
+    } finally {
+      setSaveLoading(false);
+    }
+  }, [isSignedIn, stavbaId, saveLoading, isSaved, naslov, etnAnaliza]);
   const delStavbeId = selectedDel != null ? String(selectedDel) : null;
 
   useEffect(() => {
@@ -386,14 +440,36 @@ export function PropertyCard({
               Pregled podatkov o nepremičnini
             </p>
           </div>
-          <button
-            onClick={() => window.print()}
-            title="Izvozi poročilo o nepremičnini"
-            className="print:hidden flex-shrink-0 rounded border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors whitespace-nowrap shadow-sm"
-            aria-label="Izvozi poročilo o nepremičnini"
-          >
-            Izvozi poročilo
-          </button>
+          <div className="print:hidden flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={toggleSave}
+              disabled={saveLoading}
+              title={isSaved ? "Odstrani iz shranjenih" : "Shrani nepremičnino"}
+              className={`rounded border px-2 py-1.5 transition-colors shadow-sm ${
+                isSaved
+                  ? "bg-yellow-50 border-yellow-300 text-yellow-600 hover:bg-yellow-100"
+                  : "bg-white border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+              }`}
+              aria-label={isSaved ? "Odstrani iz shranjenih" : "Shrani nepremičnino"}
+            >
+              <svg className="w-4 h-4" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() => window.print()}
+              title="Izvozi poročilo o nepremičnini"
+              className="rounded border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors whitespace-nowrap shadow-sm"
+              aria-label="Izvozi poročilo o nepremičnini"
+            >
+              Izvozi poročilo
+            </button>
+          </div>
         </div>
       </div>
 
