@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
-import { CreditCalculator } from "./credit-calculator";
+import { SubvencijeSection } from "./subvencije-section";
 import { PropertyEditDrawer } from "./property-edit-drawer";
 import { izracunajVisinoStropov, izracunajStavbneKorekcije } from "@/lib/location-premium";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
@@ -313,7 +313,6 @@ export function PropertyCard({
   placesData,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
-  const [kreditOpen, setKreditOpen] = useState(false);
   const [showAllUnits, setShowAllUnits] = useState(false);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [corrections, setCorrections] = useState<Correction[]>([]);
@@ -686,26 +685,13 @@ export function PropertyCard({
 
           {/* Ocenjena vrednost — premaknjeno v desni sidebar */}
 
-          {/* 9. Storitve — vedno odprto */}
+          {/* 9. Razpoložljive spodbude */}
           <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
-            <ServicesSection />
-          </div>
-
-          {/* Izračunaj kredit */}
-          <div>
-            <button
-              onClick={() => setKreditOpen(!kreditOpen)}
-              className="w-full flex items-center justify-between px-6 py-3 bg-green-50 border border-green-200 hover:bg-green-100 transition-colors text-sm font-medium text-[#2d6a4f]"
-            >
-              <span>Izračunaj kredit</span>
-              <span className="text-xs">{kreditOpen ? '▲' : '▼'}</span>
-            </button>
-            {kreditOpen && (
-              <div className="border-l-4 border-[#2d6a4f] bg-gray-50 px-6 py-4">
-                <CreditCalculator />
-              </div>
-            )}
-
+            <SubvencijeSection
+              letoGradnje={stavba?.letoIzgradnje}
+              energijskiRazred={energetskaIzkaznica?.razred}
+              tipStavbe={tipProdaje === "enota" ? "stanovanje" : tipProdaje === "stavba" ? "stavba" : "parcela"}
+            />
           </div>
         </div>
 
@@ -4037,28 +4023,6 @@ function ZavarovanjeSection({
           </div>
         </div>
       )}
-    </section>
-  );
-}
-
-function ServicesSection() {
-  const cards = [
-    { title: "Kredit za prenovo", desc: "Primerjajte ponudbe bank za stanovanjski kredit" },
-    { title: "Zavarovanje nepremičnine", desc: "Zavarovajte svojo naložbo po ugodni ceni" },
-    { title: "Energetska sanacija", desc: "Preverite subvencije Eko sklada za energetsko prenovo" },
-  ];
-  return (
-    <section>
-      <Label>Uredite z enim klikom</Label>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {cards.map((c) => (
-          <div key={c.title} className="rounded-md border border-gray-100 bg-white p-5 shadow-sm">
-            <h5 className="font-medium text-sm text-gray-800">{c.title}</h5>
-            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{c.desc}</p>
-            <span className="inline-block mt-3 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-400">Kmalu</span>
-          </div>
-        ))}
-      </div>
     </section>
   );
 }
