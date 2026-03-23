@@ -683,6 +683,23 @@ export function PropertyCard({
             <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
           </div>
 
+          {/* 4a. EIZ Podloge za energetičarje — samo za prijavljene */}
+          {isSignedIn && stavba?.eid_stavba && lat != null && lng != null && (
+            <div className="px-3 sm:px-5 py-3 border-b border-gray-100 bg-gray-50">
+              <a
+                href={`/eiz-podloge?eid=${stavba.eid_stavba}&lat=${lat}&lng=${lng}${currentPart?.stDela ? `&del=${currentPart.stDela}` : ""}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              >
+                <span>📋</span>
+                <span>Pripravi podloge za energetsko izkaznico</span>
+                <span className="text-gray-400">→</span>
+              </a>
+              <p className="text-[10px] text-gray-400 mt-0.5">Predizpolnjeni podatki za certificiranega energetičarja · EN ISO 13790</p>
+            </div>
+          )}
+
           {/* 4b. Stroški ogrevanja — takoj pod EIZ */}
           {!(isMultiUnit && !(!!activePart || requestedDel != null)) &&
            energetskaIzkaznica?.potrebnaTopota != null &&
