@@ -160,6 +160,7 @@ export async function generateEizPrefill(params: {
   eidStavba: string;
   eidDelStavbe?: string;
   naslov?: string;
+  nosilnaKonstrukcija?: string; // iz GURS KN WFS (eProstor) — NOSILNA_KONSTRUKCIJA_ID
   lat: number;
   lng: number;
   userOverrides?: Record<string, unknown>;
@@ -310,8 +311,22 @@ export async function generateEizPrefill(params: {
       eidStavba:    { value: eidStavba, source: "GURS_REN", confidence: "high" },
       address:      { value: address, source: "GURS_REN", confidence: "high" },
       yearBuilt:    { value: yearBuilt, source: "GURS_REN", confidence: "high" },
-      material:     { value: materialName, source: "GURS_REN", confidence: "high",
-                      note: `id_konstrukcija=${materialCode}` },
+      material:     (() => {
+        const wfs = params.nosilnaKonstrukcija ?? null;
+        // Če se vira razlikujeta — prikaži oba, nižje zaupanje
+        if (wfs && wfs !== materialName) {
+          return {
+            value: `${wfs} (KN) · ${materialName} (REN)`,
+            source: "GURS_REN" as const, confidence: "medium" as const,
+            note: `Vira se razlikujeta: GURS KN/eProstor="${wfs}" vs GURS REN id_konstrukcija=${materialCode}="${materialName}". Preverite na terenu.`,
+          };
+        }
+        return {
+          value: wfs ?? materialName,
+          source: "GURS_REN" as const, confidence: "high" as const,
+          note: wfs ? `GURS KN (eProstor): ${wfs}` : `id_konstrukcija=${materialCode}`,
+        };
+      })(),
       buildingType: { value: (parseInt(g.st_stanovanj) || 0) > 3 ? "Večstanovanjska" : "Stanovanjska",
                       source: "GURS_REN", confidence: "high" },
       floors:       { value: floors, source: "GURS_REN", confidence: "high" },

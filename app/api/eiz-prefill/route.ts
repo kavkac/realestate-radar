@@ -18,6 +18,7 @@ const schema = z.object({
   lng: z.coerce.number().min(13).max(17),
   del: z.string().optional(),
   naslov: z.string().optional(),
+  nosilnaKonstrukcija: z.string().optional(), // iz GURS KN WFS (eProstor)
 });
 
 export async function GET(req: NextRequest) {
@@ -28,13 +29,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid params", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { eid, lat, lng, del, naslov } = parsed.data;
+  const { eid, lat, lng, del, naslov, nosilnaKonstrukcija } = parsed.data;
 
   try {
     const report = await generateEizPrefill({
       eidStavba: eid,
       eidDelStavbe: del,
       naslov,
+      nosilnaKonstrukcija,
       lat,
       lng,
     });

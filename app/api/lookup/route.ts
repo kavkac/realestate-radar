@@ -490,6 +490,7 @@ export async function POST(request: NextRequest) {
       },
       stavba: {
         eidStavba: stavba.eidStavba,
+        nosilnaKonstrukcija: stavba.nosilnaKonstrukcija ?? null,
         letoIzgradnje: stavba.letoIzgradnje,
         letoObnove: {
           fasade: stavba.letoObnoveFasade,
