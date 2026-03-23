@@ -112,16 +112,27 @@ interface EnergyData {
     yearBuilt: number;
     material: string;
     conditionedAreaM2: number;
+    wallAreaM2: number;
+    roofAreaM2: number;
     svRatio: number;
+    floors: number | null;
+    avgFloorHeightM: number;
     uWall: number;
     uRoof: number;
     uFloor: number;
     uWindow: number;
+    gWindow: number;
+    thermalBridgeDeltaU: number;
     windowRatio: number;
+    windowAreaM2: number;
+    ventilationNEff: number;
+    ventilationSystem: string;
     heatingSystem: string;
     heatingEfficiency: number;
     climateZone: string;
     heatingDegreeDays: number;
+    solarSouthKwhM2: number;
+    lidarUsed: boolean;
   };
   ocenaOpomba?: string;
 }
@@ -2254,13 +2265,49 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
           </div>
         )}
         {vhodi && (
-          <div className="text-xs text-gray-400 space-y-0.5 mb-2">
-            <p className="font-medium text-gray-500 mb-1">Vhodni parametri:</p>
-            <p>U stena: <span className="text-gray-600">{vhodi.uWall} W/m²K</span>
-            {" · "}U streha: <span className="text-gray-600">{vhodi.uRoof} W/m²K</span>
-            {" · "}U okna: <span className="text-gray-600">{vhodi.uWindow} W/m²K</span>
-            {" · "}Delež oken: <span className="text-gray-600">{Math.round(vhodi.windowRatio * 100)}%</span>
-            {" · "}HDD: <span className="text-gray-600">{vhodi.heatingDegreeDays}</span></p>
+          <div className="text-xs text-gray-400 space-y-1.5 mb-2 pt-2 border-t border-gray-100">
+            <p className="font-medium text-gray-500">Vhodni parametri izračuna:</p>
+            {/* Geometry */}
+            <div>
+              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Geometrija</span>
+              <p className="mt-0.5">
+                Površina sten: <span className="text-gray-600">{vhodi.wallAreaM2} m²</span>
+                {" · "}Streha/tla: <span className="text-gray-600">{vhodi.roofAreaM2} m²</span>
+                {" · "}A/V: <span className="text-gray-600">{vhodi.svRatio} m²/m³</span>
+                {" · "}Etaže: <span className="text-gray-600">{vhodi.floors ?? "?"} × {vhodi.avgFloorHeightM} m</span>
+                {vhodi.lidarUsed && <span className="ml-1 text-teal-600 font-medium">LiDAR</span>}
+              </p>
+            </div>
+            {/* Thermal envelope */}
+            <div>
+              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Toplotna lupina</span>
+              <p className="mt-0.5">
+                U stena: <span className="text-gray-600">{vhodi.uWall}</span>
+                {" · "}U streha: <span className="text-gray-600">{vhodi.uRoof}</span>
+                {" · "}U tla: <span className="text-gray-600">{vhodi.uFloor}</span>
+                {" · "}U okna: <span className="text-gray-600">{vhodi.uWindow} W/m²K</span>
+                {" · "}g: <span className="text-gray-600">{vhodi.gWindow}</span>
+                {" · "}ΔU mostovi: <span className="text-gray-600">{vhodi.thermalBridgeDeltaU}</span>
+              </p>
+            </div>
+            {/* Windows */}
+            <div>
+              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Okna</span>
+              <p className="mt-0.5">
+                Delež: <span className="text-gray-600">{Math.round(vhodi.windowRatio * 100)}%</span>
+                {" · "}Površina: <span className="text-gray-600">~{vhodi.windowAreaM2} m²</span>
+              </p>
+            </div>
+            {/* Climate & ventilation */}
+            <div>
+              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Klima in prezračevanje</span>
+              <p className="mt-0.5">
+                HDD: <span className="text-gray-600">{vhodi.heatingDegreeDays} Kd/a</span>
+                {" · "}Sončno J: <span className="text-gray-600">{vhodi.solarSouthKwhM2} kWh/m²a</span>
+                {" · "}n_eff: <span className="text-gray-600">{vhodi.ventilationNEff} h⁻¹</span>
+                {" · "}<span className="text-gray-600">{vhodi.ventilationSystem}</span>
+              </p>
+            </div>
           </div>
         )}
       </section>

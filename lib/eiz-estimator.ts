@@ -49,16 +49,27 @@ export interface EizEstimate {
     yearBuilt: number;
     material: string;
     conditionedAreaM2: number;
-    svRatio: number;             // surface/volume
+    wallAreaM2: number;
+    roofAreaM2: number;
+    svRatio: number;
+    floors: number | null;
+    avgFloorHeightM: number;
     uWall: number;
     uRoof: number;
     uFloor: number;
     uWindow: number;
+    gWindow: number;
+    thermalBridgeDeltaU: number;
     windowRatio: number;
+    windowAreaM2: number;
+    ventilationNEff: number;
+    ventilationSystem: string;
     heatingSystem: string;
     heatingEfficiency: number;
     climateZone: string;
     heatingDegreeDays: number;
+    solarSouthKwhM2: number;
+    lidarUsed: boolean;
   };
 
   // Legal disclaimer (always present)
@@ -463,16 +474,27 @@ export async function estimateEiz(params: {
         yearBuilt,
         material: getMaterialGroup(konstrukcijaId),
         conditionedAreaM2: Math.round(conditionedAreaM2),
+        wallAreaM2: Math.round(wallAreaM2),
+        roofAreaM2: Math.round(roofAreaM2),
         svRatio: Math.round(svRatio * 100) / 100,
+        floors,
+        avgFloorHeightM: floorHeightM,
         uWall: envelope.uWall,
         uRoof: envelope.uRoof,
         uFloor: envelope.uFloor,
         uWindow: envelope.uWindow,
+        gWindow: envelope.gWindow,
+        thermalBridgeDeltaU: envelope.thermalBridge,
         windowRatio,
+        windowAreaM2: Math.round(totalWindowAreaM2),
+        ventilationNEff: ventilationResult.nEff,
+        ventilationSystem: ventilationResult.system,
         heatingSystem: heatingSystem.label,
         heatingEfficiency: heatingSystem.efficiency,
         climateZone: climate.climateZone,
         heatingDegreeDays: climate.hdd,
+        solarSouthKwhM2: Math.round(climate.solarSouth),
+        lidarUsed: !!(lidarWallAreaM2 || lidarRoofAreaM2),
       },
       disclaimer: "OCENJENI energetski razred — ni pravno veljavna energetska izkaznica (EIZ). Za uradno izkaznico se obrnite na certificiranega energetičarja.",
       computedAt: new Date(),
