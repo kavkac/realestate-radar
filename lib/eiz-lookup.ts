@@ -51,21 +51,49 @@ export async function lookupEnergyCertificate({
 }
 
 /**
- * Poišče EIZ za bližnje stavbe v isti KO (±50 stStavbe).
- * Uporablja se kot fallback ko GURS lookup vrne pomožno zgradbo brez EIZ.
+ * Poišče EIZ za koordinatno bližnje stavbe (30m radius) v isti KO.
+ * Fallback ko GURS lookup vrne pomožno zgradbo (garaža, drvarnica) brez EIZ.
+ * Koristi koordinate iz ev_stavba za geoproximity lookup.
  */
 export async function lookupEizNearby(
   koId: number,
   stStavbe: number,
 ) {
-  return prisma.energyCertificate.findFirst({
-    where: {
-      koId,
-      stStavbe: { gte: stStavbe - 50, lte: stStavbe + 50, not: stStavbe },
-      validUntil: { gte: new Date() },
-    },
-    orderBy: { issueDate: "desc" },
-  });
+  // Najprej dobimo koordinate primarne stavbe iz ev_stavba
+  const primary = await prisma.$queryRaw<Array<{ e: string; n: string }>>`
+    SELECT e, n FROM ev_stavba
+    WHERE ko_sifko = ${String(koId)} AND stev_st = ${String(stStavbe)}
+    LIMIT 1
+  `;
+  if (!primary[0]?.e || !primary[0]?.n) return null;
+
+  const e = parseFloat(primary[0].e);
+  const n = parseFloat(primary[0].n);
+  const radius = 30; // metrov
+
+  // Iščemo stavbe v 30m radiju z EIZ
+  const nearby = await prisma.$queryRaw<Array<{ stev_st: string }>>`
+    SELECT s.stev_st FROM ev_stavba s
+    WHERE s.ko_sifko = ${String(koId)}
+      AND s.stev_st != ${String(stStavbe)}
+      AND s.e IS NOT NULL AND s.n IS NOT NULL
+      AND sqrt(power(s.e::float - ${e}, 2) + power(s.n::float - ${n}, 2)) < ${radius}
+    ORDER BY sqrt(power(s.e::float - ${e}, 2) + power(s.n::float - ${n}, 2))
+    LIMIT 10
+  `;
+
+  for (const nb of nearby) {
+    const cert = await prisma.energyCertificate.findFirst({
+      where: {
+        koId,
+        stStavbe: parseInt(nb.stev_st),
+        validUntil: { gte: new Date() },
+      },
+      orderBy: { issueDate: "desc" },
+    });
+    if (cert) return cert;
+  }
+  return null;
 }
 
 /**
