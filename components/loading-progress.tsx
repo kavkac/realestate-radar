@@ -11,7 +11,7 @@ function AnimatedDots() {
   return <span className="inline-block w-4 text-left">{".".repeat(frame)}</span>;
 }
 
-const STEPS = [
+const DEFAULT_STEPS = [
   { label: "Iščem naslov v registru naslovov (GURS RPE)…", delay: 0 },
   { label: "Pridobivam podatke iz katastra nepremičnin…", delay: 800 },
   { label: "Iščem energetsko izkaznico (MOP)…", delay: 1800 },
@@ -19,7 +19,10 @@ const STEPS = [
   { label: "Sestavljam poročilo o nepremičnini…", delay: 3800 },
 ];
 
-export function LoadingProgress() {
+export function LoadingProgress({ steps: customSteps }: { steps?: string[] } = {}) {
+  const STEPS = customSteps
+    ? customSteps.map((label, i) => ({ label, delay: i * 900 }))
+    : DEFAULT_STEPS;
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {

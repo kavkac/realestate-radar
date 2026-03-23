@@ -682,25 +682,8 @@ export function PropertyCard({
 
           {/* 4. Energetsko stanje — vedno odprto */}
           <div className="px-3 sm:px-5 py-6 border-b border-gray-100">
-            <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} />
+            <EnergyCertificateSection data={energetskaIzkaznica} stavba={stavba} part={currentPart} lat={lat} lng={lng} naslov={naslov} />
           </div>
-
-          {/* 4a. EIZ Podloge za energetičarje — samo za prijavljene */}
-          {isSignedIn && stavba?.eidStavba && lat != null && lng != null && (
-            <div className="px-3 sm:px-5 py-3 border-b border-gray-100 bg-gray-50">
-              <a
-                href={`/eiz-podloge?eid=${stavba.eidStavba}&lat=${lat}&lng=${lng}${currentPart?.stDela ? `&del=${currentPart.stDela}` : ""}&naslov=${encodeURIComponent(naslov ?? "")}${stavba.nosilnaKonstrukcija ? `&nosilnaKonstrukcija=${encodeURIComponent(stavba.nosilnaKonstrukcija)}` : ""}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-              >
-                <span>📋</span>
-                <span>Pripravi podloge za energetsko izkaznico</span>
-                <span className="text-gray-400">→</span>
-              </a>
-              <p className="text-[10px] text-gray-400 mt-0.5">Predizpolnjeni podatki za certificiranega energetičarja · EN ISO 13790</p>
-            </div>
-          )}
 
           {/* 4b. Stroški ogrevanja — takoj pod EIZ */}
           {!(isMultiUnit && !(!!activePart || requestedDel != null)) &&
@@ -2172,12 +2155,40 @@ function EnergetskiUkrepiSection({ ukrepi, delez, lat, lng, isMultiUnit, hasSele
   );
 }
 
-function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
+function PodlogeButton({ stavba, part, lat, lng, naslov }: {
+  stavba: PropertyCardProps["stavba"];
+  part?: PropertyCardProps["deliStavbe"][number] | null;
+  lat?: number | null;
+  lng?: number | null;
+  naslov?: string;
+}) {
+  const { isSignedIn } = useUser();
+  if (!isSignedIn || !stavba?.eidStavba || lat == null || lng == null) return null;
+  const url = `/eiz-podloge?eid=${stavba.eidStavba}&lat=${lat}&lng=${lng}${part?.stDela ? `&del=${part.stDela}` : ""}&naslov=${encodeURIComponent(naslov ?? "")}${stavba.nosilnaKonstrukcija ? `&nosilnaKonstrukcija=${encodeURIComponent(stavba.nosilnaKonstrukcija)}` : ""}`;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg border border-indigo-100 bg-indigo-50 hover:bg-indigo-100 transition-colors group"
+    >
+      <span className="text-base">📋</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-indigo-700 group-hover:text-indigo-900">Pripravi podloge za energetsko izkaznico</p>
+        <p className="text-[10px] text-indigo-400">Predizpolnjeni podatki za certificiranega energetičarja</p>
+      </div>
+      <span className="text-indigo-300 group-hover:text-indigo-500 text-sm">→</span>
+    </a>
+  );
+}
+
+function EnergyCertificateSection({ data, stavba, part, lat, lng, naslov }: {
   data: EnergyData | null;
   stavba: PropertyCardProps["stavba"];
   part?: PropertyCardProps["deliStavbe"][number] | null;
   lat?: number | null;
   lng?: number | null;
+  naslov?: string;
 }) {
   // 1. Prava EIZ ima prednost - uradna izkaznica iz registra
   if (data?.razred && !data?.ocenjena) {
@@ -2209,6 +2220,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
             <Field label="Datum izdaje" value={data.datumIzdaje ?? null} />
           </div>
         </div>
+        <PodlogeButton stavba={stavba} part={part} lat={lat} lng={lng} naslov={naslov} />
       </section>
     );
   }
@@ -2329,6 +2341,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
             </div>
           </div>
         )}
+        <PodlogeButton stavba={stavba} part={part} lat={lat} lng={lng} naslov={naslov} />
       </section>
     );
   }

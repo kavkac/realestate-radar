@@ -13,6 +13,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { EizAuditorReport } from "@/components/eiz-auditor-report";
+import { LoadingProgress } from "@/components/loading-progress";
 import type { EizPrefillReport } from "@/lib/eiz-prefill";
 
 function EizPodlogeContent() {
@@ -62,14 +63,15 @@ function EizPodlogeContent() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto mt-8 px-4">
-        <div className="animate-pulse space-y-3">
-          <div className="h-24 bg-gray-100 rounded-lg" />
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-40 bg-gray-50 rounded-lg border border-gray-200" />
-          ))}
-        </div>
-        <p className="text-center text-sm text-gray-400 mt-4">Nalagam podatke iz GURS, TABULA, Open-Meteo…</p>
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gray-50">
+        <p className="text-sm font-medium text-gray-700 mb-6">Pripravljam podloge za energetsko izkaznico…</p>
+        <LoadingProgress steps={[
+          "Pridobivam podatke iz GURS (REN, EVS)…",
+          "Iščem energetsko izkaznico (MOP register)…",
+          "Nalagam klimatske podatke (ARSO, Open-Meteo ERA5)…",
+          "Računam toplotno ovojnico (TABULA SLO)…",
+          "Sestavljam podloge za energetičarja…",
+        ]} />
       </div>
     );
   }
