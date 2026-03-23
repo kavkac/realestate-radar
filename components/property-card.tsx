@@ -969,7 +969,7 @@ function Field({
 // SOURCE-AWARE DATA MERGE (user corrections override registry)
 // ─────────────────────────────────────────────────────────────
 
-type Correction = { atribut: string; vrednost: string; trust_level: string; is_public: boolean; is_own: boolean; vloga?: string };
+type Correction = { atribut: string; vrednost: string; trust_level: string; is_public: boolean; is_own: boolean; vloga?: string; vir?: string };
 type DataSource = "registry" | "user" | "verified";
 
 const CORRECTION_LABELS: Record<string, string> = {
@@ -1001,14 +1001,23 @@ function mergeValue(
 }
 
 // Subtle gray pill for user-provided data (private variant)
-function UserCorrectionPill({ value, variant = "private" }: { value: string | number; variant?: "public" | "private"; }) {
+function UserCorrectionPill({ value, variant = "private", vir }: { value: string | number; variant?: "public" | "private"; vir?: string }) {
   if (variant === "public") {
+    // Determine prefix based on vir (source)
+    let prefix = "lastnik poroča:";
+    let icon = "";
+    if (vir === "dokument") {
+      icon = "📄 ";
+      prefix = "dokument:";
+    } else if (vir === "posrednik") {
+      prefix = "posrednik poroča:";
+    }
     return (
       <span
         className="inline-flex items-center text-[10px] text-green-600 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 ml-1.5 font-normal"
         title="Verificiran podatek lastnika"
       >
-        lastnik poroča: {value}
+        {icon}{prefix} {value}
       </span>
     );
   }
@@ -1066,6 +1075,7 @@ function MergedField({
             <UserCorrectionPill
               value={value as string | number}
               variant={corrections.find(c => c.atribut === atribut)?.is_public ? "public" : "private"}
+              vir={corrections.find(c => c.atribut === atribut)?.vir}
             />
           )
         )}

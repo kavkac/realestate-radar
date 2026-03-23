@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { stavba, deliStavbe, lat, lng } = result;
+    let { stavba, deliStavbe, lat, lng } = result;
 
     // Validate requested del stavbe
     if (delStavbe != null) {
@@ -283,6 +283,35 @@ export async function POST(request: NextRequest) {
       ),
       ...deliStavbe.map((d) => getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>)),
     ]);
+
+    // Load trusted corrections for this stavba (public corrections from verified users)
+    const stavbaId = `${stavba.koId}-${stavba.stStavbe}`;
+    const trustedCorrections = await prisma.$queryRawUnsafe<{atribut: string; vrednost: string; vloga_rank: number}[]>(
+      `SELECT DISTINCT ON (atribut) atribut, vrednost,
+         CASE cl.verification_tier
+           WHEN 'lastnik'     THEN 4
+           WHEN 'solastnik'   THEN 4
+           WHEN 'upravljalec' THEN 3
+           WHEN 'agent'       THEN 2
+           ELSE 1
+         END AS vloga_rank
+       FROM user_corrections c
+       LEFT JOIN user_property_claims cl ON cl.user_id = c.user_id AND cl.stavba_id = c.stavba_id AND cl.deleted_at IS NULL
+       WHERE c.stavba_id = $1 AND c.is_public = true
+       ORDER BY atribut, vloga_rank DESC, c.created_at DESC`,
+      stavbaId
+    ).catch(() => []);
+
+    // Apply corrections to stavba data fields
+    const correctionMap = Object.fromEntries(trustedCorrections.map(c => [c.atribut, c.vrednost]));
+
+    // Override stavba fields with trusted user corrections
+    if (correctionMap.fasada_leto) {
+      stavba = { ...stavba, letoObnoveFasade: parseInt(correctionMap.fasada_leto) || stavba.letoObnoveFasade };
+    }
+    if (correctionMap.streha_leto) {
+      stavba = { ...stavba, letoObnoveStrehe: parseInt(correctionMap.streha_leto) || stavba.letoObnoveStrehe };
+    }
 
     // Fire-and-forget: store OSM data in building record
     if (osmData) {
@@ -485,6 +514,8 @@ export async function POST(request: NextRequest) {
       koRentalYield: koRentalYield ?? null,
       saleToListRatio: saleToListRatio ?? null,
       propertyContext,
+      trustedCorrections,
+      correctionMap,
       // Tip prodaje: ločimo med prodajo enote in prodajo celotne stavbe
       tipProdaje: (() => {
         const imaParcele = parcele && parcele.length > 0;

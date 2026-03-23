@@ -66,13 +66,21 @@ export async function POST(req: NextRequest) {
 
   const dbUserId = await getOrCreateUser(userId);
 
-  // Pridobi verification_tier
+  // Pridobi verification_tier iz users tabele
   const userRows = await prisma.$queryRawUnsafe<{ verification_tier: string }[]>(
     `SELECT verification_tier FROM users WHERE id = $1`, dbUserId
   );
   const trustLevel = userRows[0]?.verification_tier ?? "none";
 
-  const isPublic = ["bank", "agent"].includes(trustLevel);
+  // Check if user has a verified claim on this stavba (lastnik, solastnik, upravljalec, agent, valuator)
+  const claimRows = await prisma.$queryRawUnsafe<{ verification_tier: string }[]>(
+    `SELECT verification_tier FROM user_property_claims
+     WHERE user_id = $1 AND stavba_id = $2 AND deleted_at IS NULL LIMIT 1`,
+    dbUserId, body.stavba_id
+  );
+  const claimTier = claimRows[0]?.verification_tier;
+  const isPublic = claimTier != null && ["lastnik", "solastnik", "upravljalec", "agent", "valuator"].includes(claimTier);
+
   for (const c of body.corrections) {
     await prisma.$executeRawUnsafe(
       `INSERT INTO user_corrections (user_id, stavba_id, del_stavbe_id, atribut, vrednost, trust_level, is_public)
