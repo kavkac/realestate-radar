@@ -828,6 +828,54 @@ export async function lookupByAddress(address: string): Promise<{
   ]);
 
   if (!stavba) return null;
+
+  // Preverimo v lokalnem ev_stavba: je GURS vrnil pomožno stavbo?
+  // Pomožna = 0 stanovanj IN majhna površina v NAŠI bazi (zanesljiva).
+  // Če da, zamenjamo z najbližjo stanovanjsko stavbo iz ev_stavba.
+  try {
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
+    const localStavba = await prisma.$queryRaw<Array<{
+      eid_stavba: string; ko_sifko: string; stev_st: string;
+      st_stanovanj: string; pov_stavbe: string; e: string; n: string;
+    }>>`SELECT eid_stavba, ko_sifko, stev_st, st_stanovanj, pov_stavbe, e, n
+        FROM ev_stavba WHERE eid_stavba = ${stavba.eidStavba} LIMIT 1`;
+    await prisma.$disconnect();
+
+    const ls = localStavba[0];
+    const isAuxiliary = ls &&
+      (parseInt(ls.st_stanovanj) || 0) === 0 &&
+      (parseFloat(ls.pov_stavbe) || 0) < 80 &&
+      ls.e && ls.n;
+
+    if (isAuxiliary) {
+      const prisma2 = new PrismaClient();
+      const eF = parseFloat(ls.e!), nF = parseFloat(ls.n!);
+      const residential = await prisma2.$queryRaw<Array<{
+        eid_stavba: string; ko_sifko: string; stev_st: string;
+      }>>`SELECT eid_stavba, ko_sifko, stev_st
+          FROM ev_stavba
+          WHERE ko_sifko = ${ls.ko_sifko}
+            AND eid_stavba != ${stavba.eidStavba}
+            AND (st_stanovanj::int > 0 OR pov_stavbe::float > 80)
+            AND e IS NOT NULL AND n IS NOT NULL
+          ORDER BY sqrt(power(e::float - ${eF}, 2) + power(n::float - ${nF}, 2))
+          LIMIT 1`;
+      await prisma2.$disconnect();
+
+      if (residential[0]) {
+        const betterEid = residential[0].eid_stavba;
+        const [betterStavba, betterParts] = await Promise.all([
+          getBuilding(betterEid),
+          getBuildingParts(betterEid),
+        ]);
+        if (betterStavba) {
+          return { stavba: betterStavba, deliStavbe: betterParts, lat: hsResult.lat, lng: hsResult.lng };
+        }
+      }
+    }
+  } catch { /* ev_stavba lookup failed — use original GURS result */ }
+
   return { stavba, deliStavbe, lat: hsResult.lat, lng: hsResult.lng };
 }
 
