@@ -183,6 +183,14 @@ interface SaleToListRatio {
   nMatched: number;
 }
 
+interface AirbnbStats {
+  avgPriceNight: number;
+  medianPriceNight: number;
+  avgOccupancyPct: number;
+  nListings: number;
+  radiusM: number;
+}
+
 interface PropertyCardProps {
   naslov: string;
   enolicniId: { koId: number; stStavbe: number; stDelaStavbe: number | null };
@@ -230,6 +238,7 @@ interface PropertyCardProps {
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   propertyContext?: PropertyContextData | null;
   placesData?: PlacesDataCard | null;
+  airbnbStats?: AirbnbStats | null;
 }
 
 export interface PropertyContextData {
@@ -333,6 +342,7 @@ export function PropertyCard({
   tipProdaje,
   propertyContext,
   placesData,
+  airbnbStats,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [showAllUnits, setShowAllUnits] = useState(false);
@@ -785,6 +795,7 @@ export function PropertyCard({
                 stavbaTip={stavba.tip}
                 poplavnaNevarnost={poplavnaNevarnost}
                 azbestRisk={azbestRisk}
+                airbnbStats={airbnbStats}
               />
             </div>
           )}
@@ -2288,6 +2299,7 @@ function PropertyContextSection({
   stavbaLetoIzgradnje,
   poplavnaNevarnost,
   azbestRisk,
+  airbnbStats,
 }: {
   ctx: PropertyContextData;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
@@ -2296,6 +2308,7 @@ function PropertyContextSection({
   stavbaTip?: string | null;
   poplavnaNevarnost?: PoplavnaNevarnost | null;
   azbestRisk?: { hasRisk: boolean; level: string | null; note: string } | null;
+  airbnbStats?: AirbnbStats | null;
 }) {
   // Lokacija
   const lokacijaKat = ctx.lokacija.kategorija;
@@ -2328,13 +2341,25 @@ function PropertyContextSection({
   const tveganjaValue = tveganjaValues.length > 0 ? tveganjaValues.join(' · ') : 'Ni posebnih tveganj';
   const tveganjaAlert = hasFloodRisk || hasSeismicRisk || hasAzbest;
 
+  // Airbnb kratkoročni najem
+  const airbnbValue = airbnbStats && airbnbStats.nListings >= 3
+    ? `Povp. ${airbnbStats.avgPriceNight} €/noč · ~${airbnbStats.avgOccupancyPct}% zasedenost · ${airbnbStats.nListings} oglasov`
+    : null;
+
+  // TODO: Bremena/hipoteke - podatki iz Zemljiške knjige niso dostopni preko GURS WFS.
+  // Zemljiška knjiga je ločen register, ki ga vodijo sodišča. Za dostop bi potrebovali
+  // integracijo z e-ZK (https://evlozisce.sodisce.si/) ali scraping javnih izpiskov.
+  const bremenaValue = "Podatki se nalagajo";
+
   return (
     <div>
       <Label>Kontekst nepremičnine</Label>
       <ContextRow label="Lokacija" value={lokacijaValue} />
       <ContextRow label="Stavba" value={stavbaValue} alert={stavbaAlert} />
       <ContextRow label="Trg" value={trgValue} />
+      {airbnbValue && <ContextRow label="Kratkoročni najem" value={airbnbValue} />}
       <ContextRow label="Tveganja" value={tveganjaValue} alert={tveganjaAlert} />
+      <ContextRow label="Bremena (ZK)" value={bremenaValue} />
     </div>
   );
 }

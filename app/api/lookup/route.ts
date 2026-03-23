@@ -10,6 +10,7 @@ import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
 import { getPlacesData } from "@/lib/places-api";
 import { getLppLineCount } from "@/lib/lpp-lines";
+import { getAirbnbStats } from "@/lib/airbnb";
 import { prisma } from "@/lib/prisma";
 
 const LookupSchema = z.object({
@@ -247,8 +248,14 @@ export async function POST(request: NextRequest) {
         ? getLppLineCount(lat, lng).catch(() => null)
         : Promise.resolve(null);
 
+    // Airbnb short-term rental stats (non-blocking)
+    const airbnbStatsPromise =
+      lat != null && lng != null
+        ? getAirbnbStats(lat, lng, 500).catch(() => null)
+        : Promise.resolve(null);
+
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, KN namembnost, and rental yield in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, koRentalYield, saleToListRatio, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -265,6 +272,7 @@ export async function POST(request: NextRequest) {
       lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
       osmDataPromise,
       lppLinesPromise,
+      airbnbStatsPromise,
       getKoRentalYield(stavba.koId).catch(() => null),
       getSaleToListRatio(stavba.koId).catch(() => null),
       Promise.all(
@@ -513,6 +521,7 @@ export async function POST(request: NextRequest) {
       oglasneAnalize: oglasneAnalize ?? null,
       koRentalYield: koRentalYield ?? null,
       saleToListRatio: saleToListRatio ?? null,
+      airbnbStats: airbnbStats ?? null,
       propertyContext,
       trustedCorrections,
       correctionMap,
