@@ -367,6 +367,16 @@ export async function getHouseNumberId(
   return { hsMid, lat, lng };
 }
 
+/** Vrne vse EID_STAVBA vrednosti za hišno številko (lahko jih je več). */
+export async function getAllBuildingEids(hsMid: number): Promise<string[]> {
+  const urlV = buildWfsUrl(BASE_KN, "SI.GURS.KN:HISNE_STEVILKE_H", `ST_HS=${hsMid} AND STATUS_VELJAVNOSTI='V'`);
+  const dataV = await fetchWfs(urlV);
+  const features = (dataV?.features?.length ? dataV : await fetchWfs(
+    buildWfsUrl(BASE_KN, "SI.GURS.KN:HISNE_STEVILKE_H", `ST_HS=${hsMid}`)
+  ))?.features ?? [];
+  return features.map((f: any) => String(f.properties.EID_STAVBA)).filter(Boolean);
+}
+
 export async function getBuildingEid(hsMid: number): Promise<string | null> {
   // Najprej veljavna tablica (STATUS_VELJAVNOSTI='V'), nato brez filtra kot fallback
   const urlV = buildWfsUrl(BASE_KN, "SI.GURS.KN:HISNE_STEVILKE_H", `ST_HS=${hsMid} AND STATUS_VELJAVNOSTI='V'`);
@@ -818,6 +828,24 @@ export async function lookupByAddress(address: string): Promise<{
   ]);
 
   if (!stavba) return null;
+
+  // Ko GURS vrne pomožno zgradbo (garaža, drvarnica: 0 stanovanj, mala površina),
+  // poskusimo z vsemi stavbami na isti hišni številki in izberemo stanovanjsko.
+  const isAuxiliary = (stavba.steviloStanovanj ?? 0) === 0 &&
+    (stavba.brutoTlorisnaPovrsina ?? 0) < 80;
+
+  if (isAuxiliary) {
+    const allEids = await getAllBuildingEids(hsResult.hsMid);
+    for (const eid of allEids) {
+      if (eid === eidStavba) continue;
+      const candidate = await getBuilding(eid);
+      if (candidate && (candidate.steviloStanovanj ?? 0) >= 1) {
+        const candidateParts = await getBuildingParts(eid);
+        return { stavba: candidate, deliStavbe: candidateParts, lat: hsResult.lat, lng: hsResult.lng };
+      }
+    }
+  }
+
   return { stavba, deliStavbe, lat: hsResult.lat, lng: hsResult.lng };
 }
 
