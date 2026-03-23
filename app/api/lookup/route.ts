@@ -3,7 +3,7 @@ import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE, GursServiceUnavailableError } from "@/lib/gurs-api";
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { getAzbestRisk } from "@/lib/azbest";
-import { lookupEnergyCertificate, lookupEizNearby } from "@/lib/eiz-lookup";
+import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { estimateEiz } from "@/lib/eiz-estimator";
 import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio } from "@/lib/etn-lookup";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
@@ -262,16 +262,7 @@ export async function POST(request: NextRequest) {
         stStavbe: stavba.stStavbe,
         stDelaStavbe,
       }).catch(() => ({ cert: null, source: null as "stanovanje" | "stavba" | null }))
-        .then(async (r) => {
-          if (r.cert) return r;
-          // Fallback: GURS address lookup včasih vrne pomožno zgradbo (garaža, drvarnica)
-          // namesto glavne hiše. Preverimo bližnje stavbe v isti KO (±50 stStavbe).
-          try {
-            const nearbyResult = await lookupEizNearby(stavba.koId, stavba.stStavbe);
-            if (nearbyResult) return { cert: nearbyResult, source: "stavba" as const };
-          } catch { /* ignore */ }
-          return r;
-        }),
+  ,
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
       getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba, lat, lng, null, stavba.stStavbe)
