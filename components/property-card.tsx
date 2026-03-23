@@ -231,6 +231,7 @@ interface PropertyCardProps {
   naslov: string;
   enolicniId: { koId: number; stStavbe: number; stDelaStavbe: number | null };
   stavba: {
+    eidStavba?: string | null;
     letoIzgradnje: number | null;
     letoObnove: { fasade: number | null; strehe: number | null };
     steviloEtaz: number | null;
@@ -684,10 +685,10 @@ export function PropertyCard({
           </div>
 
           {/* 4a. EIZ Podloge za energetičarje — samo za prijavljene */}
-          {isSignedIn && stavba?.eid_stavba && lat != null && lng != null && (
+          {isSignedIn && stavba?.eidStavba && lat != null && lng != null && (
             <div className="px-3 sm:px-5 py-3 border-b border-gray-100 bg-gray-50">
               <a
-                href={`/eiz-podloge?eid=${stavba.eid_stavba}&lat=${lat}&lng=${lng}${currentPart?.stDela ? `&del=${currentPart.stDela}` : ""}`}
+                href={`/eiz-podloge?eid=${stavba.eidStavba}&lat=${lat}&lng=${lng}${currentPart?.stDela ? `&del=${currentPart.stDela}` : ""}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium"

@@ -488,6 +488,7 @@ export async function POST(request: NextRequest) {
         stDelaStavbe: stDelaStavbe ?? null,
       },
       stavba: {
+        eidStavba: stavba.eidStavba,
         letoIzgradnje: stavba.letoIzgradnje,
         letoObnove: {
           fasade: stavba.letoObnoveFasade,
