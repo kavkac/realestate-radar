@@ -18,8 +18,9 @@ import { getWindowData } from "./window-cache";
 
 // ─── Data source labels ───────────────────────────────────────────────────────
 export type DataSource =
-  | "GURS_REN"          // Official GURS cadastre data
-  | "GURS_EVS"          // GURS building parts register
+  | "GURS_REN"          // GURS Register nepremičnin (ev_stavba)
+  | "GURS_EVS"          // GURS Evidenca stavb (ev_del_stavbe)
+  | "GURS_KN"           // GURS Kataster nepremičnin / eProstor (WFS STAVBE_H)
   | "TABULA_SLO"        // EU TABULA/EPISCOPE SLO archetypes
   | "OPEN_METEO_ERA5"   // Open-Meteo ERA5 reanalysis (10y avg)
   | "ARSO_JRC"          // ARSO/JRC solar irradiation atlas
@@ -34,6 +35,7 @@ export type Confidence = "high" | "medium" | "low" | "missing";
 export interface PrefillField<T = number | string | null> {
   value: T;
   source: DataSource;
+  sources?: DataSource[]; // ko vrednost izhaja iz več virov hkrati
   confidence: Confidence;
   note?: string;                // shown to auditor as context
   verifyOnSite?: boolean;       // true = auditor should verify/measure
@@ -364,13 +366,17 @@ export async function generateEizPrefill(params: {
         if (wfs && wfs !== materialName) {
           return {
             value: `${wfs} (KN) · ${materialName} (REN)`,
-            source: "GURS_REN" as const, confidence: "medium" as const,
+            source: "GURS_REN" as const,
+            sources: ["GURS_KN", "GURS_REN"] as DataSource[],
+            confidence: "medium" as const,
             note: `Vira se razlikujeta: GURS KN/eProstor="${wfs}" vs GURS REN id_konstrukcija=${materialCode}="${materialName}". Preverite na terenu.`,
           };
         }
         return {
           value: wfs ?? materialName,
-          source: "GURS_REN" as const, confidence: "high" as const,
+          source: "GURS_REN" as const,
+          sources: wfs ? ["GURS_KN"] as DataSource[] : undefined,
+          confidence: "high" as const,
           note: wfs ? `GURS KN (eProstor): ${wfs}` : `id_konstrukcija=${materialCode}`,
         };
       })(),

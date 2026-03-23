@@ -18,11 +18,12 @@ import type { EizPrefillReport, PrefillField, DataSource, Confidence } from "@/l
 
 // ─── Source labels ────────────────────────────────────────────────────────────
 // Uradni registri — podatki so neposredno iz javnih registrov, brez izpeljave
-const OFFICIAL_SOURCES = new Set<DataSource>(["GURS_REN", "GURS_EVS"]);
+const OFFICIAL_SOURCES = new Set<DataSource>(["GURS_REN", "GURS_EVS", "GURS_KN"]);
 
 const SOURCE_LABEL: Record<DataSource, string> = {
   GURS_REN:          "GURS · Register nepremičnin",
   GURS_EVS:          "GURS · Evidenca stavb",
+  GURS_KN:           "GURS · KN / eProstor",
   TABULA_SLO:        "TABULA SLO",
   OPEN_METEO_ERA5:   "Open-Meteo ERA5",
   ARSO_JRC:          "ARSO / JRC",
@@ -36,6 +37,7 @@ const SOURCE_LABEL: Record<DataSource, string> = {
 const SOURCE_COLOR: Record<DataSource, string> = {
   GURS_REN:          "bg-blue-50 text-blue-800 border-blue-400",
   GURS_EVS:          "bg-blue-50 text-blue-800 border-blue-400",
+  GURS_KN:           "bg-blue-50 text-blue-800 border-blue-400",
   TABULA_SLO:        "bg-indigo-50 text-indigo-700 border-indigo-200",
   OPEN_METEO_ERA5:   "bg-teal-50 text-teal-700 border-teal-200",
   ARSO_JRC:          "bg-teal-50 text-teal-700 border-teal-200",
@@ -124,16 +126,20 @@ function FieldRow({
         )}
       </div>
 
-      {/* Source badge */}
+      {/* Source badge(s) */}
       <div className="flex flex-col items-end gap-0.5">
-        {OFFICIAL_SOURCES.has(field.source) && (
+        {(field.sources ?? [field.source]).some(s => OFFICIAL_SOURCES.has(s)) && (
           <span className="text-[8px] text-blue-600 font-semibold uppercase tracking-wide flex items-center gap-0.5">
             🏛 Uradni register
           </span>
         )}
-        <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${SOURCE_COLOR[field.source]}`}>
-          {SOURCE_LABEL[field.source]}
-        </span>
+        <div className="flex flex-col items-end gap-0.5">
+          {(field.sources ?? [field.source]).map((src, i) => (
+            <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${SOURCE_COLOR[src]}`}>
+              {SOURCE_LABEL[src]}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
