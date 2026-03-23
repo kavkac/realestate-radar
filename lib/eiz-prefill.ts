@@ -159,38 +159,52 @@ const DESIGN_TEMP: Record<string, number> = {
 };
 
 // ─── Main prefill generator ───────────────────────────────────────────────────
-/** Izračuna točen obseg poligona (Haversine po D96/TM metrskih koordinatah) */
+// Slovenija: φ≈46°, 1°lat≈111,195m, 1°lng≈77,160m
+const LAT_M = 111195;
+const LNG_M = 77160;
+
+/** Normalizira koordinate v metre. Če so v stopinjah (|x|<90), konvertira. */
+function toMeters(coords: number[][]): [number, number][] {
+  const isGeo = Math.abs(coords[0][0]) < 90; // lng/lat v stopinjah
+  if (!isGeo) return coords as [number, number][];
+  return coords.map(([lng, lat]) => [lng * LNG_M, lat * LAT_M]);
+}
+
+/** Izračuna točen obseg poligona v metrih */
 function calcObseg(coords: number[][]): number {
+  const m = toMeters(coords);
   let obseg = 0;
-  for (let i = 0; i < coords.length - 1; i++) {
-    const dx = coords[i + 1][0] - coords[i][0];
-    const dy = coords[i + 1][1] - coords[i][1];
+  for (let i = 0; i < m.length - 1; i++) {
+    const dx = m[i + 1][0] - m[i][0];
+    const dy = m[i + 1][1] - m[i][1];
     obseg += Math.sqrt(dx * dx + dy * dy);
   }
   return obseg;
 }
 
-/** Izračuna površino poligona (Shoelace) */
+/** Izračuna površino poligona v m² (Shoelace) */
 function calcPovrsina(coords: number[][]): number {
+  const m = toMeters(coords);
   let area = 0;
-  for (let i = 0; i < coords.length - 1; i++) {
-    area += coords[i][0] * coords[i + 1][1];
-    area -= coords[i + 1][0] * coords[i][1];
+  for (let i = 0; i < m.length - 1; i++) {
+    area += m[i][0] * m[i + 1][1];
+    area -= m[i + 1][0] * m[i][1];
   }
   return Math.abs(area) / 2;
 }
 
 /** Orientacija glavne fasade iz poligona (najdaljša stranica) */
 function calcOrientacija(coords: number[][]): string | null {
+  const m = toMeters(coords);
   let maxD = 0, kot = 0;
-  for (let i = 0; i < coords.length - 1; i++) {
-    const dx = coords[i + 1][0] - coords[i][0];
-    const dy = coords[i + 1][1] - coords[i][1];
+  for (let i = 0; i < m.length - 1; i++) {
+    const dx = m[i + 1][0] - m[i][0];
+    const dy = m[i + 1][1] - m[i][1];
     const d = Math.sqrt(dx * dx + dy * dy);
     if (d > maxD) { maxD = d; kot = Math.atan2(dy, dx) * 180 / Math.PI; }
   }
   if (maxD === 0) return null;
-  // Kot v D96/TM: x=E, y=N, 0°=V; pretvorimo v azimut od severa
+  // x=E, y=N, azimut od severa
   const azimut = ((90 - kot) + 360) % 360;
   const dirs = ["S","SV","V","JV","J","JZ","Z","SZ","S"];
   return dirs[Math.round(azimut / 45) % 8];
