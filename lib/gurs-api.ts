@@ -828,24 +828,6 @@ export async function lookupByAddress(address: string): Promise<{
   ]);
 
   if (!stavba) return null;
-
-  // Ko GURS vrne pomožno zgradbo (garaža, drvarnica: 0 stanovanj, mala površina),
-  // poskusimo z vsemi stavbami na isti hišni številki in izberemo stanovanjsko.
-  const isAuxiliary = (stavba.steviloStanovanj ?? 0) === 0 &&
-    (stavba.brutoTlorisnaPovrsina ?? 0) < 80;
-
-  if (isAuxiliary) {
-    const allEids = await getAllBuildingEids(hsResult.hsMid);
-    for (const eid of allEids) {
-      if (eid === eidStavba) continue;
-      const candidate = await getBuilding(eid);
-      if (candidate && (candidate.steviloStanovanj ?? 0) >= 1) {
-        const candidateParts = await getBuildingParts(eid);
-        return { stavba: candidate, deliStavbe: candidateParts, lat: hsResult.lat, lng: hsResult.lng };
-      }
-    }
-  }
-
   return { stavba, deliStavbe, lat: hsResult.lat, lng: hsResult.lng };
 }
 
