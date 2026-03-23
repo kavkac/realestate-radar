@@ -18,6 +18,7 @@
 import { prisma } from "./prisma";
 import { getThermalEnvelope, getMaterialGroup, type GursKonstrukcijaId } from "./tabula-lookup";
 import { getWindowData } from "./window-cache";
+import { calibrateQnh, applyPuresConstraint, isLikelyDistrictHeating, getPanelBuildingUValues } from "./eiz-calibration";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -324,6 +325,24 @@ export async function estimateEiz(params: {
     const envelopeSource: EnvelopeSource =
       (yearFacadeRenovated || yearRoofRenovated) ? "gurs_renovation" : "tabula";
 
+    // Apply PURES upper bound constraint
+    const puresConstrained = applyPuresConstraint(envelope, yearBuilt);
+    envelope.uWall = puresConstrained.uWall;
+    envelope.uRoof = puresConstrained.uRoof;
+    envelope.uFloor = puresConstrained.uFloor;
+    envelope.uWindow = puresConstrained.uWindow;
+
+    // Panel building catalog override (more precise than generic TABULA)
+    if (konstrukcijaId === 7) {
+      const panelSpec = getPanelBuildingUValues(yearBuilt);
+      if (panelSpec && !yearFacadeRenovated) {
+        envelope.uWall = panelSpec.uWall;
+        envelope.uRoof = panelSpec.uRoof;
+        // Don't override uWindow if we have GURS renovation data
+        if (!yearWindowsRenovated) envelope.uWindow = panelSpec.uWindow;
+      }
+    }
+
     // ── 5. Window data ────────────────────────────────────────────────────────
     const windowData = await getWindowData({
       propertyId: eidDelStavbe || eidStavba,
@@ -338,8 +357,8 @@ export async function estimateEiz(params: {
     const windowEastWestM2 = totalWindowAreaM2 * 0.40;
 
     // ── 6. Heating system ─────────────────────────────────────────────────────
-    // TODO: district heating zone join (Phase 2)
-    const inDistrictHeatingZone = false;
+    // District heating zone (static municipality lookup, Phase 2: polygon join)
+    const inDistrictHeatingZone = isLikelyDistrictHeating(municipality);
     const heatingSystemKey = (userOverrides?.heatingSystem as keyof typeof HEATING_SYSTEMS) ||
       estimateHeatingSystem({ hasGas, inDistrictHeatingZone, yearBuilt });
     const heatingSystem = HEATING_SYSTEMS[heatingSystemKey] ?? HEATING_SYSTEMS.default;
@@ -373,8 +392,18 @@ export async function estimateEiz(params: {
       shadingFactorEastWest: 0.85,
     });
 
-    // ── 9. Primary energy + CO₂ ──────────────────────────────────────────────
-    const primaryEnergyKwhM2 = Math.round(heatingNeedKwhM2 / heatingSystem.efficiency);
+    // ── 9. Calibrate QNH against empirical SLO data ──────────────────────────
+    const hasRenovationData = !!(yearFacadeRenovated || yearRoofRenovated || yearWindowsRenovated);
+    const { calibratedQnh } = calibrateQnh({
+      calculatedQnh: heatingNeedKwhM2,
+      yearBuilt,
+      konstrukcijaId,
+      hasRenovationData,
+    });
+    const finalQnh = calibratedQnh;
+
+    // ── 10. Primary energy + CO₂ ─────────────────────────────────────────────
+    const primaryEnergyKwhM2 = Math.round(finalQnh / heatingSystem.efficiency);
     const co2KgM2 = Math.round(primaryEnergyKwhM2 * heatingSystem.co2Factor);
 
     // ── 10. Overall confidence ────────────────────────────────────────────────
@@ -386,8 +415,8 @@ export async function estimateEiz(params: {
           : "low";
 
     return {
-      energyClass: classifyEnergyClass(heatingNeedKwhM2),
-      heatingNeedKwhM2,
+      energyClass: classifyEnergyClass(finalQnh),
+      heatingNeedKwhM2: finalQnh,
       primaryEnergyKwhM2,
       co2KgM2,
       confidence,
