@@ -21,9 +21,10 @@ function EizPodlogeContent() {
   const lat = params.get("lat");
   const lng = params.get("lng");
   const del = params.get("del");
+  const naslov = params.get("naslov");
 
   const [report, setReport] = useState<EizPrefillReport | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // true = nalagam takoj
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +32,7 @@ function EizPodlogeContent() {
     setLoading(true);
     setError(null);
 
-    const url = `/api/eiz-prefill?eid=${eid}&lat=${lat}&lng=${lng}${del ? `&del=${del}` : ""}`;
+    const url = `/api/eiz-prefill?eid=${eid}&lat=${lat}&lng=${lng}${del ? `&del=${del}` : ""}${naslov ? `&naslov=${encodeURIComponent(naslov)}` : ""}`;
     fetch(url)
       .then(r => r.json())
       .then(data => {

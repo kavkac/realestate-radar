@@ -159,18 +159,20 @@ const DESIGN_TEMP: Record<string, number> = {
 export async function generateEizPrefill(params: {
   eidStavba: string;
   eidDelStavbe?: string;
+  naslov?: string;
   lat: number;
   lng: number;
   userOverrides?: Record<string, unknown>;
 }): Promise<EizPrefillReport> {
   const { eidStavba, lat, lng } = params;
 
-  // ── Load GURS data ────────────────────────────────────────────────────────
+  // ── Load GURS data (ev_stavba — dejanska kolumna imena) ──────────────────
   const stavbaRow = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT eid_stavba, id_katastrske_obcine, st_stavbe,
-            leto_izgradnje, id_konstrukcija, stevilka_etaz, stevilo_stanovanj,
-            leto_obnove_fasade, leto_obnove_strehe, bruto_tlorisna_povrsina,
-            visina_h3, visina_h2, plin, elektrika, vodovod
+    `SELECT eid_stavba, ko_sifko, stev_st,
+            leto_izg_sta, id_konstrukcija, st_etaz, st_stanovanj,
+            leto_obn_fasade, leto_obn_strehe, pov_stavbe,
+            ima_plin_dn, ima_elektriko_dn, ima_vodovod_dn, ima_kanalizacijo_dn,
+            id_tip_stavbe
      FROM ev_stavba WHERE eid_stavba = $1 LIMIT 1`,
     eidStavba
   ).catch(() => []);
@@ -178,50 +180,46 @@ export async function generateEizPrefill(params: {
 
   const delStavbeRow = params.eidDelStavbe
     ? await prisma.$queryRawUnsafe<any[]>(
-        `SELECT eid_del_stavbe, uporabna_povrsina, povrsina, leto_obnove_oken, visina_etaze
+        `SELECT eid_del_stavbe, upor_pov, povrsina, leto_obn_oken, visina_etaze
          FROM ev_del_stavbe WHERE eid_del_stavbe = $1 LIMIT 1`,
         params.eidDelStavbe
       ).catch(() => [])
     : await prisma.$queryRawUnsafe<any[]>(
-        `SELECT eid_del_stavbe, uporabna_povrsina, povrsina, leto_obnove_oken, visina_etaze
-         FROM ev_del_stavbe WHERE eid_stavba = $1 ORDER BY povrsina DESC NULLS LAST LIMIT 1`,
+        `SELECT eid_del_stavbe, upor_pov, povrsina, leto_obn_oken, visina_etaze
+         FROM ev_del_stavbe WHERE eid_stavba = $1 ORDER BY upor_pov::float DESC NULLS LAST LIMIT 1`,
         eidStavba
       ).catch(() => []);
   const d = delStavbeRow[0] ?? {};
 
+  // Address: try buildings table (has normalized naslov), fallback to passed-in naslov param
   const addressRow = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT naziv_ulice, hisna_stevilka, naziv_naselja
-     FROM rpe_naslovi WHERE eid_stavba = $1 LIMIT 1`,
-    eidStavba
+    `SELECT naslov FROM buildings WHERE "eidStavba" = $1 LIMIT 1`,
+    parseInt(eidStavba)
   ).catch(() => []);
-  const addr = addressRow[0];
-  const address = addr
-    ? `${addr.naziv_ulice ?? ""} ${addr.hisna_stevilka ?? ""}, ${addr.naziv_naselja ?? ""}`.trim()
-    : `EID ${eidStavba}`;
+  const address = addressRow[0]?.naslov ?? params.naslov ?? `EID ${eidStavba}`;
 
   // ── Derived values ────────────────────────────────────────────────────────
-  const yearBuilt: number | null = g.leto_izgradnje ?? null;
-  const materialCode: number = g.id_konstrukcija ?? 1;
+  const yearBuilt: number | null = parseInt(g.leto_izg_sta) || null;
+  const materialCode: number = parseInt(g.id_konstrukcija) || 1;
   const MATERIAL_NAMES: Record<number, string> = {
     1: "opeka", 2: "beton", 3: "kamen", 4: "les", 5: "kombinacija", 7: "montažna plošča"
   };
   const materialName = MATERIAL_NAMES[materialCode] ?? "neznano";
 
-  const floors: number | null = g.stevilka_etaz ?? null;
-  const area: number | null = d.uporabna_povrsina ?? d.povrsina ?? g.bruto_tlorisna_povrsina ?? null;
-  const floorHeight: number = d.visina_etaze ?? 2.6;
-  const renovFasade: number | null = g.leto_obnove_fasade ?? null;
-  const renovStreha: number | null = g.leto_obnove_strehe ?? null;
-  const renovOkna: number | null = d.leto_obnove_oken ?? null;
-  const hasGas: boolean = g.plin === true || g.plin === 1;
+  const floors: number | null = parseInt(g.st_etaz) || null;
+  const area: number | null = parseFloat(d.upor_pov) || parseFloat(d.povrsina) || parseFloat(g.pov_stavbe) || null;
+  const floorHeight: number = parseFloat(d.visina_etaze) || 2.6;
+  const renovFasade: number | null = parseInt(g.leto_obn_fasade) || null;
+  const renovStreha: number | null = parseInt(g.leto_obn_strehe) || null;
+  const renovOkna: number | null = parseInt(d.leto_obn_oken) || null;
+  const hasGas: boolean = g.ima_plin_dn === "1";
 
-  const buildingH: number | null = (g.visina_h3 != null && g.visina_h2 != null)
-    ? Math.abs(g.visina_h3 - g.visina_h2) : null;
+  const buildingH: number | null = (null /* LiDAR pending */;
 
   const heatedVol = area && floors ? area * floorHeight * floors : null;
 
   // S/V ratio estimate from footprint
-  const footprint = g.bruto_tlorisna_povrsina ?? null;
+  const footprint = parseFloat(g.pov_stavbe) || null;
   let svRatio: number | null = null;
   if (footprint && buildingH) {
     const perimeter = Math.sqrt(footprint) * 4;
@@ -314,10 +312,10 @@ export async function generateEizPrefill(params: {
       yearBuilt:    { value: yearBuilt, source: "GURS_REN", confidence: "high" },
       material:     { value: materialName, source: "GURS_REN", confidence: "high",
                       note: `id_konstrukcija=${materialCode}` },
-      buildingType: { value: (g.stevilo_stanovanj ?? 0) > 3 ? "Večstanovanjska" : "Stanovanjska",
+      buildingType: { value: (parseInt(g.st_stanovanj) || 0) > 3 ? "Večstanovanjska" : "Stanovanjska",
                       source: "GURS_REN", confidence: "high" },
       floors:       { value: floors, source: "GURS_REN", confidence: "high" },
-      dwellings:    { value: g.stevilo_stanovanj ?? null, source: "GURS_REN", confidence: "high" },
+      dwellings:    { value: parseInt(g.st_stanovanj) || null, source: "GURS_REN", confidence: "high" },
     },
 
     geometry: {
