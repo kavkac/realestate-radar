@@ -1,7 +1,11 @@
 /**
- * Window detection via Gemini Vision
+ * Window detection via Vision API
  * Estimates window-to-wall ratio from facade images.
- * Uses Gemini 1.5 Flash (free tier: 15 req/min, 1M tokens/day)
+ *
+ * Provider priority (first available key wins):
+ *   1. OPENAI_API_KEY  → GPT-4o mini (cheapest, ~$0.00015/image)
+ *   2. ANTHROPIC_API_KEY → Claude 3.5 Haiku
+ *   3. GEMINI_API_KEY  → Gemini 1.5 Flash (free tier fallback)
  *
  * Returns:
  *   windowRatio: 0.0-1.0 (fraction of facade that is windows)
@@ -46,81 +50,123 @@ confidence=low: image unclear, building not main subject, or facade not visible`
 /**
  * Analyze a single facade image for window ratio.
  * imageUrl: publicly accessible URL (Mapillary thumb URL)
+ *
+ * Provider cascade: OpenAI → Claude → Gemini
  */
 async function analyzeImage(
   imageUrl: string,
 ): Promise<{ ratio: number; confidence: string } | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.warn("[window-detection] GEMINI_API_KEY not set");
-    return null;
-  }
-
-  const body = {
-    contents: [
-      {
-        parts: [
-          { text: GEMINI_PROMPT },
-          { inline_data: undefined as unknown },
-          {
-            image_url: undefined as unknown,
-          },
-        ],
-      },
-    ],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 200 },
-  };
-
-  // Use image URL directly (Gemini supports public URLs via parts)
-  const payload = {
-    contents: [
-      {
-        parts: [
-          { text: GEMINI_PROMPT },
-          {
-            fileData: {
-              mimeType: "image/jpeg",
-              fileUri: imageUrl,
-            },
-          },
-        ],
-      },
-    ],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 200 },
-  };
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
+  // 1. OpenAI GPT-4o mini (preferred — cheapest vision model)
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          max_tokens: 200,
+          temperature: 0.1,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: GEMINI_PROMPT },
+              { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
+            ],
+          }],
+        }),
         signal: AbortSignal.timeout(15_000),
-      },
-    );
-
-    if (!res.ok) {
-      console.error("[window-detection] Gemini error", res.status, await res.text());
-      return null;
-    }
-
-    const json = await res.json();
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-    // Parse JSON from response
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-
-    const parsed = JSON.parse(match[0]);
-    const ratio = parseFloat(parsed.window_ratio);
-    if (isNaN(ratio) || ratio < 0 || ratio > 1) return null;
-
-    return { ratio, confidence: parsed.confidence ?? "medium" };
-  } catch (e) {
-    console.error("[window-detection] error", e);
-    return null;
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const text = json.choices?.[0]?.message?.content ?? "";
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          const ratio = parseFloat(parsed.window_ratio);
+          if (!isNaN(ratio) && ratio >= 0 && ratio <= 1) {
+            return { ratio, confidence: parsed.confidence ?? "medium" };
+          }
+        }
+      }
+    } catch { /* fall through */ }
   }
+
+  // 2. Claude 3.5 Haiku
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5",
+          max_tokens: 200,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: GEMINI_PROMPT },
+              { type: "image", source: { type: "url", url: imageUrl } },
+            ],
+          }],
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const text = json.content?.[0]?.text ?? "";
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          const ratio = parseFloat(parsed.window_ratio);
+          if (!isNaN(ratio) && ratio >= 0 && ratio <= 1) {
+            return { ratio, confidence: parsed.confidence ?? "medium" };
+          }
+        }
+      }
+    } catch { /* fall through */ }
+  }
+
+  // 3. Gemini 1.5 Flash (fallback)
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { text: GEMINI_PROMPT },
+              { fileData: { mimeType: "image/jpeg", fileUri: imageUrl } },
+            ]}],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 200 },
+          }),
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          const ratio = parseFloat(parsed.window_ratio);
+          if (!isNaN(ratio) && ratio >= 0 && ratio <= 1) {
+            return { ratio, confidence: parsed.confidence ?? "medium" };
+          }
+        }
+      }
+    } catch { /* exhausted */ }
+  }
+
+  console.warn("[window-detection] No vision API key available or all failed");
+  return null;
 }
 
 /**
