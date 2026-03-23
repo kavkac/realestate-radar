@@ -17,22 +17,25 @@ import React, { useState, useCallback } from "react";
 import type { EizPrefillReport, PrefillField, DataSource, Confidence } from "@/lib/eiz-prefill";
 
 // ─── Source labels ────────────────────────────────────────────────────────────
+// Uradni registri — podatki so neposredno iz javnih registrov, brez izpeljave
+const OFFICIAL_SOURCES = new Set<DataSource>(["GURS_REN", "GURS_EVS"]);
+
 const SOURCE_LABEL: Record<DataSource, string> = {
-  GURS_REN:          "GURS REN",
-  GURS_EVS:          "GURS EVS",
+  GURS_REN:          "GURS · Register nepremičnin",
+  GURS_EVS:          "GURS · Evidenca stavb",
   TABULA_SLO:        "TABULA SLO",
   OPEN_METEO_ERA5:   "Open-Meteo ERA5",
-  ARSO_JRC:          "ARSO/JRC",
-  DH_SPATIAL:        "DH cona",
+  ARSO_JRC:          "ARSO / JRC",
+  DH_SPATIAL:        "DH omrežje (prostorski sloj)",
   MAPILLARY_ML:      "Mapillary ML",
-  STATISTICAL_PRIOR: "Statistično",
-  USER_INPUT:        "Lastnik",
-  AUDITOR_INPUT:     "Vnos auditorja",
+  STATISTICAL_PRIOR: "Statistični prior",
+  USER_INPUT:        "Vnesel lastnik",
+  AUDITOR_INPUT:     "Vnos energetičarja",
 };
 
 const SOURCE_COLOR: Record<DataSource, string> = {
-  GURS_REN:          "bg-blue-50 text-blue-700 border-blue-200",
-  GURS_EVS:          "bg-blue-50 text-blue-700 border-blue-200",
+  GURS_REN:          "bg-blue-50 text-blue-800 border-blue-400",
+  GURS_EVS:          "bg-blue-50 text-blue-800 border-blue-400",
   TABULA_SLO:        "bg-indigo-50 text-indigo-700 border-indigo-200",
   OPEN_METEO_ERA5:   "bg-teal-50 text-teal-700 border-teal-200",
   ARSO_JRC:          "bg-teal-50 text-teal-700 border-teal-200",
@@ -122,7 +125,12 @@ function FieldRow({
       </div>
 
       {/* Source badge */}
-      <div>
+      <div className="flex flex-col items-end gap-0.5">
+        {OFFICIAL_SOURCES.has(field.source) && (
+          <span className="text-[8px] text-blue-600 font-semibold uppercase tracking-wide flex items-center gap-0.5">
+            🏛 Uradni register
+          </span>
+        )}
         <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${SOURCE_COLOR[field.source]}`}>
           {SOURCE_LABEL[field.source]}
         </span>
