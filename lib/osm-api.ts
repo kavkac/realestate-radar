@@ -2,9 +2,12 @@ export interface OsmBuildingData {
   osmId?: number;
   levels?: number;
   heightM?: number;
-  roofShape?: string;
+  roofShape?: string;       // flat, gabled, hipped, pyramidal, skillion, dome, ...
+  roofHeightM?: number;     // višina slemena nad zadnjo etažo
+  roofAngle?: number;       // naklon strehe v stopinjah
   roofMaterial?: string;
-  wallMaterial?: string;
+  wallMaterial?: string;    // brick, concrete, wood, stone, plaster, ...
+  buildingType?: string;    // apartments, house, commercial, industrial, ...
   yearBuilt?: number;
   name?: string;
   // Javni promet v bližini (300m)
@@ -63,8 +66,19 @@ out tags;`;
         if (!isNaN(v)) result.heightM = v;
       }
       if (tags["roof:shape"]) result.roofShape = tags["roof:shape"];
+      if (tags["roof:height"]) {
+        const v = parseFloat(tags["roof:height"]);
+        if (!isNaN(v)) result.roofHeightM = v;
+      }
+      if (tags["roof:angle"]) {
+        const v = parseFloat(tags["roof:angle"]);
+        if (!isNaN(v)) result.roofAngle = v;
+      }
       if (tags["roof:material"]) result.roofMaterial = tags["roof:material"];
-      if (tags["wall"]) result.wallMaterial = tags["wall"];
+      // wall material: multiple possible tags
+      result.wallMaterial = tags["building:material"] || tags["wall"] || tags["building:facade:material"] || undefined;
+      // building type
+      if (tags["building"] && tags["building"] !== "yes") result.buildingType = tags["building"];
       if (tags["building:year"]) {
         const v = parseInt(tags["building:year"], 10);
         if (!isNaN(v)) result.yearBuilt = v;
