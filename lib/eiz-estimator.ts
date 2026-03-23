@@ -19,6 +19,7 @@ import { prisma } from "./prisma";
 import { getThermalEnvelope, getMaterialGroup, type GursKonstrukcijaId } from "./tabula-lookup";
 import { getWindowData } from "./window-cache";
 import { calibrateQnh, applyPuresConstraint, isLikelyDistrictHeating, getPanelBuildingUValues } from "./eiz-calibration";
+import { estimateVentilation, calculateHeatedVolume } from "./ventilation-model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -291,7 +292,7 @@ export async function estimateEiz(params: {
     const floors = parseInt(stavba.st_etaz) || 2;
     const grossAreaM2 = parseFloat(stavba.pov_stavbe) || 100;
     const conditionedAreaM2 = parseFloat(delStavbe?.upor_pov || "0") || grossAreaM2 * 0.85;
-    const floorHeightM = parseFloat(delStavbe?.visina_etaze || "0") || 2.85;
+    const vizinaEtaze = parseFloat(delStavbe?.visina_etaze || "0") || null;
     const hasGas = stavba.ima_plin_dn === "1";
 
     const yearFacadeRenovated = userOverrides?.yearFacadeRenovated ||
@@ -301,11 +302,17 @@ export async function estimateEiz(params: {
     const yearWindowsRenovated = userOverrides?.yearWindowsRenovated ||
       (parseInt(delStavbe?.leto_obn_oken || "") || null);
 
-    // ── 3. Geometry ───────────────────────────────────────────────────────────
-    const heightM = lidarHeightM ?? (floors * floorHeightM);
+    // ── 3. Geometry (visina_etaze iz GURS kjer je, sicer LiDAR/default) ──────
     const footprintM2 = grossAreaM2 / Math.max(floors, 1);
-    const perimeterM = 4 * Math.sqrt(footprintM2); // approx square
-    const volumeM3 = lidarVolumeM3 ?? (footprintM2 * heightM);
+    const perimeterM = 4 * Math.sqrt(footprintM2);
+    const volumeCalc = calculateHeatedVolume({
+      conditionedAreaM2,
+      floors,
+      vizinaEtaze,
+      lidarHeightM,
+    });
+    const volumeM3 = lidarVolumeM3 ?? volumeCalc.volumeM3;
+    const heightM = lidarHeightM ?? (volumeM3 / footprintM2);
     const wallAreaM2 = lidarWallAreaM2 ?? (perimeterM * heightM);
     const roofAreaM2 = lidarRoofAreaM2 ?? footprintM2;
     const svRatio = (wallAreaM2 + roofAreaM2 + footprintM2) / volumeM3;
@@ -369,6 +376,16 @@ export async function estimateEiz(params: {
     // ── 7. Climate ────────────────────────────────────────────────────────────
     const climate = getClimateData(municipality);
 
+    // ── 7b. Ventilation ───────────────────────────────────────────────────────
+    const ventilation = estimateVentilation({
+      yearBuilt,
+      konstrukcijaId,
+      yearWindowsRenovated,
+      floors,
+      conditionedAreaM2,
+      userVentilationSystem: userOverrides?.heatingSystem === "mvhr" ? "mvhr" : undefined,
+    });
+
     // ── 8. EN 13790 calculation ───────────────────────────────────────────────
     const heatingNeedKwhM2 = calculateHeatingNeed({
       conditionedAreaM2,
@@ -385,7 +402,7 @@ export async function estimateEiz(params: {
       uWindow: envelope.uWindow,
       gWindow: envelope.gWindow,
       thermalBridge: envelope.thermalBridge,
-      airChangeRate: 0.5,  // natural ventilation default
+      airChangeRate: ventilation.nEff,
       hdd: climate.hdd,
       shadingFactorSouth: lidarShadingFactorSouth ?? 0.85,
       shadingFactorNorth: 0.90,
