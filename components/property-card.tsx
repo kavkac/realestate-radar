@@ -2199,19 +2199,40 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
       mapillary_ml: "Mapillary ML", statistical: "statistično",
       district_heating: "DH cona", gas: "GURS (plin)",
     };
+    const heatingLabel: Record<string, string> = {
+      district_heating: "Daljinsko ogrevanje",
+      gas_boiler: "Plinski kotel",
+      heat_pump_air: "Toplotna črpalka (zrak)",
+      heat_pump_ground: "Toplotna črpalka (zemlja)",
+      oil_boiler: "Oljni kotel",
+      wood_boiler: "Kotel na lesno biomaso",
+      electric: "Električno ogrevanje",
+      unknown: "Neznano",
+    };
+    const climateLabel: Record<string, string> = {
+      primorska: "Primorska", osrednja: "Osrednja",
+      alpska: "Alpska", panonska: "Panonska",
+    };
     const viri = data.ocenaViriPodatkov;
     const vhodi = data.ocenaVhodi;
     return (
       <section>
-        <div className="mb-3 pb-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-700">Uradna energetska izkaznica ni na voljo</p>
-          <p className="text-xs text-gray-400 mt-0.5">Algoritmična ocena · EN ISO 13790 · TABULA SLO</p>
+        {/* Prominent disclaimer banner */}
+        <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2">
+          <span className="text-amber-500 text-sm flex-shrink-0 mt-0.5">⚠</span>
+          <div>
+            <p className="text-xs font-semibold text-amber-800">OCENA energetskega stanja — ni uradna EIZ</p>
+            <p className="text-[10px] text-amber-700 mt-0.5">Algoritmični izračun · EN ISO 13790 · TABULA SLO · Za uradno izkaznico se obrnite na certificiranega energetičarja.</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 mb-3">
+        {/* Energy meter + confidence badge below it */}
+        <div className="mb-3">
           <EnergyMeter razred={data.razred} />
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${zaupanjeBgMap[data.ocenaZaupanje ?? "low"]}`}>
-            {zaupanjeMap[data.ocenaZaupanje ?? "low"]}
-          </span>
+          <div className="mt-1.5">
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${zaupanjeBgMap[data.ocenaZaupanje ?? "low"]}`}>
+              {zaupanjeMap[data.ocenaZaupanje ?? "low"]}
+            </span>
+          </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm mb-4">
           <Field label="Ogrevalna potreba" value={data.potrebnaTopota != null ? `${data.potrebnaTopota} kWh/m²a` : null} />
@@ -2219,8 +2240,8 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
           <Field label="CO₂ emisije" value={data.co2 != null ? `${data.co2} kg/m²a` : null} />
           {vhodi && <>
             <Field label="Kondicionirana površina" value={`${vhodi.conditionedAreaM2} m²`} />
-            <Field label="Ogrevanje" value={vhodi.heatingSystem} />
-            <Field label="Klimatska cona" value={vhodi.climateZone} />
+            <Field label="Ogrevanje" value={heatingLabel[vhodi.heatingSystem] ?? vhodi.heatingSystem} />
+            <Field label="Klimatska cona" value={climateLabel[vhodi.climateZone] ?? vhodi.climateZone} />
           </>}
         </div>
         {viri && (
@@ -2233,7 +2254,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
           </div>
         )}
         {vhodi && (
-          <div className="text-xs text-gray-400 space-y-0.5 mb-3">
+          <div className="text-xs text-gray-400 space-y-0.5 mb-2">
             <p className="font-medium text-gray-500 mb-1">Vhodni parametri:</p>
             <p>U stena: <span className="text-gray-600">{vhodi.uWall} W/m²K</span>
             {" · "}U streha: <span className="text-gray-600">{vhodi.uRoof} W/m²K</span>
@@ -2242,9 +2263,6 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
             {" · "}HDD: <span className="text-gray-600">{vhodi.heatingDegreeDays}</span></p>
           </div>
         )}
-        <p className="text-[10px] text-gray-400 italic border-t border-gray-100 pt-2 mt-2">
-          {data.ocenaOpomba}
-        </p>
       </section>
     );
   }
