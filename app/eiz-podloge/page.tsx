@@ -1,0 +1,102 @@
+"use client";
+
+/**
+ * /eiz-podloge?eid=<eidStavba>&lat=<lat>&lng=<lng>[&del=<eidDelStavbe>]
+ *
+ * EIZ Pre-fill page for certified energy auditors.
+ * Shows full structured data package with provenance per field.
+ * Auditor can override values and export.
+ *
+ * TODO: Add auth guard (require logged-in user or auditor token)
+ */
+
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { EizAuditorReport } from "@/components/eiz-auditor-report";
+import type { EizPrefillReport } from "@/lib/eiz-prefill";
+
+function EizPodlogeContent() {
+  const params = useSearchParams();
+  const eid = params.get("eid");
+  const lat = params.get("lat");
+  const lng = params.get("lng");
+  const del = params.get("del");
+
+  const [report, setReport] = useState<EizPrefillReport | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!eid || !lat || !lng) return;
+    setLoading(true);
+    setError(null);
+
+    const url = `/api/eiz-prefill?eid=${eid}&lat=${lat}&lng=${lng}${del ? `&del=${del}` : ""}`;
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setReport(data);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [eid, lat, lng, del]);
+
+  if (!eid || !lat || !lng) {
+    return (
+      <div className="max-w-lg mx-auto mt-16 text-center px-4">
+        <h1 className="text-xl font-bold text-gray-900 mb-2">EIZ Podloge</h1>
+        <p className="text-gray-500 text-sm mb-4">
+          Ta stran generira predizpolnjene podatke za pripravo energetske izkaznice.
+        </p>
+        <p className="text-xs text-gray-400">
+          Uporaba: <code className="bg-gray-100 px-1 rounded">/eiz-podloge?eid=&lt;EID&gt;&lat=&lt;lat&gt;&lng=&lt;lng&gt;</code>
+        </p>
+        <p className="text-xs text-gray-400 mt-2">
+          EID stavbe najdete na <a href="/" className="text-blue-600 underline">RealEstateRadar</a> pri vsakem objektu.
+        </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto mt-8 px-4">
+        <div className="animate-pulse space-y-3">
+          <div className="h-24 bg-gray-100 rounded-lg" />
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-40 bg-gray-50 rounded-lg border border-gray-200" />
+          ))}
+        </div>
+        <p className="text-center text-sm text-gray-400 mt-4">Nalagam podatke iz GURS, TABULA, Open-Meteo…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-lg mx-auto mt-16 text-center px-4">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 font-medium">Napaka pri generiranju podlog</p>
+          <p className="text-red-500 text-sm mt-1">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!report) return null;
+
+  return (
+    <div className="px-4 py-6">
+      <EizAuditorReport report={report} />
+    </div>
+  );
+}
+
+export default function EizPodlogePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400 text-sm">Nalagam…</div>}>
+      <EizPodlogeContent />
+    </Suspense>
+  );
+}
