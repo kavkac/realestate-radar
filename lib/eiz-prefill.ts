@@ -214,7 +214,7 @@ export async function generateEizPrefill(params: {
   const renovOkna: number | null = parseInt(d.leto_obn_oken) || null;
   const hasGas: boolean = g.ima_plin_dn === "1";
 
-  const buildingH: number | null = (null /* LiDAR pending */;
+  const buildingH: number | null = null; // LiDAR pending
 
   const heatedVol = area && floors ? area * floorHeight * floors : null;
 
