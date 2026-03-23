@@ -51,6 +51,24 @@ export async function lookupEnergyCertificate({
 }
 
 /**
+ * Poišče EIZ za bližnje stavbe v isti KO (±50 stStavbe).
+ * Uporablja se kot fallback ko GURS lookup vrne pomožno zgradbo brez EIZ.
+ */
+export async function lookupEizNearby(
+  koId: number,
+  stStavbe: number,
+) {
+  return prisma.energyCertificate.findFirst({
+    where: {
+      koId,
+      stStavbe: { gte: stStavbe - 50, lte: stStavbe + 50, not: stStavbe },
+      validUntil: { gte: new Date() },
+    },
+    orderBy: { issueDate: "desc" },
+  });
+}
+
+/**
  * Poišče transakcije za nepremičnino.
  */
 export async function lookupTransactions({
