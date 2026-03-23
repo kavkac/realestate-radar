@@ -45,12 +45,9 @@ export async function lookupEnergyCertificate({
   });
   if (buildingCert) return { cert: buildingCert, source: "stavba" };
 
-  // 3. Zadnji fallback: katerakoli izkaznica za to stavbo (brez filtra na enoto)
-  const anyCert = await prisma.energyCertificate.findFirst({
-    where: { koId, stStavbe, validUntil: { gte: new Date() } },
-    orderBy: { issueDate: "desc" },
-  });
-  return { cert: anyCert, source: anyCert ? "stavba" : null };
+  // Fallback #3 je bil tukaj — prikazoval EIZ drug enot v isti stavbi.
+  // Odstranjeno: napačno je prikazovalo certifikat soseda kot lastnika.
+  return { cert: null, source: null };
 }
 
 /**
