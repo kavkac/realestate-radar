@@ -2164,7 +2164,8 @@ function PodlogeButton({ stavba, part, lat, lng, naslov }: {
 }) {
   const { isSignedIn } = useUser();
   if (!isSignedIn || !stavba?.eidStavba || lat == null || lng == null) return null;
-  const url = `/eiz-podloge?eid=${stavba.eidStavba}&lat=${lat}&lng=${lng}${part?.stDela ? `&del=${part.stDela}` : ""}&naslov=${encodeURIComponent(naslov ?? "")}${stavba.nosilnaKonstrukcija ? `&nosilnaKonstrukcija=${encodeURIComponent(stavba.nosilnaKonstrukcija)}` : ""}`;
+  const obrisParam = stavba.obrisGeom ? `&obrisGeom=${encodeURIComponent(JSON.stringify(stavba.obrisGeom))}` : "";
+  const url = `/eiz-podloge?eid=${stavba.eidStavba}&lat=${lat}&lng=${lng}${part?.stDela ? `&del=${part.stDela}` : ""}&naslov=${encodeURIComponent(naslov ?? "")}${stavba.nosilnaKonstrukcija ? `&nosilnaKonstrukcija=${encodeURIComponent(stavba.nosilnaKonstrukcija)}` : ""}${obrisParam}&tipPolozaja=${stavba.tipPolozaja ?? ""}`;
   return (
     <a
       href={url}

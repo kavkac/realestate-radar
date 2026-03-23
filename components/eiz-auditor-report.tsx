@@ -223,12 +223,14 @@ export function EizAuditorReport({ report }: { report: EizPrefillReport }) {
       {/* 2. Geometry */}
       <Section title="2. Geometrija" icon="📐">
         <FieldRow label="Kondicionirana površina" field={report.geometry.conditionedAreaM2} unit="m²" override={ov("g_area")} onOverride={v => setField("g_area",v)} />
+        <FieldRow label="Tlorisna površina" field={report.geometry.footprintM2} unit="m²" override={ov("g_fp")} onOverride={v => setField("g_fp",v)} />
+        <FieldRow label="Obod tlorisa" field={report.geometry.perimeterM} unit="m" override={ov("g_perim")} onOverride={v => setField("g_perim",v)} />
         <FieldRow label="Ogrevani volumen" field={report.geometry.heatedVolumeM3} unit="m³" override={ov("g_vol")} onOverride={v => setField("g_vol",v)} />
-        <FieldRow label="A/V razmernik" field={report.geometry.svRatio} unit="m²/m³" override={ov("g_sv")} onOverride={v => setField("g_sv",v)} />
         <FieldRow label="Površina strehe" field={report.geometry.roofAreaM2} unit="m²" override={ov("g_roof")} onOverride={v => setField("g_roof",v)} />
+        <FieldRow label="A/V razmernik" field={report.geometry.svRatio} unit="m²/m³" override={ov("g_sv")} onOverride={v => setField("g_sv",v)} />
         <FieldRow label="Povp. višina etaže" field={report.geometry.avgFloorHeightM} unit="m" override={ov("g_h")} onOverride={v => setField("g_h",v)} />
-        <FieldRow label="Orientacija" field={report.geometry.orientation} override={ov("g_orient")} onOverride={v => setField("g_orient",v)} />
-        <FieldRow label="Obod tlorisa" field={report.geometry.perimeter} unit="m" override={ov("g_perim")} onOverride={v => setField("g_perim",v)} />
+        <FieldRow label="Orientacija glavne fasade" field={report.geometry.orientation} override={ov("g_orient")} onOverride={v => setField("g_orient",v)} />
+        <FieldRow label="Lega stavbe" field={report.geometry.buildingPosition} override={ov("g_pos")} onOverride={v => setField("g_pos",v)} />
       </Section>
 
       {/* 3. Climate */}

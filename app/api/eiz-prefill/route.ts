@@ -18,7 +18,9 @@ const schema = z.object({
   lng: z.coerce.number().min(13).max(17),
   del: z.string().optional(),
   naslov: z.string().optional(),
-  nosilnaKonstrukcija: z.string().optional(), // iz GURS KN WFS (eProstor)
+  nosilnaKonstrukcija: z.string().optional(),
+  obrisGeom: z.string().optional(), // JSON serialized Polygon iz GURS KN
+  tipPolozaja: z.string().optional(), // samostoječa/vogalna/vmesna vrstna
 });
 
 export async function GET(req: NextRequest) {
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid params", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { eid, lat, lng, del, naslov, nosilnaKonstrukcija } = parsed.data;
+  const { eid, lat, lng, del, naslov, nosilnaKonstrukcija, obrisGeom, tipPolozaja } = parsed.data;
 
   try {
     const report = await generateEizPrefill({
@@ -37,6 +39,8 @@ export async function GET(req: NextRequest) {
       eidDelStavbe: del,
       naslov,
       nosilnaKonstrukcija,
+      obrisGeom: obrisGeom ? JSON.parse(obrisGeom) : undefined,
+      tipPolozaja,
       lat,
       lng,
     });

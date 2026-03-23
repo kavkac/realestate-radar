@@ -58,12 +58,13 @@ export interface EizPrefillReport {
   // ── 2. Geometry ────────────────────────────────────────────────────────────
   geometry: {
     conditionedAreaM2: PrefillField<number | null>;
+    footprintM2: PrefillField<number | null>;
+    perimeterM: PrefillField<number | null>;
     heatedVolumeM3: PrefillField<number | null>;
-    svRatio: PrefillField<number | null>;      // A/V [m²/m³]
     roofAreaM2: PrefillField<number | null>;
-    floorAreaM2: PrefillField<number | null>;
     orientation: PrefillField<string | null>;
-    perimeter: PrefillField<number | null>;
+    buildingPosition: PrefillField<string | null>;
+    svRatio: PrefillField<number | null>;
     avgFloorHeightM: PrefillField<number | null>;
   };
 
@@ -156,11 +157,50 @@ const DESIGN_TEMP: Record<string, number> = {
 };
 
 // ─── Main prefill generator ───────────────────────────────────────────────────
+/** Izračuna točen obseg poligona (Haversine po D96/TM metrskih koordinatah) */
+function calcObseg(coords: number[][]): number {
+  let obseg = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const dx = coords[i + 1][0] - coords[i][0];
+    const dy = coords[i + 1][1] - coords[i][1];
+    obseg += Math.sqrt(dx * dx + dy * dy);
+  }
+  return obseg;
+}
+
+/** Izračuna površino poligona (Shoelace) */
+function calcPovrsina(coords: number[][]): number {
+  let area = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    area += coords[i][0] * coords[i + 1][1];
+    area -= coords[i + 1][0] * coords[i][1];
+  }
+  return Math.abs(area) / 2;
+}
+
+/** Orientacija glavne fasade iz poligona (najdaljša stranica) */
+function calcOrientacija(coords: number[][]): string | null {
+  let maxD = 0, kot = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const dx = coords[i + 1][0] - coords[i][0];
+    const dy = coords[i + 1][1] - coords[i][1];
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d > maxD) { maxD = d; kot = Math.atan2(dy, dx) * 180 / Math.PI; }
+  }
+  if (maxD === 0) return null;
+  // Kot v D96/TM: x=E, y=N, 0°=V; pretvorimo v azimut od severa
+  const azimut = ((90 - kot) + 360) % 360;
+  const dirs = ["S","SV","V","JV","J","JZ","Z","SZ","S"];
+  return dirs[Math.round(azimut / 45) % 8];
+}
+
 export async function generateEizPrefill(params: {
   eidStavba: string;
   eidDelStavbe?: string;
   naslov?: string;
-  nosilnaKonstrukcija?: string; // iz GURS KN WFS (eProstor) — NOSILNA_KONSTRUKCIJA_ID
+  nosilnaKonstrukcija?: string;
+  obrisGeom?: { type: "Polygon"; coordinates: number[][][] } | null;
+  tipPolozaja?: string | null;
   lat: number;
   lng: number;
   userOverrides?: Record<string, unknown>;
@@ -219,14 +259,21 @@ export async function generateEizPrefill(params: {
 
   const heatedVol = area && floors ? area * floorHeight * floors : null;
 
-  // S/V ratio estimate from footprint
-  const footprint = parseFloat(g.pov_stavbe) || null;
+  // ── Geometrija iz obrisGeom (točna) ali pov_stavbe (aproksimacija) ───────
+  const obrisCoords = params.obrisGeom?.coordinates?.[0] ?? null;
+  const footprintFromObris = obrisCoords ? Math.round(calcPovrsina(obrisCoords)) : null;
+  const perimeterFromObris = obrisCoords ? Math.round(calcObseg(obrisCoords)) : null;
+  const orientacijaFromObris = obrisCoords ? calcOrientacija(obrisCoords) : null;
+  const footprint = footprintFromObris ?? (parseFloat(g.pov_stavbe) || null);
+  const perimeterExact = perimeterFromObris;
+  const perimeterApprox = footprint ? Math.round(Math.sqrt(footprint) * 4) : null;
+  const hasObris = !!obrisCoords;
+
   let svRatio: number | null = null;
   if (footprint && buildingH) {
-    const perimeter = Math.sqrt(footprint) * 4;
+    const perimeter = perimeterExact ?? perimeterApprox ?? Math.sqrt(footprint) * 4;
     const wallArea = perimeter * buildingH;
-    const roofArea = footprint;
-    const totalEnvelope = wallArea + roofArea + footprint;
+    const totalEnvelope = wallArea + footprint * 2;
     svRatio = heatedVol ? Math.round((totalEnvelope / heatedVol) * 100) / 100 : null;
   }
 
@@ -336,22 +383,35 @@ export async function generateEizPrefill(params: {
     geometry: {
       conditionedAreaM2:  { value: area, source: "GURS_EVS", confidence: area ? "high" : "missing",
                             verifyOnSite: !area },
+      footprintM2:        { value: footprint ? Math.round(footprint) : null,
+                            source: "GURS_REN", confidence: hasObris ? "high" : footprint ? "medium" : "missing",
+                            note: hasObris ? "Točna vrednost iz tlorisnega poligona (GURS KN)" : "Iz pov_stavbe (GURS REN)" },
+      perimeterM:         { value: perimeterExact ?? perimeterApprox,
+                            source: "GURS_REN",
+                            confidence: hasObris ? "high" : perimeterApprox ? "low" : "missing",
+                            note: hasObris ? "Točen obseg iz tlorisnega poligona (GURS KN)" : "Aproksimacija √površina × 4 — preveriti z dejanskim obrisom" },
       heatedVolumeM3:     { value: heatedVol ? Math.round(heatedVol) : null,
                             source: "GURS_EVS", confidence: area && floors ? "medium" : "low",
-                            note: `${area}m² × ${floorHeight}m × ${floors} etaž` },
-      svRatio:            { value: svRatio, source: "GURS_REN", confidence: svRatio ? "medium" : "low" },
+                            note: `${area}m² × ${floorHeight}m × ${floors} etaž — LiDAR bo izboljšal` },
       roofAreaM2:         { value: footprint ? Math.round(footprint) : null,
-                            source: "GURS_REN", confidence: footprint ? "medium" : "missing" },
-      floorAreaM2:        { value: footprint ? Math.round(footprint) : null,
-                            source: "GURS_REN", confidence: footprint ? "medium" : "missing" },
-      orientation:        { value: null, source: "GURS_REN", confidence: "missing",
-                            verifyOnSite: true, note: "Določite iz tlorisa/katastrske karte" },
-      perimeter:          { value: footprint ? Math.round(Math.sqrt(footprint) * 4) : null,
-                            source: "GURS_REN", confidence: footprint ? "low" : "missing",
-                            note: "Ocena iz tlorisne površine — preveriti z dejanskim obrisom" },
+                            source: "GURS_REN", confidence: hasObris ? "medium" : "low",
+                            note: "Enako tlorisni površini — naklon strehe nepoznan (čaka LiDAR)" },
+      orientation:        { value: orientacijaFromObris,
+                            source: "GURS_REN",
+                            confidence: orientacijaFromObris ? "medium" : "missing",
+                            verifyOnSite: !orientacijaFromObris,
+                            note: orientacijaFromObris
+                              ? "Iz najdaljše stranice tlorisnega poligona (GURS KN) — preveriti s terena"
+                              : "Ni tlorisnega poligona — določite iz katastrske karte" },
+      buildingPosition:   { value: params.tipPolozaja ?? null,
+                            source: "GURS_REN",
+                            confidence: params.tipPolozaja ? "high" : "missing",
+                            note: params.tipPolozaja ? "Tip lege iz GURS KN (vpliva na toplotne mostove)" : undefined },
+      svRatio:            { value: svRatio, source: "GURS_REN", confidence: svRatio ? "medium" : "low",
+                            note: "LiDAR bo zagotovil točno višino → boljši A/V" },
       avgFloorHeightM:    { value: floorHeight, source: "GURS_EVS",
                             confidence: d.visina_etaze ? "high" : "medium",
-                            note: d.visina_etaze ? "Iz GURS ev_del_stavbe" : "Privzeto 2.6m (mediana SLO)" },
+                            note: d.visina_etaze ? "Iz GURS ev_del_stavbe (merjeno)" : "Privzeto 2.6m (mediana SLO)" },
     },
 
     climate: {

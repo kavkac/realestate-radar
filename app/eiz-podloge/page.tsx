@@ -23,6 +23,8 @@ function EizPodlogeContent() {
   const lng = params.get("lng");
   const del = params.get("del");
   const naslov = params.get("naslov");
+  const nosilnaKonstrukcija = params.get("nosilnaKonstrukcija");
+  const obrisGeomStr = params.get("obrisGeom");
 
   const [report, setReport] = useState<EizPrefillReport | null>(null);
   const [loading, setLoading] = useState(true); // true = nalagam takoj
@@ -33,7 +35,7 @@ function EizPodlogeContent() {
     setLoading(true);
     setError(null);
 
-    const url = `/api/eiz-prefill?eid=${eid}&lat=${lat}&lng=${lng}${del ? `&del=${del}` : ""}${naslov ? `&naslov=${encodeURIComponent(naslov)}` : ""}`;
+    const url = `/api/eiz-prefill?eid=${eid}&lat=${lat}&lng=${lng}${del ? `&del=${del}` : ""}${naslov ? `&naslov=${encodeURIComponent(naslov)}` : ""}${nosilnaKonstrukcija ? `&nosilnaKonstrukcija=${encodeURIComponent(nosilnaKonstrukcija)}` : ""}${obrisGeomStr ? `&obrisGeom=${encodeURIComponent(obrisGeomStr)}` : ""}`;
     fetch(url)
       .then(r => r.json())
       .then(data => {
