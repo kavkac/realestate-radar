@@ -20,6 +20,7 @@ import { getThermalEnvelope, getMaterialGroup, type GursKonstrukcijaId } from ".
 import { getWindowData } from "./window-cache";
 import { calibrateQnh, applyPuresConstraint, isLikelyDistrictHeating, getPanelBuildingUValues } from "./eiz-calibration";
 import { estimateVentilation, calculateHeatedVolume } from "./ventilation-model";
+import { getClimate } from "./climate-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,6 +176,9 @@ function calculateHeatingNeed(params: {
   shadingFactorSouth: number;
   shadingFactorNorth: number;
   shadingFactorEastWest: number;
+  solarSouth?: number;
+  solarNorth?: number;
+  solarEastWest?: number;
 }): number {
   const {
     conditionedAreaM2, volumeM3,
@@ -205,13 +209,14 @@ function calculateHeatingNeed(params: {
   // HDD is in K·days, H in W/K → kWh = H × HDD × 24 / 1000
   const Q_loss = H_total * hdd * 24 / 1000;
 
-  // Solar gains [kWh/a] — simplified by orientation
-  // Mean annual horizontal irradiation SLO ~1100 kWh/m²
-  // South vertical: ~900 kWh/m², North: ~250, E/W: ~550
+  // Solar gains [kWh/a] — per-location irradiation from climate service
+  const {
+    solarSouth = 680, solarNorth = 175, solarEastWest = 400,
+  } = params;
   const Q_sol =
-    windowAreaSouthM2 * gWindow * shadingFactorSouth * 900 +
-    windowAreaNorthM2 * gWindow * shadingFactorNorth * 250 +
-    windowAreaEastWestM2 * gWindow * shadingFactorEastWest * 550;
+    windowAreaSouthM2 * gWindow * shadingFactorSouth * solarSouth +
+    windowAreaNorthM2 * gWindow * shadingFactorNorth * solarNorth +
+    windowAreaEastWestM2 * gWindow * shadingFactorEastWest * solarEastWest;
 
   // Internal gains [kWh/a]: 4 W/m² × 8760h/a = 35 kWh/(m²·a) typical residential
   const Q_int = 4.0 * conditionedAreaM2 * 8760 / 1000;
@@ -373,8 +378,8 @@ export async function estimateEiz(params: {
     const heatingSource: EizEstimate["dataQuality"]["heating"] =
       inDistrictHeatingZone ? "district_heating" : hasGas ? "gas" : "estimated";
 
-    // ── 7. Climate ────────────────────────────────────────────────────────────
-    const climate = getClimateData(municipality);
+    // ── 7. Climate — Open-Meteo per coordinate (ERA5, 10y avg) ───────────────
+    const climate = await getClimate(lat, lng);
 
     // ── 7b. Ventilation ───────────────────────────────────────────────────────
     const ventilation = estimateVentilation({
@@ -404,6 +409,9 @@ export async function estimateEiz(params: {
       thermalBridge: envelope.thermalBridge,
       airChangeRate: ventilation.nEff,
       hdd: climate.hdd,
+      solarSouth: climate.solarSouth,
+      solarNorth: climate.solarNorth,
+      solarEastWest: climate.solarEastWest,
       shadingFactorSouth: lidarShadingFactorSouth ?? 0.85,
       shadingFactorNorth: 0.90,
       shadingFactorEastWest: 0.85,
@@ -455,7 +463,7 @@ export async function estimateEiz(params: {
         windowRatio,
         heatingSystem: heatingSystem.label,
         heatingEfficiency: heatingSystem.efficiency,
-        climateZone: climate.zone,
+        climateZone: climate.climateZone,
         heatingDegreeDays: climate.hdd,
       },
       disclaimer: "OCENJENI energetski razred — ni pravno veljavna energetska izkaznica (EIZ). Za uradno izkaznico se obrnite na certificiranega energetičarja.",
