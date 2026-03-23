@@ -21,6 +21,7 @@ import { getWindowData } from "./window-cache";
 import { calibrateQnh, applyPuresConstraint, isLikelyDistrictHeating, getPanelBuildingUValues } from "./eiz-calibration";
 import { estimateVentilation, calculateHeatedVolume } from "./ventilation-model";
 import { getClimate } from "./climate-service";
+import { estimateHeatingSystem as estimateHeating, HEATING_SPECS } from "./heating-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -368,15 +369,22 @@ export async function estimateEiz(params: {
     const windowNorthM2 = totalWindowAreaM2 * 0.20;
     const windowEastWestM2 = totalWindowAreaM2 * 0.40;
 
-    // ── 6. Heating system ─────────────────────────────────────────────────────
-    // District heating zone (static municipality lookup, Phase 2: polygon join)
-    const inDistrictHeatingZone = isLikelyDistrictHeating(municipality);
-    const heatingSystemKey = (userOverrides?.heatingSystem as keyof typeof HEATING_SYSTEMS) ||
-      estimateHeatingSystem({ hasGas, inDistrictHeatingZone, yearBuilt });
-    const heatingSystem = HEATING_SYSTEMS[heatingSystemKey] ?? HEATING_SYSTEMS.default;
-
+    // ── 6. Heating system — spatial DH zone + statistical prior ──────────────
+    const heatingEst = estimateHeating({
+      lat, lng, yearBuilt,
+      buildingFloors: floors,
+      municipality,
+      hasGas,
+      userOverride: userOverrides?.heatingSystem as any,
+    });
+    const heatingSystem = {
+      efficiency: heatingEst.efficiency,
+      co2Factor: heatingEst.co2FactorKgKwh,
+      label: heatingEst.system,
+    };
     const heatingSource: EizEstimate["dataQuality"]["heating"] =
-      inDistrictHeatingZone ? "district_heating" : hasGas ? "gas" : "estimated";
+      heatingEst.system === "district_heating" ? "district_heating" :
+      hasGas ? "gas" : "estimated";
 
     // ── 7. Climate — Open-Meteo per coordinate (ERA5, 10y avg) ───────────────
     const climate = await getClimate(lat, lng);
