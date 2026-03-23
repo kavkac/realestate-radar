@@ -4,6 +4,7 @@ import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByN
 import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { getAzbestRisk } from "@/lib/azbest";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
+import { estimateEiz } from "@/lib/eiz-estimator";
 import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio } from "@/lib/etn-lookup";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
@@ -342,6 +343,7 @@ export async function POST(request: NextRequest) {
 
     let energetskaIzkaznica = null;
     if (energyCertResult?.cert) {
+      // Uradna EIZ — iz registra energetskih izkaznic (MOP)
       const cert = energyCertResult.cert;
       energetskaIzkaznica = {
         razred: cert.energyClass,
@@ -356,7 +358,36 @@ export async function POST(request: NextRequest) {
         co2: cert.co2Emissions,
         kondicionirana: cert.conditionedArea,
         source: energyCertResult.source,
+        ocenjena: false,
       };
+    } else if (stavba.eidStavba && lat != null && lng != null) {
+      // Ni uradne EIZ — algoritmična ocena (EN 13790)
+      try {
+        const eizOcena = await estimateEiz({
+          eidStavba: stavba.eidStavba,
+          eidDelStavbe: selectedUnit?.eidDelStavbe ?? undefined,
+          lat,
+          lng,
+          municipality: null, // TODO: resolve from koId → obcina name
+        });
+        if (eizOcena) {
+          energetskaIzkaznica = {
+            razred: eizOcena.energyClass,
+            potrebnaTopota: eizOcena.heatingNeedKwhM2,
+            primaryEnergy: eizOcena.primaryEnergyKwhM2,
+            co2: eizOcena.co2KgM2,
+            kondicionirana: eizOcena.inputs.conditionedAreaM2,
+            source: "ocena",
+            ocenjena: true,
+            ocenaZaupanje: eizOcena.confidence,
+            ocenaViriPodatkov: eizOcena.dataQuality,
+            ocenaVhodi: eizOcena.inputs,
+            ocenaOpomba: eizOcena.disclaimer,
+          };
+        }
+      } catch (e) {
+        console.error("[lookup] EIZ estimate failed:", e);
+      }
     }
 
     // Re-run ETN with energy class if cert available (applies correction to value estimate)

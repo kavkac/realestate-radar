@@ -88,17 +88,42 @@ interface RenVrednost {
 
 interface EnergyData {
   razred: string;
-  tip: string | null;
-  datumIzdaje: string;
-  veljaDo: string;
-  potrebnaTopota: number | null;
-  dovedenaEnergija: number | null;
-  celotnaEnergija: number | null;
-  elektricnaEnergija: number | null;
-  primaryEnergy: number | null;
-  co2: number | null;
-  kondicionirana: number | null;
-  source?: "stanovanje" | "stavba" | null;
+  tip?: string | null;
+  datumIzdaje?: string;
+  veljaDo?: string;
+  potrebnaTopota?: number | null;
+  dovedenaEnergija?: number | null;
+  celotnaEnergija?: number | null;
+  elektricnaEnergija?: number | null;
+  primaryEnergy?: number | null;
+  co2?: number | null;
+  kondicionirana?: number | null;
+  source?: "stanovanje" | "stavba" | "ocena" | null;
+  // Algoritmična ocena (EN 13790) — samo če source === "ocena"
+  ocenjena?: boolean;
+  ocenaZaupanje?: "high" | "medium" | "low";
+  ocenaViriPodatkov?: {
+    geometry: string;
+    envelope: string;
+    windows: string;
+    heating: string;
+  };
+  ocenaVhodi?: {
+    yearBuilt: number;
+    material: string;
+    conditionedAreaM2: number;
+    svRatio: number;
+    uWall: number;
+    uRoof: number;
+    uFloor: number;
+    uWindow: number;
+    windowRatio: number;
+    heatingSystem: string;
+    heatingEfficiency: number;
+    climateZone: string;
+    heatingDegreeDays: number;
+  };
+  ocenaOpomba?: string;
 }
 
 interface LokacijskiFaktor {
@@ -2158,10 +2183,74 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
     );
   }
 
-  // 2. Ni uradne izkaznice - poskusi algoritmično oceno
-  const ocena = stavba ? oceniEnergetskiRazred(stavba, part) : null;
+  // 2. Algoritmična ocena (EN 13790) — data.ocenjena === true
+  if (data?.ocenjena) {
+    const zaupanjeMap: Record<string, string> = {
+      high: "visoko zaupanje", medium: "srednje zaupanje", low: "nizko zaupanje"
+    };
+    const zaupanjeBgMap: Record<string, string> = {
+      high: "bg-green-50 text-green-700",
+      medium: "bg-amber-50 text-amber-700",
+      low: "bg-gray-100 text-gray-500",
+    };
+    const viriMap: Record<string, string> = {
+      lidar: "LiDAR", gurs: "GURS", estimated: "ocena",
+      gurs_renovation: "GURS (obnova)", tabula: "TABULA",
+      mapillary_ml: "Mapillary ML", statistical: "statistično",
+      district_heating: "DH cona", gas: "GURS (plin)",
+    };
+    const viri = data.ocenaViriPodatkov;
+    const vhodi = data.ocenaVhodi;
+    return (
+      <section>
+        <div className="mb-3 pb-3 border-b border-gray-100">
+          <p className="text-sm font-medium text-gray-700">Uradna energetska izkaznica ni na voljo</p>
+          <p className="text-xs text-gray-400 mt-0.5">Algoritmična ocena · EN ISO 13790 · TABULA SLO</p>
+        </div>
+        <div className="flex items-center gap-2 mb-3">
+          <EnergyMeter razred={data.razred} />
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${zaupanjeBgMap[data.ocenaZaupanje ?? "low"]}`}>
+            {zaupanjeMap[data.ocenaZaupanje ?? "low"]}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm mb-4">
+          <Field label="Ogrevalna potreba" value={data.potrebnaTopota != null ? `${data.potrebnaTopota} kWh/m²a` : null} />
+          <Field label="Primarna energija" value={data.primaryEnergy != null ? `${data.primaryEnergy} kWh/m²a` : null} />
+          <Field label="CO₂ emisije" value={data.co2 != null ? `${data.co2} kg/m²a` : null} />
+          {vhodi && <>
+            <Field label="Kondicionirana površina" value={`${vhodi.conditionedAreaM2} m²`} />
+            <Field label="Ogrevanje" value={vhodi.heatingSystem} />
+            <Field label="Klimatska cona" value={vhodi.climateZone} />
+          </>}
+        </div>
+        {viri && (
+          <div className="text-xs text-gray-400 space-y-0.5 mb-3">
+            <p className="font-medium text-gray-500 mb-1">Viri podatkov:</p>
+            <p>Geometrija: <span className="text-gray-600">{viriMap[viri.geometry] ?? viri.geometry}</span>
+            {" · "}Toplotna lupina: <span className="text-gray-600">{viriMap[viri.envelope] ?? viri.envelope}</span>
+            {" · "}Okna: <span className="text-gray-600">{viriMap[viri.windows] ?? viri.windows}</span>
+            {" · "}Ogrevanje: <span className="text-gray-600">{viriMap[viri.heating] ?? viri.heating}</span></p>
+          </div>
+        )}
+        {vhodi && (
+          <div className="text-xs text-gray-400 space-y-0.5 mb-3">
+            <p className="font-medium text-gray-500 mb-1">Vhodni parametri:</p>
+            <p>U stena: <span className="text-gray-600">{vhodi.uWall} W/m²K</span>
+            {" · "}U streha: <span className="text-gray-600">{vhodi.uRoof} W/m²K</span>
+            {" · "}U okna: <span className="text-gray-600">{vhodi.uWindow} W/m²K</span>
+            {" · "}Delež oken: <span className="text-gray-600">{Math.round(vhodi.windowRatio * 100)}%</span>
+            {" · "}HDD: <span className="text-gray-600">{vhodi.heatingDegreeDays}</span></p>
+          </div>
+        )}
+        <p className="text-[10px] text-gray-400 italic border-t border-gray-100 pt-2 mt-2">
+          {data.ocenaOpomba}
+        </p>
+      </section>
+    );
+  }
 
-  if (!ocena) return (
+  // 3. Sploh ni podatkov
+  return (
     <section>
       <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
       <p className="text-sm text-gray-400 italic">
@@ -2169,62 +2258,6 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
       </p>
     </section>
   );
-
-  // 3. Algoritmična ocena
-    const zc = zaupanjeColor[ocena.zaupanje];
-    return (
-      <section>
-        <div className="mb-4 pb-4 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-700">Uradna energetska izkaznica ni na voljo</p>
-          <p className="text-xs text-gray-400 mt-0.5">Objekt ni vpisan v register energetskih izkaznic (MOPE).</p>
-        </div>
-        <div className="border-b border-gray-100 pb-1 mb-3">
-          <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-widest">
-            Energetsko stanje
-          </h4>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px] text-gray-400">Vir: Ocena · multi-faktorski algoritem</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${
-              ocena.zaupanje === 'visoko' ? 'bg-green-50 text-green-700' :
-              ocena.zaupanje === 'srednje' ? 'bg-amber-50 text-amber-700' :
-              'bg-gray-100 text-gray-500'
-            }`}>
-              {zaupanjeLabel[ocena.zaupanje]}
-            </span>
-          </div>
-        </div>
-        <span className="inline-flex items-center text-xs text-gray-400 mb-3">
-          Algoritmična ocena<InfoTooltip text={zaupanjeBesedilo[ocena.zaupanje]} />
-        </span>
-        {/* Sekcija 1: Standard */}
-        <div className="mb-3">
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Osnova · PURES 2010 / EN ISO 52000</p>
-          <p className="text-sm text-gray-600">{ocena.dejavnikiBaza[0]}</p>
-          <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
-            <span>Razred po standardu (PURES 2010): <strong className="text-gray-800">{ocena.razredBazni}</strong></span>
-            <span className="text-gray-300">→</span>
-            <span>Ocenjeni razred z algoritmom: <strong className="text-gray-800">{ocena.razred}</strong></span>
-          </div>
-        </div>
-        {/* EnergyMeter prikaže končni razred */}
-        <EnergyMeter razred={ocena.razred} />
-        {/* Sekcija 2: Prilagoditve */}
-        {ocena.dejavnikiPrilagoditve.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
-              Upoštevani dejavniki
-            </p>
-            <ul className="space-y-0.5">
-              {ocena.dejavnikiPrilagoditve.map((d, i) => (
-                <li key={i} className="text-xs text-gray-500 flex items-start gap-1">
-                  <span className="text-gray-300">·</span><span>{d}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-    );
 }
 
 interface PlacesTransit {
