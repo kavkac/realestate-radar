@@ -2150,7 +2150,7 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng }: {
   lng?: number | null;
 }) {
   // 1. Prava EIZ ima prednost - uradna izkaznica iz registra
-  if (data?.razred) {
+  if (data?.razred && !data?.ocenjena) {
     return (
       <section>
         <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
