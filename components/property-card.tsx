@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { SubvencijeSection } from "./subvencije-section";
 import { NeighborhoodCard } from "./neighborhood-card";
+import { ListingSignalsCard } from "./listing-signals-card";
 import { PropertyEditDrawer } from "./property-edit-drawer";
 import { izracunajVisinoStropov, izracunajStavbneKorekcije } from "@/lib/location-premium";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
@@ -278,6 +279,8 @@ interface PropertyCardProps {
   propertyContext?: PropertyContextData | null;
   placesData?: PlacesDataCard | null;
   airbnbStats?: AirbnbStats | null;
+  listingNlpSignals?: import("@/lib/listing-nlp").ListingSignals | null;
+  listingNlpDatum?: string | null;
 }
 
 export interface PropertyContextData {
@@ -382,6 +385,8 @@ export function PropertyCard({
   propertyContext,
   placesData,
   airbnbStats,
+  listingNlpSignals,
+  listingNlpDatum,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [showAllUnits, setShowAllUnits] = useState(false);
@@ -851,6 +856,18 @@ export function PropertyCard({
               <section>
                 <Label vir="OSM · ARSO hrup · ETN">Karakter soseske</Label>
                 <NeighborhoodCard lat={lat} lng={lng} />
+              </section>
+            </div>
+          )}
+
+          {/* Podatki iz oglasov — NLP signali */}
+          {listingNlpSignals && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <section>
+                <ListingSignalsCard
+                  signals={listingNlpSignals}
+                  datum={listingNlpDatum ?? null}
+                />
               </section>
             </div>
           )}

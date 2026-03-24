@@ -657,6 +657,8 @@ export function AddressSearch() {
               placesData={(activeTab.data as unknown as { placesData?: import('@/components/property-card').PlacesDataCard }).placesData}
               seizmicniPodatki={activeTab.data.seizmicniPodatki as never}
               poplavnaNevarnost={activeTab.data.poplavnaNevarnost as never}
+              listingNlpSignals={(activeTab.data as unknown as { listingNlpSignals?: import('@/lib/listing-nlp').ListingSignals }).listingNlpSignals}
+              listingNlpDatum={(activeTab.data as unknown as { listingNlpDatum?: string }).listingNlpDatum}
               requestedDel={activeTab.del}
               onClearDel={() => {
                 setTabs(tabs.map(t => t.id === activeTabId ? { ...t, del: undefined } : t));
