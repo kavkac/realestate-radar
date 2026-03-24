@@ -1,10 +1,28 @@
 {
-  "generated": "2026-03-22T15:53:01.541Z",
-  "n_tested": 492,
-  "n_skipped": 8,
-  "mdape_pct": 19.3,
-  "p10_pct": 3.02,
-  "p25_pct": 8.76,
-  "p75_pct": 31.63,
-  "p90_pct": 59.49
+  "generated": "2026-03-23T12:05:52.908Z",
+  "n_skipped": 13,
+  "v1_baseline": {
+    "n": 487,
+    "mdape": 15.41,
+    "p10": 2.81,
+    "p25": 7.57,
+    "p75": 27.87,
+    "p90": 45.61,
+    "description": "Pure proximity median, no factors"
+  },
+  "v2_production": {
+    "n": 487,
+    "mdape": 16.46,
+    "p10": 3.36,
+    "p25": 8.08,
+    "p75": 28.58,
+    "p90": 46.79,
+    "description": "Seasonal + time-weighted + površinska + KO kalibracija"
+  },
+  "n_tested": 487,
+  "mdape_pct": 16.46,
+  "p10_pct": 3.36,
+  "p25_pct": 8.08,
+  "p75_pct": 28.58,
+  "p90_pct": 46.79
 }
