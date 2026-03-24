@@ -1,5 +1,24 @@
 import { getCached, setCached } from "./wfs-cache";
 import { Pool } from "pg";
+import proj4 from "proj4";
+
+// D96/TM (EPSG:3794) → WGS84 converter
+// EPSG:3794 false northing = -5000000, so stored northing ≈ 90000-200000
+proj4.defs("EPSG:3794", "+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9999 +x_0=500000 +y_0=-5000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+const d96tmToWgs84 = proj4("EPSG:3794", "WGS84");
+
+/** Convert a GeoJSON Polygon with D96/TM coords to WGS84 [lng, lat] */
+function convertGeomToWgs84(geom: { type: "Polygon"; coordinates: number[][][] }): { type: "Polygon"; coordinates: number[][][] } {
+  return {
+    type: "Polygon",
+    coordinates: geom.coordinates.map(ring =>
+      ring.map(([x, y]) => {
+        const [lng, lat] = d96tmToWgs84.forward([x, y]);
+        return [lng, lat];
+      })
+    ),
+  };
+}
 
 // DB pool for gurs_kn_stavbe lookups (DB-first, WFS fallback)
 const _knPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
@@ -9,7 +28,10 @@ function knRowToStavbaData(row: Record<string, unknown>): StavbaData {
   const obrisGeom = row.obris_geom
     ? (typeof row.obris_geom === "string" ? JSON.parse(row.obris_geom) : row.obris_geom)
     : null;
-  const validObris = obrisGeom?.type === "Polygon" ? obrisGeom : null;
+  const rawObris = obrisGeom?.type === "Polygon" ? obrisGeom : null;
+  // Convert D96/TM → WGS84 if coordinates look like D96/TM (easting ~370k-620k, northing ~50k-220k)
+  const needsConversion = rawObris && rawObris.coordinates[0]?.[0]?.[0] > 1000;
+  const validObris = rawObris ? (needsConversion ? convertGeomToWgs84(rawObris) : rawObris) : null;
   return {
     koId: row.ko_id as number,
     stStavbe: row.st_stavbe as number,
