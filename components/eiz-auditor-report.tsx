@@ -32,6 +32,7 @@ const SOURCE_LABEL: Record<DataSource, string> = {
   MAPILLARY_ML:      "Mapillary ML",
   STATISTICAL_PRIOR: "Statistični prior",
   AUDITOR_INPUT:     "Vnos energetičarja",
+  LISTING_NLP:       "📋 Oglas",
 };
 
 const SOURCE_COLOR: Record<DataSource, string> = {
@@ -46,6 +47,7 @@ const SOURCE_COLOR: Record<DataSource, string> = {
   MAPILLARY_ML:      "bg-violet-50 text-violet-700 border-violet-200",
   STATISTICAL_PRIOR: "bg-amber-50 text-amber-700 border-amber-200",
   AUDITOR_INPUT:     "bg-gray-100 text-gray-600 border-gray-200",
+  LISTING_NLP:       "bg-orange-50 text-orange-700 border-orange-300",
 };
 
 const CONFIDENCE_DOT: Record<Confidence, { dot: string; label: string }> = {

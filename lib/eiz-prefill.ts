@@ -28,7 +28,8 @@ export type DataSource =
   | "MAPILLARY_ML"      // Mapillary street-view ML estimation
   | "STATISTICAL_PRIOR" // Era/material statistical prior
   | "USER_INPUT"        // Provided by property owner
-  | "AUDITOR_INPUT";    // To be filled by auditor on-site
+  | "AUDITOR_INPUT"     // To be filled by auditor on-site
+  | "LISTING_NLP";      // Extracted from listing description (not officially verified)
 
 export type Confidence = "high" | "medium" | "low" | "missing";
 

@@ -444,19 +444,22 @@ export async function POST(request: NextRequest) {
 
     // NLP signals — iz shranjenih opisov v listings_oglasi (če obstajajo)
     let listingNlpSignals: ListingSignals | null = null;
+    let listingNlpDatum: string | null = null;
     let listingValuationDelta: ReturnType<typeof calcListingValuationDelta> | null = null;
     try {
-      type NlpRow = { nlp_signals: Record<string, unknown> | null; opis: string | null };
+      type NlpRow = { nlp_signals: Record<string, unknown> | null; opis: string | null; datum_zajet: Date | null };
       const nlpRows = await prisma.$queryRawUnsafe<NlpRow[]>(
-        `SELECT nlp_signals, opis FROM listings_oglasi
+        `SELECT nlp_signals, opis, datum_zajet FROM listings_oglasi
          WHERE ko_sifko = $1 AND nlp_signals IS NOT NULL
          ORDER BY datum_zajet DESC LIMIT 1`,
         String(stavba.koId)
       );
       if (nlpRows[0]?.nlp_signals) {
         listingNlpSignals = nlpRows[0].nlp_signals as unknown as ListingSignals;
+        listingNlpDatum = nlpRows[0].datum_zajet?.toISOString().slice(0, 10) ?? null;
       } else if (nlpRows[0]?.opis) {
         listingNlpSignals = parseListingText(nlpRows[0].opis);
+        listingNlpDatum = nlpRows[0].datum_zajet?.toISOString().slice(0, 10) ?? null;
       }
       if (listingNlpSignals) {
         listingValuationDelta = calcListingValuationDelta(listingNlpSignals, stNadstropja);
@@ -595,6 +598,7 @@ export async function POST(request: NextRequest) {
       lppLines: lppLines ?? null,
       oglasneAnalize: oglasneAnalize ?? null,
       listingNlpSignals: listingNlpSignals ?? null,
+      listingNlpDatum: listingNlpDatum ?? null,
       listingValuationDelta: listingValuationDelta ?? null,
       koRentalYield: koRentalYield ?? null,
       saleToListRatio: saleToListRatio ?? null,
