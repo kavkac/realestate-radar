@@ -1,0 +1,330 @@
+/**
+ * neighborhood-service.ts
+ *
+ * Kompletna analiza soseske za dano koordinato:
+ * - OSM Overpass API → POI amenity clustering (šole, univerze, industrija...)
+ * - ARSO hrupne karte → Lden (dB) vrednost
+ * - ETN cenovni clustering → povp. cena/m² v radiju 500m
+ * - SURS census tract → demografija (starost, izobrazba)
+ *
+ * Lazy compute + 90-day cache v neighborhood_cache tabeli.
+ */
+
+import { prisma } from "@/lib/prisma";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface AmenityData {
+  r300: AmenityCount;
+  r500: AmenityCount;
+  r1000: AmenityCount;
+}
+
+export interface AmenityCount {
+  universities: number;
+  schools: number;
+  kindergartens: number;
+  dormitories: number;
+  restaurants: number;
+  bars: number;
+  supermarkets: number;
+  pharmacies: number;
+  doctors: number;
+  hospitals: number;
+  industrial: number;   // industrial landuse areas nearby
+  parks: number;
+  playgrounds: number;
+  bus_stops: number;
+  tram_stops: number;
+}
+
+export interface NeighborhoodProfile {
+  lat: number;
+  lng: number;
+
+  // Hrup
+  noiseLdenDb: number | null;
+  noiseLabel: "tiho" | "zmerno" | "prometno" | "hrupno" | null;
+
+  // Demografija (SURS)
+  statOkolisId: string | null;
+  statOkolisName: string | null;
+  ageU30Pct: number | null;
+  age3065Pct: number | null;
+  ageO65Pct: number | null;
+  eduTertiaryPct: number | null;
+
+  // Amenitiji (OSM)
+  amenity: AmenityData | null;
+
+  // Cene
+  pricePerM2_500m: number | null;
+
+  // Izpeljano
+  characterTags: string[];
+  neighborhoodType: string | null;
+}
+
+// ── Noise label ───────────────────────────────────────────────────────────────
+function noiseLabel(lden: number | null): "tiho" | "zmerno" | "prometno" | "hrupno" | null {
+  if (lden == null) return null;
+  if (lden < 45) return "tiho";
+  if (lden < 55) return "zmerno";
+  if (lden < 65) return "prometno";
+  return "hrupno";
+}
+
+// ── OSM Overpass amenity query ────────────────────────────────────────────────
+async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Promise<AmenityCount> {
+  const query = `
+    [out:json][timeout:10];
+    (
+      node["amenity"="university"](around:${radiusM},${lat},${lng});
+      node["amenity"="college"](around:${radiusM},${lat},${lng});
+      way["building"="dormitory"](around:${radiusM},${lat},${lng});
+      node["amenity"="school"](around:${radiusM},${lat},${lng});
+      node["amenity"="kindergarten"](around:${radiusM},${lat},${lng});
+      node["amenity"="restaurant"](around:${radiusM},${lat},${lng});
+      node["amenity"="bar"](around:${radiusM},${lat},${lng});
+      node["amenity"="pub"](around:${radiusM},${lat},${lng});
+      node["shop"="supermarket"](around:${radiusM},${lat},${lng});
+      node["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
+      node["amenity"="doctors"](around:${radiusM},${lat},${lng});
+      node["amenity"="hospital"](around:${radiusM},${lat},${lng});
+      way["landuse"="industrial"](around:${radiusM},${lat},${lng});
+      node["leisure"="park"](around:${radiusM},${lat},${lng});
+      node["leisure"="playground"](around:${radiusM},${lat},${lng});
+      node["highway"="bus_stop"](around:${radiusM},${lat},${lng});
+      node["railway"="tram_stop"](around:${radiusM},${lat},${lng});
+    );
+    out count;
+  `;
+
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return emptyCount();
+    const data = await res.json() as { elements: Array<{ tags?: Record<string,string> }> };
+    
+    const count = emptyCount();
+    for (const el of data.elements) {
+      const tags = el.tags ?? {};
+      const amenity = tags.amenity;
+      const building = tags.building;
+      const landuse = tags.landuse;
+      const leisure = tags.leisure;
+      const highway = tags.highway;
+      const railway = tags.railway;
+      const shop = tags.shop;
+
+      if (amenity === "university" || amenity === "college") count.universities++;
+      else if (building === "dormitory") count.dormitories++;
+      else if (amenity === "school") count.schools++;
+      else if (amenity === "kindergarten") count.kindergartens++;
+      else if (amenity === "restaurant") count.restaurants++;
+      else if (amenity === "bar" || amenity === "pub") count.bars++;
+      else if (shop === "supermarket") count.supermarkets++;
+      else if (amenity === "pharmacy") count.pharmacies++;
+      else if (amenity === "doctors") count.doctors++;
+      else if (amenity === "hospital") count.hospitals++;
+      else if (landuse === "industrial") count.industrial++;
+      else if (leisure === "park") count.parks++;
+      else if (leisure === "playground") count.playgrounds++;
+      else if (highway === "bus_stop") count.bus_stops++;
+      else if (railway === "tram_stop") count.tram_stops++;
+    }
+    return count;
+  } catch {
+    return emptyCount();
+  }
+}
+
+function emptyCount(): AmenityCount {
+  return {
+    universities: 0, schools: 0, kindergartens: 0, dormitories: 0,
+    restaurants: 0, bars: 0, supermarkets: 0, pharmacies: 0,
+    doctors: 0, hospitals: 0, industrial: 0, parks: 0, playgrounds: 0,
+    bus_stops: 0, tram_stops: 0,
+  };
+}
+
+// ── ARSO noise (WMS GetFeatureInfo) ──────────────────────────────────────────
+async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> {
+  // ARSO hrupne karte — cestni hrup Lden
+  // WMS endpoint (preveriti točen layer)
+  try {
+    const url = `https://gis.arso.gov.si/arcgis/rest/services/okolje/hrup_ceste_Lden/ImageServer/identify?geometry=${lng},${lat}&geometryType=esriGeometryPoint&returnGeometry=false&f=json`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const data = await res.json() as { value?: string };
+    const val = parseFloat(data.value ?? "");
+    return isNaN(val) ? null : val;
+  } catch {
+    return null;
+  }
+}
+
+// ── ETN price clustering ──────────────────────────────────────────────────────
+async function fetchEtnPrice500m(lat: number, lng: number): Promise<number | null> {
+  // lat/lng v WGS84 → approx meter offset: 1°lat=111195m, 1°lng=77160m
+  const dLat = 500 / 111195;
+  const dLng = 500 / 77160;
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ avg_price: string }[]>(`
+      SELECT AVG(cena_m2)::text AS avg_price
+      FROM etn_transactions
+      WHERE lat BETWEEN ${lat - dLat} AND ${lat + dLat}
+        AND lng BETWEEN ${lng - dLng} AND ${lng + dLng}
+        AND cena_m2 > 100 AND cena_m2 < 20000
+        AND datum_pogodbe > NOW() - INTERVAL '3 years'
+    `);
+    const val = parseFloat(rows[0]?.avg_price ?? "");
+    return isNaN(val) ? null : Math.round(val);
+  } catch {
+    return null;
+  }
+}
+
+// ── Character tags derivation ─────────────────────────────────────────────────
+function deriveCharacter(
+  amenity300: AmenityCount,
+  amenity500: AmenityCount,
+  noise: number | null,
+  ageO65: number | null,
+  ageU30: number | null,
+): { tags: string[]; type: string } {
+  const tags: string[] = [];
+
+  // Šolajoča / mladinska
+  if (amenity500.universities + amenity500.dormitories >= 2) tags.push("🎓 Študentsko");
+  else if (amenity500.schools >= 2 && (ageU30 ?? 0) > 30) tags.push("👨‍👩‍👧 Družinsko");
+
+  // Starostna
+  if ((ageO65 ?? 0) > 30) tags.push("👴 Upokojensko");
+
+  // Industrija
+  if (amenity500.industrial >= 1) tags.push("🏭 Industrijsko");
+
+  // Hrup
+  if (noise != null) {
+    if (noise < 45) tags.push("🌿 Tiho območje");
+    else if (noise >= 65) tags.push("🚗 Prometno");
+  }
+
+  // Zeleno
+  if (amenity500.parks >= 2 && (noise ?? 99) < 55) tags.push("🌳 Zelena soseska");
+
+  // Gastro/urbano
+  if (amenity300.restaurants + amenity300.bars >= 5) tags.push("🍕 Živahno");
+
+  // Zdravstveno
+  if (amenity500.hospitals >= 1 || amenity500.doctors >= 3) tags.push("🏥 Zdravstveno");
+
+  // Transit
+  if (amenity300.tram_stops >= 1) tags.push("🚃 Tramvajska dostopnost");
+  else if (amenity300.bus_stops >= 3) tags.push("🚌 Dobra javna pot");
+
+  // Primary type
+  let type = "mešano";
+  if (tags.some(t => t.includes("Študentsko"))) type = "študentsko";
+  else if (tags.some(t => t.includes("Industrijsko"))) type = "industrijsko";
+  else if (tags.some(t => t.includes("Upokojensko"))) type = "upokojensko";
+  else if (tags.some(t => t.includes("Družinsko"))) type = "družinsko";
+  else if (tags.some(t => t.includes("Tiho"))) type = "mirno";
+  else if (tags.some(t => t.includes("Prometno"))) type = "prometno";
+
+  return { tags, type };
+}
+
+// ── Main: get or compute neighborhood profile ─────────────────────────────────
+export async function getNeighborhoodProfile(lat: number, lng: number): Promise<NeighborhoodProfile> {
+  const latR = Math.round(lat * 1000) / 1000;
+  const lngR = Math.round(lng * 1000) / 1000;
+
+  // Cache check
+  const cached = await prisma.$queryRawUnsafe<any[]>(`
+    SELECT * FROM neighborhood_cache
+    WHERE round(lat::numeric, 3) = ${latR} AND round(lng::numeric, 3) = ${lngR}
+      AND expires_at > NOW()
+    LIMIT 1
+  `).catch(() => []);
+
+  if (cached.length > 0) {
+    const c = cached[0];
+    return {
+      lat, lng,
+      noiseLdenDb: c.noise_lden_db,
+      noiseLabel: c.noise_label,
+      statOkolisId: c.stat_okolis_id,
+      statOkolisName: c.stat_okolis_name,
+      ageU30Pct: c.age_u30_pct,
+      age3065Pct: c.age_3065_pct,
+      ageO65Pct: c.age_o65_pct,
+      eduTertiaryPct: c.edu_tertiary_pct,
+      amenity: c.amenity_data,
+      pricePerM2_500m: c.price_per_m2_500m,
+      characterTags: c.character_tags ?? [],
+      neighborhoodType: c.neighborhood_type,
+    };
+  }
+
+  // Compute in parallel
+  const [noise, amenity300, amenity500, amenity1000, price] = await Promise.all([
+    fetchNoiseLden(lat, lng),
+    fetchOsmAmenities(lat, lng, 300),
+    fetchOsmAmenities(lat, lng, 500),
+    fetchOsmAmenities(lat, lng, 1000),
+    fetchEtnPrice500m(lat, lng),
+  ]);
+
+  // TODO: SURS census tract lookup (pending bulk import of census_tracts table)
+  const statOkolisId: string | null = null;
+  const statOkolisName: string | null = null;
+  const ageU30Pct: number | null = null;
+  const age3065Pct: number | null = null;
+  const ageO65Pct: number | null = null;
+  const eduTertiaryPct: number | null = null;
+
+  const amenityData: AmenityData = { r300: amenity300, r500: amenity500, r1000: amenity1000 };
+  const nLabel = noiseLabel(noise);
+  const { tags, type } = deriveCharacter(amenity300, amenity500, noise, ageO65Pct, ageU30Pct);
+
+  // Cache
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO neighborhood_cache
+      (lat, lng, stat_okolis_id, stat_okolis_name, noise_lden_db, noise_label,
+       age_u30_pct, age_3065_pct, age_o65_pct, edu_tertiary_pct,
+       amenity_data, character_tags, neighborhood_type, price_per_m2_500m,
+       computed_at, expires_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW()+INTERVAL '90 days')
+    ON CONFLICT DO NOTHING
+  `,
+    lat, lng,
+    statOkolisId, statOkolisName,
+    noise, nLabel,
+    ageU30Pct, age3065Pct, ageO65Pct, eduTertiaryPct,
+    JSON.stringify(amenityData),
+    tags, type,
+    price,
+  ).catch(() => {});
+
+  return {
+    lat, lng,
+    noiseLdenDb: noise,
+    noiseLabel: nLabel,
+    statOkolisId,
+    statOkolisName,
+    ageU30Pct,
+    age3065Pct,
+    ageO65Pct,
+    eduTertiaryPct,
+    amenity: amenityData,
+    pricePerM2_500m: price,
+    characterTags: tags,
+    neighborhoodType: type,
+  };
+}

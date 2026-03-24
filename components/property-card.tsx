@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { SubvencijeSection } from "./subvencije-section";
+import { NeighborhoodCard } from "./neighborhood-card";
 import { PropertyEditDrawer } from "./property-edit-drawer";
 import { izracunajVisinoStropov, izracunajStavbneKorekcije } from "@/lib/location-premium";
 import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
@@ -841,6 +842,16 @@ export function PropertyCard({
           {placesData && (
             <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
               <OkolicaSection placesData={placesData!} />
+            </div>
+          )}
+
+          {/* Soseska — neighborhood intelligence */}
+          {lat != null && lng != null && (
+            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <section>
+                <Label vir="OSM · ARSO hrup · ETN">Karakter soseske</Label>
+                <NeighborhoodCard lat={lat} lng={lng} />
+              </section>
             </div>
           )}
 
