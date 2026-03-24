@@ -31,11 +31,14 @@ export interface AmenityCount {
   pharmacies: number;
   doctors: number;
   hospitals: number;
-  industrial: number;   // industrial landuse areas nearby
+  health_centres: number;
+  industrial: number;
   parks: number;
   playgrounds: number;
+  sports_centres: number;
   bus_stops: number;
   tram_stops: number;
+  train_stations: number;
 }
 
 export interface NeighborhoodProfile {
@@ -93,11 +96,20 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       node["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
       node["amenity"="doctors"](around:${radiusM},${lat},${lng});
       node["amenity"="hospital"](around:${radiusM},${lat},${lng});
+      node["amenity"="clinic"](around:${radiusM},${lat},${lng});
+      node["amenity"="health_centre"](around:${radiusM},${lat},${lng});
       way["landuse"="industrial"](around:${radiusM},${lat},${lng});
       node["leisure"="park"](around:${radiusM},${lat},${lng});
+      way["leisure"="park"](around:${radiusM},${lat},${lng});
       node["leisure"="playground"](around:${radiusM},${lat},${lng});
+      node["leisure"="sports_centre"](around:${radiusM},${lat},${lng});
+      way["leisure"="sports_centre"](around:${radiusM},${lat},${lng});
+      node["leisure"="fitness_centre"](around:${radiusM},${lat},${lng});
+      node["leisure"="swimming_pool"](around:${radiusM},${lat},${lng});
       node["highway"="bus_stop"](around:${radiusM},${lat},${lng});
       node["railway"="tram_stop"](around:${radiusM},${lat},${lng});
+      node["railway"="station"](around:${radiusM},${lat},${lng});
+      node["railway"="halt"](around:${radiusM},${lat},${lng});
     );
     out count;
   `;
@@ -133,11 +145,14 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       else if (amenity === "pharmacy") count.pharmacies++;
       else if (amenity === "doctors") count.doctors++;
       else if (amenity === "hospital") count.hospitals++;
+      else if (amenity === "clinic" || amenity === "health_centre") count.health_centres++;
       else if (landuse === "industrial") count.industrial++;
       else if (leisure === "park") count.parks++;
       else if (leisure === "playground") count.playgrounds++;
+      else if (leisure === "sports_centre" || leisure === "fitness_centre" || leisure === "swimming_pool") count.sports_centres++;
       else if (highway === "bus_stop") count.bus_stops++;
       else if (railway === "tram_stop") count.tram_stops++;
+      else if (railway === "station" || railway === "halt") count.train_stations++;
     }
     return count;
   } catch {
@@ -149,8 +164,9 @@ function emptyCount(): AmenityCount {
   return {
     universities: 0, schools: 0, kindergartens: 0, dormitories: 0,
     restaurants: 0, bars: 0, supermarkets: 0, pharmacies: 0,
-    doctors: 0, hospitals: 0, industrial: 0, parks: 0, playgrounds: 0,
-    bus_stops: 0, tram_stops: 0,
+    doctors: 0, hospitals: 0, health_centres: 0, industrial: 0,
+    parks: 0, playgrounds: 0, sports_centres: 0,
+    bus_stops: 0, tram_stops: 0, train_stations: 0,
   };
 }
 
