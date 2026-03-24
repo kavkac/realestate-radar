@@ -122,21 +122,16 @@ def fetch_oglas(listing_id: str) -> dict | None:
         if "Just a moment" in html or "security verification" in html.lower():
             return None  # Cloudflare blocked
 
-        # Cena
-        cena = None
-        m = re.search(r'Cena[:\s]+([\d.,]+)\s*EUR', html, re.I)
-        if not m: m = re.search(r'([\d.,]+)\s*€', html)
-        if m:
-            try: cena = float(m.group(1).replace(".", "").replace(",", "."))
-            except: pass
-
-        # Površina
+        # Površina (relevantna za matching z GURS)
         pov = None
         m = re.search(r'Velikost[:\s]+([\d,]+)\s*m', html, re.I)
         if not m: m = re.search(r'>([\d,]+)\s*m\s*<sup>2', html)
         if m:
             try: pov = float(m.group(1).replace(",", "."))
             except: pass
+
+        # Cena: NE shranjujemo — listing price != transakcijska cena (ETN je vir resnice)
+        cena = None
 
         # Naslov iz h1
         naslov = ""
