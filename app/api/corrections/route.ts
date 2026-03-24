@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   // Check if user has a verified claim on this stavba (lastnik, solastnik, upravljalec, agent, valuator)
   const claimRows = await prisma.$queryRawUnsafe<{ verification_tier: string }[]>(
     `SELECT verification_tier FROM user_property_claims
-     WHERE user_id = $1 AND stavba_id = $2 AND deleted_at IS NULL LIMIT 1`,
+     WHERE user_id = $1 AND stavba_id = $2 LIMIT 1`,
     dbUserId, body.stavba_id
   );
   const claimTier = claimRows[0]?.verification_tier;
