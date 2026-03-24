@@ -14,6 +14,7 @@ import { getLppLineCount } from "@/lib/lpp-lines";
 import { getAirbnbStats } from "@/lib/airbnb";
 import { prisma } from "@/lib/prisma";
 import { getNeighborhoodProfile, calcProximityScore, getNearestWalkingTargets } from "@/lib/neighborhood-service";
+import { parseListingText, calcListingValuationDelta, type ListingSignals } from "@/lib/listing-nlp";
 
 const LookupSchema = z.object({
   address: z.string().min(3, "Naslov mora vsebovati vsaj 3 znake"),
@@ -441,6 +442,27 @@ export async function POST(request: NextRequest) {
       if (withLega) etnAnalizaFinal = withLega;
     }
 
+    // NLP signals — iz shranjenih opisov v listings_oglasi (če obstajajo)
+    let listingNlpSignals: ListingSignals | null = null;
+    let listingValuationDelta: ReturnType<typeof calcListingValuationDelta> | null = null;
+    try {
+      type NlpRow = { nlp_signals: Record<string, unknown> | null; opis: string | null };
+      const nlpRows = await prisma.$queryRawUnsafe<NlpRow[]>(
+        `SELECT nlp_signals, opis FROM listings_oglasi
+         WHERE ko_sifko = $1 AND nlp_signals IS NOT NULL
+         ORDER BY datum_zajet DESC LIMIT 1`,
+        String(stavba.koId)
+      );
+      if (nlpRows[0]?.nlp_signals) {
+        listingNlpSignals = nlpRows[0].nlp_signals as unknown as ListingSignals;
+      } else if (nlpRows[0]?.opis) {
+        listingNlpSignals = parseListingText(nlpRows[0].opis);
+      }
+      if (listingNlpSignals) {
+        listingValuationDelta = calcListingValuationDelta(listingNlpSignals, stNadstropja);
+      }
+    } catch { /* NLP je bonus, ne blokiramo */ }
+
     // Oglasne analize — dopolni z ETN mediano za razliko
     const oglasneAnalize = await oglasneAnalizePromise.then(r => {
       // Dopolni z ETN mediano za izračun discount-a
@@ -572,6 +594,8 @@ export async function POST(request: NextRequest) {
       placesData,
       lppLines: lppLines ?? null,
       oglasneAnalize: oglasneAnalize ?? null,
+      listingNlpSignals: listingNlpSignals ?? null,
+      listingValuationDelta: listingValuationDelta ?? null,
       koRentalYield: koRentalYield ?? null,
       saleToListRatio: saleToListRatio ?? null,
       airbnbStats: airbnbStats ?? null,
