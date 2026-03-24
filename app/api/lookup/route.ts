@@ -5,7 +5,7 @@ import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { getAzbestRisk } from "@/lib/azbest";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { estimateEiz } from "@/lib/eiz-estimator";
-import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio } from "@/lib/etn-lookup";
+import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio, getEtnPropertySignals } from "@/lib/etn-lookup";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
@@ -479,6 +479,17 @@ export async function POST(request: NextRequest) {
       }
     } catch { /* NLP je bonus, ne blokiramo */ }
 
+    // ETN property signals — stevilo_sob, parking, novogradnja iz etn_delistavb
+    let etnPropertySignals = null;
+    try {
+      const stDelList = deliStavbe?.map(d => String(d.stDelaStavbe ?? "")).filter(Boolean) ?? [];
+      etnPropertySignals = await getEtnPropertySignals(
+        String(stavba.koId),
+        String(stavba.stStavbe),
+        stDelList,
+      );
+    } catch { /* bonus */ }
+
     // Oglasne analize — dopolni z ETN mediano za razliko
     const oglasneAnalize = await oglasneAnalizePromise.then(r => {
       // Dopolni z ETN mediano za izračun discount-a
@@ -611,6 +622,7 @@ export async function POST(request: NextRequest) {
       lppLines: lppLines ?? null,
       oglasneAnalize: oglasneAnalize ?? null,
       listingNlpSignals: listingNlpSignals ?? null,
+      etnPropertySignals: etnPropertySignals ?? null,
       listingNlpDatum: listingNlpDatum ?? null,
       listingValuationDelta: listingValuationDelta ?? null,
       koRentalYield: koRentalYield ?? null,

@@ -1151,3 +1151,68 @@ export async function getSaleToListRatio(koId: number): Promise<SaleToListRatio 
 
   return { avgRatio, nMatched };
 }
+
+// ─── ETN Property Signals ───────────────────────────────────────────────────
+
+export interface EtnPropertySignals {
+  steviloSob: number | null;
+  parkingMesta: number | null;
+  atrij: boolean | null;
+  povrsinaAtrija: number | null;
+  novogradnja: boolean | null;
+  letoIzgradnje: number | null;
+  zadnjaTransakcija: string | null;
+}
+
+/**
+ * Prebere ETN signal-atribute za konkreten del stavbe (ko+stavba+del).
+ * Vrne zadnje znane vrednosti iz etn_delistavb (po datumu).
+ */
+export async function getEtnPropertySignals(
+  koSifko: string,
+  stevilkaStavbe: string,
+  stevilaDelStavbe: string[],
+): Promise<EtnPropertySignals | null> {
+  if (!koSifko || !stevilkaStavbe) return null;
+
+  const delFilter = stevilaDelStavbe.length > 0
+    ? `AND d.stevilka_dela_stavbe = ANY(ARRAY[${stevilaDelStavbe.map(s => `'${s}'`).join(",")}])`
+    : "";
+
+  const rows = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+    `SELECT
+      d.stevilo_sob,
+      d.stevilo_zunanjih_parkirnih_mest,
+      d.atrij,
+      d.povrsina_atrija,
+      d.novogradnja,
+      d.leto_izgradnje_dela_stavbe,
+      p.datum_sklenitve_pogodbe
+    FROM etn_delistavb d
+    JOIN etn_posli p ON p.id_posla = d.id_posla
+    WHERE d.sifra_ko = $1
+      AND d.stevilka_stavbe = $2
+      ${delFilter}
+      AND p.trznost_posla IN ('1','2','5')
+    ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
+    LIMIT 1`,
+    koSifko,
+    stevilkaStavbe,
+  );
+
+  if (!rows || rows.length === 0) return null;
+
+  const r = rows[0];
+  const toNum = (v: unknown) => (v != null && v !== "" ? parseFloat(String(v)) || null : null);
+  const toBool = (v: unknown) => (v != null && v !== "" ? String(v) === "1" || String(v).toLowerCase() === "true" : null);
+
+  return {
+    steviloSob: toNum(r.stevilo_sob),
+    parkingMesta: toNum(r.stevilo_zunanjih_parkirnih_mest),
+    atrij: toBool(r.atrij),
+    povrsinaAtrija: toNum(r.povrsina_atrija),
+    novogradnja: toBool(r.novogradnja),
+    letoIzgradnje: toNum(r.leto_izgradnje_dela_stavbe),
+    zadnjaTransakcija: r.datum_sklenitve_pogodbe ? String(r.datum_sklenitve_pogodbe) : null,
+  };
+}
