@@ -13,6 +13,7 @@ import { getPlacesData } from "@/lib/places-api";
 import { getLppLineCount } from "@/lib/lpp-lines";
 import { getAirbnbStats } from "@/lib/airbnb";
 import { prisma } from "@/lib/prisma";
+import { getNeighborhoodProfile, calcProximityScore, getNearestWalkingTargets } from "@/lib/neighborhood-service";
 
 const LookupSchema = z.object({
   address: z.string().min(3, "Naslov mora vsebovati vsaj 3 znake"),
@@ -411,14 +412,32 @@ export async function POST(request: NextRequest) {
     let etnAnalizaFinal = etnAnaliza;
     const certEnergyClass = energyCertResult?.cert?.energyClass;
     const osmAmenitiesCount = osmData ? (Object.values(osmData as Record<string, unknown[]>).flat().length) : null;
+
+    // Proximity score — walking-time-based valuation signal
+    // Najprej poskusimo iz cache (neighborhood_cache), sicer hitri OSRM fetch
+    let proximityScore: number | null = null;
+    if (lat != null && lng != null) {
+      try {
+        const cached = await getNeighborhoodProfile(lat, lng).catch(() => null);
+        if (cached?.proximityScore != null) {
+          proximityScore = cached.proximityScore;
+        } else {
+          // Ni v cache → async izračun (ne blokira, timeout 8s)
+          const walking = await getNearestWalkingTargets(lat, lng);
+          const noiseDb = cached?.noiseLdenDb ?? null;
+          proximityScore = calcProximityScore(walking, noiseDb);
+        }
+      } catch { /* proximity je bonus, ne blokiramo valuacije */ }
+    }
+
     if (certEnergyClass && etnAnaliza && useableArea) {
-      const corrected = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja)
-        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja).catch(() => null))
+      const corrected = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja, proximityScore)
+        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja, proximityScore).catch(() => null))
         .catch(() => null);
       if (corrected) etnAnalizaFinal = corrected;
     } else if (etnAnalizaFinal && (idLega || stNadstropja)) {
       // Re-run with lega even without cert correction
-      const withLega = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass ?? null, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja).catch(() => null);
+      const withLega = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass ?? null, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja, proximityScore).catch(() => null);
       if (withLega) etnAnalizaFinal = withLega;
     }
 

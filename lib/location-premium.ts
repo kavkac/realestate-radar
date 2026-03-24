@@ -69,7 +69,10 @@ function distToPolylineKm(lat: number, lng: number, polyline: [number, number][]
 export function izracunajLokacijskiPremium(
   lat: number,
   lng: number,
+  /** @deprecated — zamenjaj z proximityScore iz neighborhood-service */
   osmAmenitiesCount?: number | null,
+  /** Predizračunan walking-time-based score iz calcProximityScore() (-0.15..+0.20) */
+  proximityScore?: number | null,
 ): LokacijskiPremium {
   const faktorji: LokacijskiFaktor[] = [];
 
@@ -109,8 +112,21 @@ export function izracunajLokacijskiPremium(
     faktorji.push({ naziv: "Blizu Tivolija", opis: `${Math.round(distTivoli * 1000)}m od parka`, korekcija: 0.03, ikona: "🌳" });
   }
 
-  // 5. OSM amenity density score (dostopnost)
-  if (osmAmenitiesCount != null) {
+  // 5. Proximity score — walking-time-based (neighborhood-service)
+  // Prednost pred osmAmenitiesCount: baziran na dejanski razdalji hoje, vključuje hrup
+  if (proximityScore != null) {
+    if (proximityScore >= 0.10) {
+      faktorji.push({ naziv: "Odlična dostopnost", opis: `Šole, prevoz, storitve v kratki hoji (walking score +${Math.round(proximityScore * 100)}%)`, korekcija: proximityScore, ikona: "🚶" });
+    } else if (proximityScore >= 0.03) {
+      faktorji.push({ naziv: "Dobra dostopnost", opis: `Osnovna infrastruktura dostopna peš (+${Math.round(proximityScore * 100)}%)`, korekcija: proximityScore, ikona: "🚶" });
+    } else if (proximityScore <= -0.05) {
+      faktorji.push({ naziv: "Slaba dostopnost / hrup", opis: `Oddaljenost ali visok hrup (${Math.round(proximityScore * 100)}%)`, korekcija: proximityScore, ikona: "🔇" });
+    } else if (proximityScore < 0) {
+      faktorji.push({ naziv: "Zmerna dostopnost", opis: `Omejene storitve ali zmeren hrup (${Math.round(proximityScore * 100)}%)`, korekcija: proximityScore, ikona: "📍" });
+    }
+    // neutralen proximityScore (0–0.03) → ni posebnega faktorja
+  } else if (osmAmenitiesCount != null) {
+    // Fallback na stari sistem če proximityScore ni na voljo
     if (osmAmenitiesCount >= 20) {
       faktorji.push({ naziv: "Odlična dostopnost", opis: `${osmAmenitiesCount}+ točk storitev v bližini`, korekcija: 0.05, ikona: "🏪" });
     } else if (osmAmenitiesCount >= 10) {
