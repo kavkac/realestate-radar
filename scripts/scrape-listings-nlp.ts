@@ -72,9 +72,10 @@ async function main() {
 
       const signals = parseListingText(opis);
 
+      // SHIELD: shranjujemo SAMO strukturirane NLP signale, ne surovih opisov
+      // robots.txt: /nepremicnine.html Allow; ai-train=no → interno samo
       await prisma.$executeRawUnsafe(
-        `UPDATE listings_oglasi SET opis = $1, nlp_signals = $2::jsonb WHERE id = $3`,
-        opis.slice(0, 5000),
+        `UPDATE listings_oglasi SET nlp_signals = $1::jsonb WHERE id = $2`,
         JSON.stringify(signals),
         oglas.id
       );
