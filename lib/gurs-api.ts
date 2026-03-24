@@ -1,4 +1,67 @@
 import { getCached, setCached } from "./wfs-cache";
+import { Pool } from "pg";
+
+// DB pool for gurs_kn_stavbe lookups (DB-first, WFS fallback)
+const _knPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
+
+/** Map gurs_kn_stavbe DB row → StavbaData */
+function knRowToStavbaData(row: Record<string, unknown>): StavbaData {
+  const obrisGeom = row.obris_geom
+    ? (typeof row.obris_geom === "string" ? JSON.parse(row.obris_geom) : row.obris_geom)
+    : null;
+  const validObris = obrisGeom?.type === "Polygon" ? obrisGeom : null;
+  return {
+    koId: row.ko_id as number,
+    stStavbe: row.st_stavbe as number,
+    eidStavba: String(row.eid_stavba),
+    letoIzgradnje: (row.leto_izgradnje as number) || null,
+    letoObnoveFasade: (row.leto_obnove_fasade as number) || null,
+    letoObnoveStrehe: (row.leto_obnove_strehe as number) || null,
+    steviloEtaz: (row.stevilo_etaz as number) || null,
+    steviloStanovanj: (row.stevilo_stanovanj as number) || null,
+    brutoTlorisnaPovrsina: (row.bruto_tlorisna_pov as number) || null,
+    elektrika: Boolean(row.elektrika),
+    plin: Boolean(row.plin),
+    vodovod: Boolean(row.vodovod),
+    kanalizacija: Boolean(row.kanalizacija),
+    nosilnaKonstrukcija: NOSILNA_KONSTRUKCIJA[row.nosilna_konstrukcija_id as number] ?? null,
+    tipStavbe: TIP_STAVBE[row.tip_stavbe_id as number] ?? null,
+    datumSys: row.datum_sys ? String(row.datum_sys) : null,
+    visina: (row.visina_h2 != null && row.visina_h3 != null)
+      ? (row.visina_h2 as number) - (row.visina_h3 as number) : null,
+    tipPolozaja: null,
+    obrisGeom: validObris,
+    ...izracunajGeometrijo(validObris),
+  };
+}
+
+/** Lookup single building from gurs_kn_stavbe table */
+async function getBuildingFromDb(eidStavba: string): Promise<StavbaData | null> {
+  try {
+    const res = await _knPool.query(
+      "SELECT * FROM gurs_kn_stavbe WHERE eid_stavba=$1 LIMIT 1",
+      [BigInt(eidStavba)]
+    );
+    if (res.rows.length === 0) return null;
+    return knRowToStavbaData(res.rows[0]);
+  } catch { return null; }
+}
+
+/** Lookup multiple buildings by ko_id from gurs_kn_stavbe table */
+async function getBuildingsByKoFromDb(koId: number, stStavbeList?: number[]): Promise<StavbaData[]> {
+  try {
+    let res;
+    if (stStavbeList && stStavbeList.length > 0) {
+      res = await _knPool.query(
+        "SELECT * FROM gurs_kn_stavbe WHERE ko_id=$1 AND st_stavbe=ANY($2)",
+        [koId, stStavbeList]
+      );
+    } else {
+      res = await _knPool.query("SELECT * FROM gurs_kn_stavbe WHERE ko_id=$1", [koId]);
+    }
+    return res.rows.map(knRowToStavbaData);
+  } catch { return []; }
+}
 
 /** Preveri ali katerakoli točka poligona A leži v poligonu B ali obratno → presečišče */
 function polygonsIntersect(ringA: number[][], ringB: number[][]): boolean {
@@ -393,6 +456,11 @@ export async function getBuildingEid(hsMid: number): Promise<string | null> {
 export async function getBuilding(
   eidStavba: string,
 ): Promise<StavbaData | null> {
+  // DB-first: hit gurs_kn_stavbe if import is complete, WFS fallback otherwise
+  const fromDb = await getBuildingFromDb(eidStavba);
+  if (fromDb) return fromDb;
+
+  // WFS fallback (during import or for very new buildings)
   const url = buildWfsUrl(BASE_KN, "SI.GURS.KN:STAVBE_H", `EID_STAVBA='${eidStavba}'`) + "&SRSNAME=EPSG:4326";
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return null;
@@ -546,6 +614,7 @@ export async function getParcelById(
 export async function getBuildingsByParcel(
   eidParcele: string,
 ): Promise<StavbaData[]> {
+  // Step 1: get EID_STAVBA list from WFS STAVBE_H by parcel (lightweight — just need EIDs)
   const url = buildWfsUrl(
     BASE_KN,
     "SI.GURS.KN:STAVBE_H",
@@ -554,12 +623,23 @@ export async function getBuildingsByParcel(
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return [];
 
-  return data.features.map((feat) => {
+  // Step 2: for each EID, try DB first → WFS fallback
+  const results: StavbaData[] = [];
+  for (const feat of data.features) {
+    const eidStavba = String(feat.properties?.EID_STAVBA);
+    if (!eidStavba || eidStavba === "undefined") continue;
+
+    const fromDb = await getBuildingFromDb(eidStavba);
+    if (fromDb) {
+      results.push(fromDb);
+      continue;
+    }
+    // WFS fallback (import not yet complete)
     const p = feat.properties;
-    return {
+    results.push({
       koId: p.KO_ID as number,
       stStavbe: p.ST_STAVBE as number,
-      eidStavba: String(p.EID_STAVBA),
+      eidStavba,
       letoIzgradnje: (p.LETO_IZGRADNJE as number) || null,
       letoObnoveFasade: (p.LETO_OBNOVE_FASADE as number) || null,
       letoObnoveStrehe: (p.LETO_OBNOVE_STREHE as number) || null,
@@ -571,7 +651,7 @@ export async function getBuildingsByParcel(
       vodovod: wfsBool(p.VODOVOD),
       kanalizacija: wfsBool(p.KANALIZACIJA),
       nosilnaKonstrukcija:
-        NOSILNA_KONSTRUKCIJA[p.NOSILNA_KONSTRUKCIJA_ID as number] ?? null,
+        NOSILNA_KONSTRUKCIJA[p.NOSILCI_KONSTRUKCIJA_ID as number] ?? null,
       tipStavbe: TIP_STAVBE[p.TIP_STAVBE_ID as number] ?? null,
       datumSys: p.DATUM_SYS ? String(p.DATUM_SYS) : null,
       visina: (p.VISINA_H2 != null && p.VISINA_H3 != null) ? (p.VISINA_H2 as number) - (p.VISINA_H3 as number) : null,
@@ -579,8 +659,9 @@ export async function getBuildingsByParcel(
       kompaktnost: null,
       orientacija: null,
       obrisGeom: null,
-    };
-  });
+    });
+  }
+  return results;
 }
 
 // --- Zemljišče šifrant ---
