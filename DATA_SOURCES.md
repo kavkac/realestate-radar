@@ -1,8 +1,57 @@
 # DATA_SOURCES.md — RealEstateRadar Master Data Catalog
 
-> Zadnja posodobitev: 2026-03-19  
+> Zadnja posodobitev: 2026-03-23  
 > Avtor: Atlas (CEO), generiran z analizo live DB  
 > DB: `postgresql://switchback.proxy.rlwy.net:31940/railway`
+
+---
+
+## 📍 Source of Truth Registry — Kateri vir je resnica za kateri atribut
+
+> Pravilo: **nikoli ne mešaj virov za isti atribut brez razloga**. Če ima LiDAR boljšo natančnost, ga uporabi — in ignoriraj GURS za ta atribut. Če ima GURS pravno veljavnost, ga uporabi — in ignoriraj LiDAR. Hibrid samo kadar ni boljše opcije.
+
+| Atribut | ✅ Primarni vir | 🔄 Fallback | ❌ Ne uporabi | Opomba |
+|---------|----------------|------------|--------------|--------|
+| **Tržna vrednost** | ETN kupoprodaja | KO mediana → regija → nacional | GURS EV (zastarela metoda) | Proximity 400m je king |
+| **Mesečna najemnina** | ETN najem | — | Oglaševane cene (bias +30%) | Tržna korekcija po lokacijskem faktorju |
+| **Cena/m² trend** | ETN letni podatki | SURS indeksi | — | Y-o-Y primerjava zadnja 2 leti |
+| **Površina enote** | GURS `ev_del_stavbe.upor_pov` | `ev_del_stavbe.povrsina` | LiDAR (ni interier) | Pravno relevantna površina |
+| **Površina parcele** | GURS `ev_parcela` | — | LiDAR | Katastrska površina je pravna |
+| **Leto izgradnje** | GURS `ev_stavba.leto_izg_sta` | OSM `start_date` | LiDAR (ne vidi časa) | Pogosto NULL — handle gracefully |
+| **Višina stavbe** | **LiDAR DMP−DMR** | GURS `ev_stavba` (napake ~20%) | OSM `height` (unreliable) | LiDAR ±0.15m vs GURS ±2-5m |
+| **Število nadstropij** | GURS `ev_stavba.st_etaz` | LiDAR (višina/3m estimate) | OSM | GURS je legal ground truth |
+| **Nadmorska višina stavbe** | **LiDAR DMR** | GURS koordinate (samo X,Y) | SRTM (30m resolucija) | LiDAR 1m vs SRTM 30m |
+| **Naklon terena** | **LiDAR DMR** | — | ARSO, GURS (nimata) | Samo LiDAR ima zadostno resolucijo |
+| **Pogled (viewshed)** | **LiDAR DMP** | — | Nič drugega ni zanesljivo | Raytrace iz nadstropja na tarče |
+| **Osončenost** | **LiDAR DMP** | Orientacija fasade (grobo) | — | Solar radiation model |
+| **Poplavno tveganje (mikro)** | **LiDAR DMR** | ARSO poplavne cone (grobe) | — | Flow accumulation < 10m resolucija |
+| **Potresna nevarnost** | ARSO seizmična conacija | — | LiDAR (ne vidi geologije) | ARSO je edini zanesljiv vir |
+| **Energetski razred** | EIZ certifikat | Heuristika po letu izgradnje | LiDAR (ni toplotnih podatkov) | Veljavnost 10 let — preveri datum |
+| **Material konstrukcije** | GURS `ev_stavba.id_konstrukcija` | OSM `building:material` | LiDAR | GURS je primarni register |
+| **Lastništvo** | GURS ZK (e-sodstvo) | `ev_oseba` bulk dump | — | ZK je pravno zavezujoč |
+| **Bremena/hipoteke** | GURS ZK API | — | — | TODO — zahteva ZK dostop |
+| **POI dostopnost** | OSM Overpass | — | LiDAR | OSM pokriva ~80% urbanih POI |
+| **Javni promet** | OSM (postaje) | — | LiDAR | R²<2% na vrednost — informativno only |
+| **Azbest tveganje** | Heuristika (leto izgradnje) | — | LiDAR | Ni javnega azbest registra |
+| **Šolski okoliš** | GURS RPE + občinski OPN | — | — | Infrastructure ready |
+
+### ⚖️ Kdaj LiDAR, kdaj ne
+
+**LiDAR JE ground truth za:**
+- Višina stavbe (ne GURS)
+- Nadmorska višina točke (ne SRTM)
+- Naklon terena
+- Viewshed / pogled
+- Osončenost / senca
+- Mikro-poplavno tveganje (ne ARSO cone)
+
+**LiDAR NI primeren za:**
+- Površina (pravna — GURS)
+- Lastništvo (pravna — ZK)
+- Energetska učinkovitost (fizikalni izračun — EIZ)
+- Tržna vrednost (trg — ETN)
+- Vse kar je za zidovi (interior)
+- Vse kar se spreminja z gradbeno aktivnostjo med letnimi osvežitvami
 
 ---
 
@@ -269,53 +318,67 @@ Za oceno vrednosti nepremičnine uporabljaj vire v tem vrstnem redu:
 
 ---
 
-### 7. `dmr_1m_tiles` + `dmr_download_urls` — LiDAR DMR Topografija
+### 7. `dmr_download_urls` — LiDAR DMR + DMP (Point Cloud)
 
-**Namen:** Digitalni model reliefa (DMR) 1m resolucija — LiDAR aero-snemanje celotne Slovenije. GURS podatki. Za izračun naklona, orientacije (sever/jug), nadmorske višine, poplavnih tveganj.
+**Namen:** LiDAR aero-snemanje celotne Slovenije. Dva dataseta:
+- **DMR** (Digitalni model reliefa) = čisti teren brez stavb in vegetacije
+- **DMP** (Digitalni model površja) = vse skupaj: teren + stavbe + drevesa
 
-**Vrstice:** `dmr_1m_tiles`: 21,261 ploščic | `dmr_download_urls`: 14,721 blokov  
+**Vrstice:** `dmr_download_urls`: 14,721 tile-ov (DMR + DMP + GKOT + NDMP)  
+**Format:** LAZ (compressed LAS), point format 0  
+**Gostota:** ~2.7 točk/m² (standardna SLO državna izmera)  
+**Natančnost:** ±0.15m vertikalno, 1mm precision (scale 0.001)  
+**CRS:** D96/TM  
+**Tile velikost:** ~1km × 1km, ~200k točk/tile  
 **Pokritost:** 100% ozemlja SLO
 
-**Natančnost/zanesljivost:** ⭐⭐⭐⭐⭐ (5/5)
-- LiDAR natančnost ±0.15m vertikalno
-- 1m × 1m grid resolucija
+**Natančnost/zanesljivost:** ⭐⭐⭐⭐⭐ (5/5) — za fizično topografijo
 
-**Tabele in ključne kolumne:**
+**Ključne kolumne `dmr_download_urls`:**
+- `ti_name` — grid koordinati (npr. `496_166` = D96 496xxx, 166xxx)
+- `link_dmr` — LAZ file: teren brez stavb (za naklon, višino, poplave)
+- `link_dmp` — LAZ file: teren + stavbe + vegetacija (za viewshed, višino stavb, osončenost)
+- `link_gkot` — geoidne kote (korekcija elipsoid → ortometrična višina)
+- `link_ndmp` — normalizirani DMP = samo stavbe + vegetacija (DMP−DMR)
 
-`dmr_1m_tiles`:
-- `tile_id` / `filename` — identifikator ploščice
-- `bbox_minx/y` + `bbox_maxx/y` — bounding box v D96/TM
-- `resolution` — "1m"
-- `blok` / `datum_snem` — blok in datum snemanja
-- `downloaded_at` — kdaj smo prenesli
-
-`dmr_download_urls`:
-- `ti_name` — ime ploščice (primarni ključ)
-- `ime_ob` — ime občine
-- `link_dmr` — URL za DMR (nadmorska višina)
-- `link_dmp` — URL za DMP (digitalni model površja)
-- `link_gkot` — URL za geoidne kote
-- `link_pof` / `link_pofi` — pohodnost
-- `link_ndmp` — normalizirani DMP (stavbe, drevesa)
-- `link_pas` — pasovni model
-- `dmr_size_mb` / `gkot_size_mb` — velikosti datotek
-
-**Svežina:** GURS izdaja nov LiDAR ciklično (~5 let). Zadnje snemanje: 2011–2015 (večina SLO).  
-**Cron refresh:** ❌ Ni potreben pogosto — statični podatki
+**Svežina:** CLSS osvežuje letno. Naš download: zadnji dostopni zajem.  
+**Token refresh:** ✅ Avtomatski cron vsak dan ob 03:00 (`refresh-clss-token.ts`)  
+**Download:** `scripts/download-lidar-tiles.py --resume --workers 4`
 
 **Omejitve:**
-- Statični podatki — ne odražajo novih gradenj
-- Ni podatkov o rabi tal ali vegetaciji (le relief)
-- Prenos tileov je potreben za processing (ne live query)
-- DMP (površje) vključuje stavbe — za relief brez stavb gebruik DMR
+- Letno osveženi podatki — aktualni zajem (potrdil Jaka 24.3.2026)
+- Stavbe: DMP vsebuje vse stavbe, a ne ve katera je katera (brez stavbnih ID-jev)
+- Vegetacija: drevesa so v DMP — za viewshed je to feature, ne bug
+- Ni podatka o notranjosti stavb
+
+**Zanesljive uporabe (implementirati):**
+
+| Izračun | Dataset | Metoda | Napaka |
+|---------|---------|--------|--------|
+| Višina stavbe | DMP − DMR @ stavbni footprint | max(DMP) − median(DMR) | ±0.3m |
+| Nadmorska višina točke | DMR | interpolacija na koordinati | ±0.15m |
+| Naklon terena | DMR | gradient | ±0.5° |
+| Viewshed (pogled) | DMP | raytrace iz nadstropja | deterministično |
+| Osončenost | DMP | solar radiation model | ±15% |
+| Mikro-poplave | DMR | flow accumulation | kvalitativno |
+
+**Nezanesljive uporabe (ne implementirati):**
+- Površina stanovanja (ni interier podatkov)
+- Material stavbe
+- Stanje stavbe po 2015
+- Karkoli pravno relevantnega
 
 **Uporaba v kodi:**
-- Trenutno: neuporabljeno v live endpointih
-- Potencial: micro-lokacijska korekcija (južna lega +3–5%, strmina diskont)
+- Trenutno: `scripts/download-lidar-tiles.py` — prenos
+- `scripts/refresh-clss-token.ts` — dnevni token refresh
+- Planirana: `lib/lidar-service.ts` — viewshed API, višina stavbe
+- Deblokira: `location-premium.ts` → TODO viewshed korekcija
 
-**Priporočena uporaba:**
-- Batch processing za izračun lokacijskih faktorjev
-- Kombinirati z centroidi iz ev_stavba za nadmorsko višino vsake stavbe
+**Pipeline za implementacijo (Faza A+B):**
+```
+LAZ → laspy → numpy raster (1m grid) → GeoTIFF COG → PostGIS index
+→ on-demand viewshed API za vsako nepremičnino
+```
 
 ---
 
