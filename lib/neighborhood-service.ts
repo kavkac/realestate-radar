@@ -63,6 +63,8 @@ export interface NeighborhoodProfile {
   // Izpeljano
   characterTags: string[];
   neighborhoodType: string | null;
+  walkingTargets?: WalkingResult[];
+  proximityScore?: number; // -0.15 do +0.20, vrednostni multiplikator
 }
 
 // ── Noise label ───────────────────────────────────────────────────────────────
@@ -327,4 +329,123 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
     characterTags: tags,
     neighborhoodType: type,
   };
+}
+
+// ── Walking distance via OSRM ─────────────────────────────────────────────────
+
+export interface WalkingTarget {
+  name: string;
+  lat: number;
+  lng: number;
+  type: "school" | "kindergarten" | "university" | "hospital" | "bus_stop" | "tram_stop" | "park" | "supermarket";
+}
+
+export interface WalkingResult extends WalkingTarget {
+  walkMinutes: number | null;
+  distanceM: number | null;
+}
+
+/** Poišče najbližje POI-je iz OSM in izračuna čas hoje via OSRM */
+export async function getNearestWalkingTargets(lat: number, lng: number): Promise<WalkingResult[]> {
+  const TYPES: Array<{ type: WalkingTarget["type"]; query: string }> = [
+    { type: "kindergarten", query: `node["amenity"="kindergarten"](around:1000,${lat},${lng});` },
+    { type: "school",       query: `node["amenity"="school"](around:1000,${lat},${lng});` },
+    { type: "university",   query: `node["amenity"="university"](around:2000,${lat},${lng});` },
+    { type: "hospital",     query: `node["amenity"="hospital"](around:2000,${lat},${lng});` },
+    { type: "bus_stop",     query: `node["highway"="bus_stop"](around:500,${lat},${lng});` },
+    { type: "tram_stop",    query: `node["railway"="tram_stop"](around:800,${lat},${lng});` },
+    { type: "supermarket",  query: `node["shop"="supermarket"](around:800,${lat},${lng});` },
+    { type: "park",         query: `node["leisure"="park"](around:800,${lat},${lng});` },
+  ];
+
+  const results: WalkingResult[] = [];
+
+  for (const { type, query } of TYPES) {
+    const overpassQ = `[out:json][timeout:6];(${query});out 3;`;
+    try {
+      const res = await fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        body: `data=${encodeURIComponent(overpassQ)}`,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json() as { elements: Array<{ lat: number; lon: number; tags?: Record<string,string> }> };
+      
+      // Vzami najbližji element
+      const nearest = data.elements[0];
+      if (!nearest) continue;
+
+      const name = nearest.tags?.name ?? nearest.tags?.["name:sl"] ?? type;
+      
+      // OSRM walking time
+      const osrmUrl = `http://router.project-osrm.org/route/v1/foot/${lng},${lat};${nearest.lon},${nearest.lat}?overview=false`;
+      let walkMins: number | null = null;
+      let distM: number | null = null;
+      try {
+        const r2 = await fetch(osrmUrl, { signal: AbortSignal.timeout(5000) });
+        if (r2.ok) {
+          const rd = await r2.json() as { routes?: Array<{ duration: number; distance: number }> };
+          if (rd.routes?.[0]) {
+            walkMins = Math.round(rd.routes[0].duration / 60);
+            distM = Math.round(rd.routes[0].distance);
+          }
+        }
+      } catch { /* fallback: crow-flies */ }
+
+      results.push({ name, lat: nearest.lat, lng: nearest.lon, type, walkMinutes: walkMins, distanceM: distM });
+    } catch { continue; }
+  }
+
+  return results;
+}
+
+// ── Proximity valuation score ─────────────────────────────────────────────────
+/**
+ * Izračuna vrednostni bonus/malus iz proximity podatkov.
+ * Vrne vrednost med -0.15 in +0.20 (multiplikator nad 1.0).
+ */
+export function calcProximityScore(walking: WalkingResult[], noise: number | null): number {
+  let score = 0;
+
+  for (const w of walking) {
+    const mins = w.walkMinutes ?? 99;
+    switch (w.type) {
+      case "kindergarten":
+      case "school":
+        if (mins <= 5) score += 0.03;
+        else if (mins <= 10) score += 0.015;
+        break;
+      case "university":
+        if (mins <= 10) score += 0.04; // najem premium
+        else if (mins <= 20) score += 0.02;
+        break;
+      case "hospital":
+        if (mins <= 10) score += 0.02;
+        break;
+      case "tram_stop":
+        if (mins <= 3) score += 0.04;
+        else if (mins <= 7) score += 0.02;
+        break;
+      case "bus_stop":
+        if (mins <= 3) score += 0.02;
+        else if (mins <= 7) score += 0.01;
+        break;
+      case "supermarket":
+        if (mins <= 5) score += 0.015;
+        break;
+      case "park":
+        if (mins <= 5) score += 0.02;
+        break;
+    }
+  }
+
+  // Hrup malus
+  if (noise != null) {
+    if (noise >= 65) score -= 0.08;
+    else if (noise >= 55) score -= 0.04;
+    else if (noise < 45) score += 0.03; // tiho = bonus
+  }
+
+  return Math.max(-0.15, Math.min(0.20, score));
 }
