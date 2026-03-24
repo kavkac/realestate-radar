@@ -57,6 +57,7 @@ def ensure_table(conn):
     print("Table kn_namenske_rabe ready")
 
 def wfs_url(start: int, count: int) -> str:
+    # No STATUS_VELJAVNOSTI filter — NAMENSKE_RABE doesn't have that column
     return (
         f"{WFS_BASE}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature"
         f"&TYPENAMES={TYPENAME}"
