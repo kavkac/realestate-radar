@@ -473,6 +473,50 @@ export function AddressSearch() {
   const isLoading = activeTab?.loading ?? false;
   const showShareButton = activeTab?.data?.success ?? false;
 
+  // Re-fetch lookup for active tab (triggered after corrections saved)
+  async function handleRefreshActiveTab() {
+    if (!activeTab || !activeTabId) return;
+    const addr = activeTab.naslov;
+    const del = activeTab.del;
+    const currentId = activeTabId;
+
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === currentId ? { ...t, loading: true, error: null } : t
+      )
+    );
+
+    try {
+      const body: Record<string, unknown> = { address: addr };
+      if (del != null) body.delStavbe = del;
+      const res = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data: LookupResult = await res.json();
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === currentId
+            ? {
+                ...t,
+                loading: false,
+                data: data.success ? data : t.data, // keep old data if refresh fails
+                error: null,
+              }
+            : t
+        )
+      );
+    } catch {
+      // On error, just clear loading state — keep old data
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === currentId ? { ...t, loading: false } : t
+        )
+      );
+    }
+  }
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-3" aria-label="Iskanje nepremičnine">
@@ -659,6 +703,7 @@ export function AddressSearch() {
               poplavnaNevarnost={activeTab.data.poplavnaNevarnost as never}
               listingNlpSignals={(activeTab.data as unknown as { listingNlpSignals?: import('@/lib/listing-nlp').ListingSignals }).listingNlpSignals}
               listingNlpDatum={(activeTab.data as unknown as { listingNlpDatum?: string }).listingNlpDatum}
+              onRefresh={handleRefreshActiveTab}
               requestedDel={activeTab.del}
               onClearDel={() => {
                 setTabs(tabs.map(t => t.id === activeTabId ? { ...t, del: undefined } : t));

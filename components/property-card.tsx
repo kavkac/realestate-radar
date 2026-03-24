@@ -281,6 +281,7 @@ interface PropertyCardProps {
   airbnbStats?: AirbnbStats | null;
   listingNlpSignals?: import("@/lib/listing-nlp").ListingSignals | null;
   listingNlpDatum?: string | null;
+  onRefresh?: () => void; // Trigger re-fetch of lookup data (after corrections saved)
 }
 
 export interface PropertyContextData {
@@ -387,6 +388,7 @@ export function PropertyCard({
   airbnbStats,
   listingNlpSignals,
   listingNlpDatum,
+  onRefresh,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
   const [showAllUnits, setShowAllUnits] = useState(false);
@@ -932,13 +934,18 @@ export function PropertyCard({
           delStavbeId={delStavbeId}
           naslov={naslov}
           onSaved={async () => {
-            // Refresh corrections after save
+            // Refresh corrections list
             try {
               const res = await fetch(`/api/corrections?stavba_id=${stavbaId}`);
               const data = await res.json();
               setCorrections(data.corrections ?? []);
             } catch {
               // Ignore refresh errors
+            }
+            // Re-fetch full lookup so corrected fields (fasada, streha, etc.)
+            // immediately update the valuation and all derived data
+            if (onRefresh) {
+              onRefresh();
             }
           }}
         />
