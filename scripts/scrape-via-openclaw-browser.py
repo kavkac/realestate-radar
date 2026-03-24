@@ -230,6 +230,16 @@ def main():
             continue
 
         upsert(conn, data)
+
+        # Per-field merge v property_signals
+        merge_signals(
+            conn,
+            ko_sifko=data.get("ko"),
+            naslov=data.get("naslov", ""),
+            new_signals=data["nlp"],
+            source_url=data["url"],
+            datum=time.strftime("%Y-%m-%d"),
+        )
         ok += 1
 
         p = data["nlp"].get("pogled") or ""
@@ -244,3 +254,76 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ── Property signals merge ────────────────────────────────────────────────────
+
+import hashlib
+
+def normalize_naslov(naslov: str) -> str:
+    """Normalizira naslov za matching (brez številk, lowercase, brez presledkov)."""
+    s = re.sub(r'\d+', '', naslov.lower())
+    s = re.sub(r'[^a-zčšž\s]', '', s)
+    return re.sub(r'\s+', ' ', s).strip()
+
+def merge_signals(conn, ko_sifko: str | None, naslov: str, new_signals: dict, source_url: str, datum: str):
+    """
+    Per-field merge v property_signals tabelo.
+    - Novo non-null polje → override staro + posodobi datum
+    - Staro polje ki ni v novem oglasu → ohrani
+    """
+    if not ko_sifko and not naslov:
+        return
+
+    cur = conn.cursor()
+    naslov_hash = hashlib.md5(normalize_naslov(naslov).encode()).hexdigest()[:12]
+
+    # Poišči obstoječ zapis
+    cur.execute(
+        "SELECT id, signals, signal_dates, signal_sources FROM property_signals WHERE ko_sifko = %s AND naslov_hash = %s",
+        (ko_sifko, naslov_hash)
+    )
+    row = cur.fetchone()
+
+    if row:
+        rec_id, old_signals, old_dates, old_sources = row
+        merged = dict(old_signals or {})
+        merged_dates = dict(old_dates or {})
+        merged_sources = dict(old_sources or {})
+
+        # Merge: novo non-null override staro
+        for field, val in new_signals.items():
+            if val is not None:  # oglas eksplicitno navaja ta signal
+                merged[field] = val
+                merged_dates[field] = datum
+                merged_sources[field] = source_url
+
+        cur.execute("""
+            UPDATE property_signals
+            SET signals = %s::jsonb,
+                signal_dates = %s::jsonb,
+                signal_sources = %s::jsonb,
+                updated_at = NOW()
+            WHERE id = %s
+        """, (
+            json.dumps(merged, ensure_ascii=False),
+            json.dumps(merged_dates),
+            json.dumps(merged_sources),
+            rec_id
+        ))
+    else:
+        # Nov zapis
+        signal_dates = {k: datum for k, v in new_signals.items() if v is not None}
+        signal_sources = {k: source_url for k, v in new_signals.items() if v is not None}
+
+        cur.execute("""
+            INSERT INTO property_signals (ko_sifko, naslov_hash, signals, signal_dates, signal_sources)
+            VALUES (%s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
+            ON CONFLICT DO NOTHING
+        """, (
+            ko_sifko, naslov_hash,
+            json.dumps(new_signals, ensure_ascii=False),
+            json.dumps(signal_dates),
+            json.dumps(signal_sources)
+        ))
+
+    conn.commit()

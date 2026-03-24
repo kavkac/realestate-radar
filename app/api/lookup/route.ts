@@ -447,19 +447,32 @@ export async function POST(request: NextRequest) {
     let listingNlpDatum: string | null = null;
     let listingValuationDelta: ReturnType<typeof calcListingValuationDelta> | null = null;
     try {
-      type NlpRow = { nlp_signals: Record<string, unknown> | null; opis: string | null; datum_zajet: Date | null };
-      const nlpRows = await prisma.$queryRawUnsafe<NlpRow[]>(
-        `SELECT nlp_signals, opis, datum_zajet FROM listings_oglasi
-         WHERE ko_sifko = $1 AND nlp_signals IS NOT NULL
-         ORDER BY datum_zajet DESC LIMIT 1`,
+      // Beri iz property_signals (merged per-field tabela)
+      type PsRow = { signals: Record<string, unknown>; signal_dates: Record<string, string>; updated_at: Date };
+      const psRows = await prisma.$queryRawUnsafe<PsRow[]>(
+        `SELECT signals, signal_dates, updated_at FROM property_signals
+         WHERE ko_sifko = $1
+         ORDER BY updated_at DESC LIMIT 1`,
         String(stavba.koId)
       );
-      if (nlpRows[0]?.nlp_signals) {
-        listingNlpSignals = nlpRows[0].nlp_signals as unknown as ListingSignals;
-        listingNlpDatum = nlpRows[0].datum_zajet?.toISOString().slice(0, 10) ?? null;
-      } else if (nlpRows[0]?.opis) {
-        listingNlpSignals = parseListingText(nlpRows[0].opis);
-        listingNlpDatum = nlpRows[0].datum_zajet?.toISOString().slice(0, 10) ?? null;
+      if (psRows[0]?.signals && Object.keys(psRows[0].signals).length > 0) {
+        listingNlpSignals = psRows[0].signals as unknown as ListingSignals;
+        // Najnovejši datum med vsemi polji
+        const dates = Object.values(psRows[0].signal_dates ?? {}).filter(Boolean).sort().reverse();
+        listingNlpDatum = dates[0] ?? psRows[0].updated_at?.toISOString().slice(0, 10) ?? null;
+      } else {
+        // Fallback: direktno iz listings_oglasi če property_signals še nima podatkov
+        type NlpRow = { nlp_signals: Record<string, unknown> | null; datum_zajet: Date | null };
+        const nlpRows = await prisma.$queryRawUnsafe<NlpRow[]>(
+          `SELECT nlp_signals, datum_zajet FROM listings_oglasi
+           WHERE ko_sifko = $1 AND nlp_signals IS NOT NULL
+           ORDER BY datum_zajet DESC LIMIT 1`,
+          String(stavba.koId)
+        );
+        if (nlpRows[0]?.nlp_signals) {
+          listingNlpSignals = nlpRows[0].nlp_signals as unknown as ListingSignals;
+          listingNlpDatum = nlpRows[0].datum_zajet?.toISOString().slice(0, 10) ?? null;
+        }
       }
       if (listingNlpSignals) {
         listingValuationDelta = calcListingValuationDelta(listingNlpSignals, stNadstropja);
