@@ -255,9 +255,24 @@ export async function generateEizPrefill(params: {
   ).catch(() => []);
   const address = addressRow[0]?.naslov ?? params.naslov ?? `EID ${eidStavba}`;
 
+  // ── Trusted user corrections ──────────────────────────────────────────────
+  const TRUSTED_TIERS = ["lastnik","solastnik","upravljalec","agent","valuator"];
+  const stavbaIdShort = g.ko_sifko && g.stev_st ? `${g.ko_sifko}-${g.stev_st}` : null;
+  const corrections: Record<string, string> = {};
+  if (stavbaIdShort) {
+    const corrRows = await prisma.$queryRawUnsafe<{atribut: string; vrednost: string}[]>(
+      `SELECT atribut, vrednost FROM user_corrections
+       WHERE stavba_id = $1 AND trust_level = ANY($2::text[]) AND is_public = true`,
+      stavbaIdShort, TRUSTED_TIERS
+    ).catch(() => []);
+    for (const row of corrRows) corrections[row.atribut] = row.vrednost;
+  }
+  const hasTrustedCorrections = Object.keys(corrections).length > 0;
+  const corrNote = "Popravek preverjenega lastnika/upravljalca";
+
   // ── Derived values ────────────────────────────────────────────────────────
-  const yearBuilt: number | null = parseInt(g.leto_izg_sta) || null;
-  const materialCode: number = parseInt(g.id_konstrukcija) || 1;
+  const yearBuilt: number | null = parseInt(corrections.leto_izg_sta ?? g.leto_izg_sta) || null;
+  const materialCode: number = parseInt(corrections.id_konstrukcija ?? g.id_konstrukcija) || 1;
   const MATERIAL_NAMES: Record<number, string> = {
     1: "opeka", 2: "beton", 3: "kamen", 4: "les", 5: "kombinacija", 7: "montažna plošča"
   };
@@ -265,10 +280,10 @@ export async function generateEizPrefill(params: {
 
   const floors: number | null = parseInt(g.st_etaz) || null;
   const area: number | null = parseFloat(d.upor_pov) || parseFloat(d.povrsina) || parseFloat(g.pov_stavbe) || null;
-  const floorHeight: number = parseFloat(d.visina_etaze) || 2.6;
-  const renovFasade: number | null = parseInt(g.leto_obn_fasade) || null;
-  const renovStreha: number | null = parseInt(g.leto_obn_strehe) || null;
-  const renovOkna: number | null = parseInt(d.leto_obn_oken) || null;
+  const floorHeight: number = parseFloat(corrections.visina_etaze ?? d.visina_etaze) || 2.6;
+  const renovFasade: number | null = parseInt(corrections.leto_obn_fasade ?? g.leto_obn_fasade) || null;
+  const renovStreha: number | null = parseInt(corrections.leto_obn_strehe ?? g.leto_obn_strehe) || null;
+  const renovOkna: number | null = parseInt(corrections.leto_obn_oken ?? d.leto_obn_oken) || null;
   const hasGas: boolean = g.ima_plin_dn === "1";
 
   const buildingH: number | null = null; // LiDAR pending
@@ -373,7 +388,10 @@ export async function generateEizPrefill(params: {
     identification: {
       eidStavba:    { value: eidStavba, source: "GURS_REN", confidence: "high" },
       address:      { value: address, source: "GURS_REN", confidence: "high" },
-      yearBuilt:    { value: yearBuilt, source: "GURS_REN", confidence: "high" },
+      yearBuilt:    { value: yearBuilt,
+                      source: corrections.leto_izg_sta ? "USER_INPUT" : "GURS_REN",
+                      confidence: "high",
+                      note: corrections.leto_izg_sta ? corrNote : undefined },
       material:     (() => {
         const wfs = params.nosilnaKonstrukcija ?? null;
         // Če se vira razlikujeta — prikaži oba, nižje zaupanje
@@ -467,12 +485,18 @@ export async function generateEizPrefill(params: {
                               note: `Tipična vrednost za ${materialName}, ${yearBuilt ?? "?"}` },
       thermalBridgesLengthM: { value: null, source: "STATISTICAL_PRIOR", confidence: "missing",
                                verifyOnSite: true },
-      renovationFacadeYear:  { value: renovFasade, source: "GURS_REN",
-                               confidence: renovFasade ? "high" : "missing" },
-      renovationRoofYear:    { value: renovStreha, source: "GURS_REN",
-                               confidence: renovStreha ? "high" : "missing" },
-      renovationWindowYear:  { value: renovOkna, source: "GURS_EVS",
-                               confidence: renovOkna ? "high" : "missing" },
+      renovationFacadeYear:  { value: renovFasade,
+                               source: corrections.leto_obn_fasade ? "USER_INPUT" : "GURS_REN",
+                               confidence: renovFasade ? "high" : "missing",
+                               note: corrections.leto_obn_fasade ? corrNote : undefined },
+      renovationRoofYear:    { value: renovStreha,
+                               source: corrections.leto_obn_strehe ? "USER_INPUT" : "GURS_REN",
+                               confidence: renovStreha ? "high" : "missing",
+                               note: corrections.leto_obn_strehe ? corrNote : undefined },
+      renovationWindowYear:  { value: renovOkna,
+                               source: corrections.leto_obn_oken ? "USER_INPUT" : "GURS_EVS",
+                               confidence: renovOkna ? "high" : "missing",
+                               note: corrections.leto_obn_oken ? corrNote : undefined },
     },
 
     ventilation: {

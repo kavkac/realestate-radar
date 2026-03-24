@@ -24,13 +24,13 @@ const SOURCE_LABEL: Record<DataSource, string> = {
   GURS_REN:          "GURS · Register nepremičnin",
   GURS_EVS:          "GURS · Evidenca stavb",
   GURS_KN:           "GURS · KN / eProstor",
+  USER_INPUT:        "✏️ Popravljeno (lastnik)",
   TABULA_SLO:        "TABULA SLO",
   OPEN_METEO_ERA5:   "Open-Meteo ERA5",
   ARSO_JRC:          "ARSO / JRC",
   DH_SPATIAL:        "DH omrežje (prostorski sloj)",
   MAPILLARY_ML:      "Mapillary ML",
   STATISTICAL_PRIOR: "Statistični prior",
-  USER_INPUT:        "Vnesel lastnik",
   AUDITOR_INPUT:     "Vnos energetičarja",
 };
 
@@ -38,13 +38,13 @@ const SOURCE_COLOR: Record<DataSource, string> = {
   GURS_REN:          "bg-blue-50 text-blue-800 border-blue-400",
   GURS_EVS:          "bg-blue-50 text-blue-800 border-blue-400",
   GURS_KN:           "bg-blue-50 text-blue-800 border-blue-400",
+  USER_INPUT:        "bg-green-50 text-green-700 border-green-300",
   TABULA_SLO:        "bg-indigo-50 text-indigo-700 border-indigo-200",
   OPEN_METEO_ERA5:   "bg-teal-50 text-teal-700 border-teal-200",
   ARSO_JRC:          "bg-teal-50 text-teal-700 border-teal-200",
   DH_SPATIAL:        "bg-purple-50 text-purple-700 border-purple-200",
   MAPILLARY_ML:      "bg-violet-50 text-violet-700 border-violet-200",
   STATISTICAL_PRIOR: "bg-amber-50 text-amber-700 border-amber-200",
-  USER_INPUT:        "bg-green-50 text-green-700 border-green-200",
   AUDITOR_INPUT:     "bg-gray-100 text-gray-600 border-gray-200",
 };
 
