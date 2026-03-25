@@ -79,17 +79,24 @@ export function NeighborhoodCard({ lat, lng }: Props) {
           </div>
         )}
 
-        {profile.ageO65Pct != null && (
+        {(profile as any).ageAvg != null && (
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Nad 65 let</p>
-            <p className="font-semibold text-gray-800">{profile.ageO65Pct.toFixed(0)}% prebivalcev</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Povp. starost</p>
+            <p className="font-semibold text-gray-800">{((profile as any).ageAvg as number).toFixed(1)} let</p>
           </div>
         )}
 
-        {profile.statOkolisName && (
+        {profile.eduTertiaryPct != null && (
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Statistični okoliš</p>
-            <p className="font-semibold text-gray-800 truncate">{profile.statOkolisName}</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Visoka izobrazba</p>
+            <p className="font-semibold text-gray-800">{profile.eduTertiaryPct.toFixed(1)}%</p>
+          </div>
+        )}
+
+        {(profile as any).popTotal != null && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Preb. v 500m celici</p>
+            <p className="font-semibold text-gray-800">{Math.round((profile as any).popTotal as number).toLocaleString("sl-SI")}</p>
           </div>
         )}
       </div>

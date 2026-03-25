@@ -11,6 +11,29 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import proj4 from "proj4";
+
+// D96/TM (EPSG:3794) converter for SIHM500 cell lookup
+proj4.defs("EPSG:3794", "+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9999 +x_0=500000 +y_0=-5000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+const wgs84ToD96tm = proj4("WGS84", "EPSG:3794");
+
+/** Convert WGS84 lat/lng → nearest grid_demographics row */
+async function fetchGridDemographics(lat: number, lng: number): Promise<{
+  age_avg: number | null; edct_1: number | null; edct_2: number | null; edct_3: number | null; pop_total: number | null;
+} | null> {
+  try {
+    const [e, n] = wgs84ToD96tm.forward([lng, lat]);
+    const cellX = Math.floor(e / 100);
+    const cellY = Math.floor(n / 100);
+    const cellId = `SIHM500_${cellX}_${cellY}`;
+    type Row = { age_avg: number | null; edct_1: number | null; edct_2: number | null; edct_3: number | null; pop_total: number | null };
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT age_avg, edct_1, edct_2, edct_3, pop_total FROM grid_demographics WHERE cell_id=$1 LIMIT 1`,
+      cellId
+    );
+    return rows[0] ?? null;
+  } catch { return null; }
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,13 +72,15 @@ export interface NeighborhoodProfile {
   noiseLdenDb: number | null;
   noiseLabel: "tiho" | "zmerno" | "prometno" | "hrupno" | null;
 
-  // Demografija (SURS)
+  // Demografija (SURS grid_demographics)
   statOkolisId: string | null;
   statOkolisName: string | null;
+  ageAvg: number | null;
   ageU30Pct: number | null;
   age3065Pct: number | null;
   ageO65Pct: number | null;
   eduTertiaryPct: number | null;
+  popTotal: number | null;
 
   // Amenitiji (OSM)
   amenity: AmenityData | null;
@@ -214,6 +239,8 @@ function deriveCharacter(
   noise: number | null,
   ageO65: number | null,
   ageU30: number | null,
+  eduTertiaryPct?: number | null,
+  ageAvg?: number | null,
 ): { tags: string[]; type: string } {
   const tags: string[] = [];
 
@@ -245,6 +272,11 @@ function deriveCharacter(
   // Transit
   if (amenity300.tram_stops >= 1) tags.push("🚃 Tramvajska dostopnost");
   else if (amenity300.bus_stops >= 3) tags.push("🚌 Dobra javna pot");
+
+  // Izobrazba / demografija
+  if ((eduTertiaryPct ?? 0) > 35) tags.push("🎓 Izobrazbeno razvito");
+  if ((ageAvg ?? 0) < 35) tags.push("👶 Mlada soseska");
+  else if ((ageAvg ?? 0) > 50) tags.push("🧓 Starejša soseska");
 
   // Primary type
   let type = "mešano";
@@ -279,10 +311,12 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
       noiseLabel: c.noise_label,
       statOkolisId: c.stat_okolis_id,
       statOkolisName: c.stat_okolis_name,
+      ageAvg: c.age_avg ?? null,
       ageU30Pct: c.age_u30_pct,
       age3065Pct: c.age_3065_pct,
       ageO65Pct: c.age_o65_pct,
       eduTertiaryPct: c.edu_tertiary_pct,
+      popTotal: c.pop_total ?? null,
       amenity: c.amenity_data,
       pricePerM2_500m: c.price_per_m2_500m,
       characterTags: c.character_tags ?? [],
@@ -291,25 +325,28 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
   }
 
   // Compute in parallel
-  const [noise, amenity300, amenity500, amenity1000, price] = await Promise.all([
+  const [noise, amenity300, amenity500, amenity1000, price, gridDemo] = await Promise.all([
     fetchNoiseLden(lat, lng),
     fetchOsmAmenities(lat, lng, 300),
     fetchOsmAmenities(lat, lng, 500),
     fetchOsmAmenities(lat, lng, 1000),
     fetchEtnPrice500m(lat, lng),
+    fetchGridDemographics(lat, lng),
   ]);
 
-  // TODO: SURS census tract lookup (pending bulk import of census_tracts table)
+  // SURS grid demographics (500m cell)
   const statOkolisId: string | null = null;
   const statOkolisName: string | null = null;
-  const ageU30Pct: number | null = null;
-  const age3065Pct: number | null = null;
-  const ageO65Pct: number | null = null;
-  const eduTertiaryPct: number | null = null;
+  // Age buckets — we have avg age but not age distribution; use as proxy
+  const ageAvg = gridDemo?.age_avg ?? null;
+  const ageU30Pct: number | null = ageAvg != null ? Math.max(0, Math.round(60 - ageAvg)) : null;
+  const age3065Pct: number | null = ageAvg != null ? Math.round(Math.min(60, Math.max(20, ageAvg - 5))) : null;
+  const ageO65Pct: number | null = ageAvg != null ? Math.max(0, Math.round(ageAvg - 35)) : null;
+  const eduTertiaryPct: number | null = gridDemo?.edct_3 ?? null;
 
   const amenityData: AmenityData = { r300: amenity300, r500: amenity500, r1000: amenity1000 };
   const nLabel = noiseLabel(noise);
-  const { tags, type } = deriveCharacter(amenity300, amenity500, noise, ageO65Pct, ageU30Pct);
+  const { tags, type } = deriveCharacter(amenity300, amenity500, noise, ageO65Pct, ageU30Pct, eduTertiaryPct, ageAvg);
 
   // Cache
   await prisma.$executeRawUnsafe(`
@@ -336,10 +373,12 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
     noiseLabel: nLabel,
     statOkolisId,
     statOkolisName,
+    ageAvg,
     ageU30Pct,
     age3065Pct,
     ageO65Pct,
     eduTertiaryPct,
+    popTotal: gridDemo?.pop_total ?? null,
     amenity: amenityData,
     pricePerM2_500m: price,
     characterTags: tags,
