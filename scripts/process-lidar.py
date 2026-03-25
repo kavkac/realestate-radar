@@ -735,6 +735,77 @@ def compute_privacy_morphology(
 # DB UTILITIES
 # ─────────────────────────────────────────────
 
+def get_gurs_floor_heights_per_floor(conn, eid_stavba: int) -> list[dict]:
+    """Fetch per-floor heights from kn_etaze, ordered by floor number.
+    Returns list of {stevilka_etaze, visina_etaze, pritlicna_etaza}.
+    """
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT stevilka_etaze, visina_etaze, pritlicna_etaza
+            FROM kn_etaze
+            WHERE eid_stavba = %s
+              AND visina_etaze IS NOT NULL
+              AND visina_etaze > 0
+            ORDER BY stevilka_etaze ASC
+        """, (eid_stavba,))
+        return [dict(r) for r in cur.fetchall()]
+    except Exception:
+        return []
+
+
+def detect_mansarda(floors: list[dict], roof_type: Optional[str] = None) -> dict:
+    """Detect mansarda from per-floor GURS data or roof type.
+
+    Mansarda signals:
+    - Last floor has significantly lower visina_etaze than others (< 2.2m avg)
+    - roof_type is pitched/complex
+    - Last floor height drop > 0.5m vs penultimate floor
+
+    Returns dict with mansarda_detected, mansarda_floor_num,
+    mansarda_usable_pct (estimated % of floor area with height >= 2.2m).
+    """
+    result = {
+        "mansarda_detected": False,
+        "mansarda_floor_num": None,
+        "mansarda_avg_height_m": None,
+        "mansarda_usable_pct": None,
+    }
+
+    if not floors or len(floors) < 2:
+        return result
+
+    valid_floors = [f for f in floors if f.get("visina_etaze") and f["visina_etaze"] > 0]
+    if len(valid_floors) < 2:
+        return result
+
+    last = valid_floors[-1]
+    prev_floors = valid_floors[:-1]
+    avg_other = sum(f["visina_etaze"] for f in prev_floors) / len(prev_floors)
+    last_h = last["visina_etaze"]
+
+    # Mansarda: last floor height significantly lower than rest
+    is_mansarda = (
+        last_h < 2.20 or                          # below legal habitable minimum average
+        (avg_other - last_h) > 0.50 or            # >50cm drop from average
+        (roof_type in ("pitched", "complex") and last_h < avg_other * 0.90)
+    )
+
+    if is_mansarda:
+        result["mansarda_detected"] = True
+        result["mansarda_floor_num"] = last.get("stevilka_etaze")
+        result["mansarda_avg_height_m"] = round(last_h, 2)
+
+        # Estimate usable % of floor area (where height >= 2.2m)
+        # For pitched roof: usable area scales with height ratio
+        # Simple model: if avg height is h, usable% ≈ (h - 0.8) / (2.2 - 0.8) * 100
+        # Clamped 0-100. At h=2.2m → 100%, at h=0.8m → 0%
+        usable_pct = max(0.0, min(100.0, (last_h - 0.80) / (2.20 - 0.80) * 100))
+        result["mansarda_usable_pct"] = round(usable_pct, 1)
+
+    return result
+
+
 def get_gurs_floor_heights(conn, eid_stavba: int) -> Optional[dict]:
     """Fetch GURS declared floor heights from kn_etaze.
     Returns dict with avg/min/max visina_etaze, or None if no data.
@@ -846,7 +917,8 @@ def upsert_batch(conn, rows: list[dict]) -> int:
         "road_exposure_score", "building_density_200m",
         "avg_building_height_200m_m", "open_space_ratio_200m",
         "viewshed_per_floor",
-        "ceiling_height_source",
+        "mansarda_detected", "mansarda_floor_num",
+        "mansarda_avg_height_m", "mansarda_usable_pct",
         "pipeline_version", "dmr_tile_ids", "dmp_tile_ids", "quality_flag",
     ]
 
@@ -1014,6 +1086,11 @@ def process_bbox(
             # 1. GURS visina_etaze (declared, most accurate)
             # 2. LiDAR corrected (DMP median - roof - slabs)
             # 3. Statistical fallback by building type/era
+
+            # Per-floor GURS data (for mansarda detection)
+            gurs_per_floor = get_gurs_floor_heights_per_floor(conn, eid)
+            mansarda = detect_mansarda(gurs_per_floor, row.get("roof_type"))
+            row.update(mansarda)
 
             gurs_floors = get_gurs_floor_heights(conn, eid)
             if gurs_floors and gurs_floors.get("avg_floor_height"):

@@ -46,7 +46,10 @@ CREATE TABLE IF NOT EXISTS lidar_building_features (
     roof_type               roof_kind       DEFAULT 'unknown',
     building_height_usable_m NUMERIC(5,2),  -- korigirana bivalna višina (brez strehe + plošč)
     floor_height_m          NUMERIC(4,2),   -- višina etaže: GURS visina_etaze ali LiDAR korigirano
-    ceiling_height_source   TEXT,           -- 'gurs_declared' | 'lidar_corrected' | 'estimated'
+    mansarda_detected       BOOLEAN DEFAULT FALSE,
+    mansarda_floor_num      INT,            -- katera etaža je mansarda
+    mansarda_avg_height_m   NUMERIC(4,2),  -- povprečna svetla višina mansarde
+    mansarda_usable_pct     NUMERIC(5,1),  -- % tlorisne površine z višino ≥ 2.2m
 
     -- ── SOLAR & LIGHT ──────────────────────────
     solar_radiation_annual_kwh_m2   NUMERIC(7,1),   -- letna sončna energija
