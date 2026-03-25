@@ -185,7 +185,10 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       else if (railway === "tram_stop") count.tram_stops++;
       else if (railway === "station" || railway === "halt") count.train_stations++;
     }
-    return count;
+      // Deduplikacija: vsaka fizična avtobusna/tramvajska postaja = 2 nodes v OSM (oba smeri)
+  count.bus_stops = Math.ceil(count.bus_stops / 2);
+  count.tram_stops = Math.ceil(count.tram_stops / 2);
+  return count;
   } catch {
     return emptyCount();
   }
@@ -204,15 +207,31 @@ function emptyCount(): AmenityCount {
 
 // ── ARSO noise (WMS GetFeatureInfo) ──────────────────────────────────────────
 async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> {
-  // ARSO hrupne karte — cestni hrup Lden
-  // WMS endpoint (preveriti točen layer)
+  // ARSO hrupne karte — zahteva token (ni javno dostopen WMS)
+  // TODO: ko dobimo ARSO API token, implementirati pravi Lden lookup
+  // Fallback: Overpass highway density proxy (ni Lden, je aproksimacija)
   try {
-    const url = `https://gis.arso.gov.si/arcgis/rest/services/okolje/hrup_ceste_Lden/ImageServer/identify?geometry=${lng},${lat}&geometryType=esriGeometryPoint&returnGeometry=false&f=json`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const query = `
+      [out:json][timeout:8];
+      (
+        way["highway"~"^(motorway|trunk|primary|secondary)$"](around:200,${lat},${lng});
+        way["highway"="tertiary"](around:100,${lat},${lng});
+      );
+      out count;
+    `;
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(8000),
+    });
     if (!res.ok) return null;
-    const data = await res.json() as { value?: string };
-    const val = parseFloat(data.value ?? "");
-    return isNaN(val) ? null : val;
+    const data = await res.json() as { elements: Array<{ tags?: { total?: string } }> };
+    const total = parseInt(data.elements[0]?.tags?.total ?? "0");
+    // Grubo: 0 = tiho (<45dB), 1-2 = zmerno (50-55dB), 3+ = prometno (60-70dB)
+    if (total === 0) return 42;
+    if (total <= 2) return 53;
+    return 63;
   } catch {
     return null;
   }
@@ -263,8 +282,8 @@ function deriveCharacter(
 
   // Hrup
   if (noise != null) {
-    if (noise < 45) tags.push("🌿 Tiho območje");
-    else if (noise >= 65) tags.push("🚗 Prometno");
+    if (noise < 45) tags.push(`🌿 Tiho območje (${noise.toFixed(0)} dB Lden)`);
+    else if (noise >= 65) tags.push(`🚗 Prometno (${noise.toFixed(0)} dB Lden)`);
   }
 
   // Zeleno
@@ -281,9 +300,9 @@ function deriveCharacter(
   else if (amenity300.bus_stops >= 3) tags.push("🚌 Dobra javna pot");
 
   // Izobrazba / demografija
-  if ((eduTertiaryPct ?? 0) > 35) tags.push("🎓 Izobrazbeno razvito");
-  if ((ageAvg ?? 0) < 35) tags.push("👶 Mlada soseska");
-  else if ((ageAvg ?? 0) > 50) tags.push("🧓 Starejša soseska");
+  if ((eduTertiaryPct ?? 0) > 35) tags.push(`🎓 Izobrazbeno razvito (${eduTertiaryPct!.toFixed(0)}% visoka izobrazba)`);
+  if (ageAvg != null && ageAvg < 35) tags.push(`👶 Mlada soseska (povp. starost: ${ageAvg.toFixed(1)} let)`);
+  else if (ageAvg != null && ageAvg > 50) tags.push(`🧓 Starejša soseska (povp. starost: ${ageAvg.toFixed(1)} let)`);
 
   // Primary type
   let type = "mešano";

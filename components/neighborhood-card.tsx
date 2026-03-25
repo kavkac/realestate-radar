@@ -95,8 +95,11 @@ export function NeighborhoodCard({ lat, lng }: Props) {
       amenityRows.push({ icon: "🛒", label: "Trgovine / supermarketi", value: `${a1.supermarkets} v 1km`, source: "OSM" });
     if (a1.restaurants > 0)
       amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `${a1.restaurants} v 1km`, source: "OSM" });
-    if (a1.banks > 0)
-      amenityRows.push({ icon: "🏦", label: "Banke", value: `${a1.banks}`, source: "OSM" });
+    // Banke — samo 500m radij (v 1km je preveč poslovalnic); cap 10+
+    if (a5.banks > 0) {
+      const bankCount = a5.banks > 10 ? "10+" : `${a5.banks}`;
+      amenityRows.push({ icon: "🏦", label: "Banke", value: `${bankCount} v 500m`, source: "OSM" });
+    }
     if (a1.postOffices > 0)
       amenityRows.push({ icon: "📮", label: "Pošte", value: `${a1.postOffices}`, source: "OSM" });
 
@@ -137,16 +140,16 @@ export function NeighborhoodCard({ lat, lng }: Props) {
           {profile.noiseLdenDb != null && (
             <div>
               <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">
-                Hrup (Lden) <SourceBadge label="ARSO" />
+                Hrupnost <SourceBadge label="OSM ceste~" />
               </p>
               <p className="font-semibold text-gray-800">
-                {profile.noiseLdenDb.toFixed(0)} dB
-                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                   profile.noiseLabel === "tiho" ? "bg-green-50 text-green-700" :
                   profile.noiseLabel === "zmerno" ? "bg-yellow-50 text-yellow-700" :
                   profile.noiseLabel === "prometno" ? "bg-orange-50 text-orange-700" :
                   "bg-red-50 text-red-700"
                 }`}>{profile.noiseLabel}</span>
+                <span className="text-[9px] text-gray-400 ml-1">(aproks. na osnovi cestne gostote)</span>
               </p>
             </div>
           )}
@@ -164,15 +167,12 @@ export function NeighborhoodCard({ lat, lng }: Props) {
       {/* Demografija */}
       {demoRows.length > 0 && (
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1">Demografija</p>
+          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1">Demografija <SourceBadge label="SURS 500m" /></p>
           <div className="space-y-0.5">
             {demoRows.map(r => (
               <div key={r.label} className="flex justify-between text-xs">
                 <span className="text-gray-500">{r.label}</span>
-                <span className="font-medium text-gray-700">
-                  {r.value}
-                  <SourceBadge label={r.source} />
-                </span>
+                <span className="font-medium text-gray-700">{r.value}</span>
               </div>
             ))}
           </div>
@@ -182,15 +182,14 @@ export function NeighborhoodCard({ lat, lng }: Props) {
       {/* Bližnja infrastruktura */}
       {amenityRows.length > 0 && (
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1">Bližnja infrastruktura</p>
+          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium mb-1">
+            Bližnja infrastruktura <SourceBadge label="OSM" />
+          </p>
           <div className="space-y-0.5">
             {amenityRows.map(r => (
               <div key={r.label} className="flex justify-between text-xs">
                 <span className="text-gray-500">{r.icon} {r.label}</span>
-                <span className="font-medium text-gray-700">
-                  {r.value}
-                  <SourceBadge label={r.source} />
-                </span>
+                <span className="font-medium text-gray-700">{r.value}</span>
               </div>
             ))}
           </div>
