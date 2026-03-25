@@ -520,7 +520,7 @@ export interface BuildPropertyContextParams {
   // Places/amenity data
   placesData?: {
     transit?: { busStops?: number; trainStations?: number; nearestBusM?: number | null; nearestTrainM?: number | null; lppLineCount?: number | null; lppLines?: string[] | null };
-    services?: { supermarkets?: number; supermarketDistM?: number | null; banks?: number; parks?: number; restaurants?: number };
+    services?: { supermarkets?: number; nearestSupermarketM?: number | null; supermarketDistM?: number | null; pharmacies?: number; nearestPharmacyM?: number | null; schools?: number; kindergartens?: number; banks?: number; postOffices?: number; parks?: number; nearestParkM?: number | null; restaurants?: number; doctors?: number; hospitals?: number };
   } | null;
 }
 

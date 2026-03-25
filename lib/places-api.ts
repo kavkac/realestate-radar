@@ -227,31 +227,24 @@ export async function getPlacesData(lat: number, lng: number): Promise<PlacesDat
     return { ...dbHit, cached: true };
   }
 
-  // L3: Live fetch (brez DB cache — HERE za transit, OSM za storitve)
-  // To se zgodi samo za lokacije ki še niso v DB (pred bulk importom)
-  if (!HERE_API_KEY) return null;
-
+  // L3: Live fetch — HERE za transit, Overpass za services
   try {
-    const herePlaces = await hereDiscover(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT);
-    const transit = hereBuildTransit(herePlaces, lat, lng);
+    const [herePlaces, osmServices] = await Promise.all([
+      HERE_API_KEY ? hereDiscover(lat, lng, HERE_TRANSIT_CATEGORIES, RADIUS_TRANSIT) : Promise.resolve([]),
+      overpassServices(lat, lng, 1000),
+    ]);
 
-    // Osnovna services struktura (bo enrichana z Overpass bulk importom)
-    const services: ServicesInfo = {
-      supermarkets: 0, nearestSupermarketM: null,
-      pharmacies: 0, nearestPharmacyM: null,
-      schools: 0, kindergartens: 0,
-      parks: 0, nearestParkM: null,
-      banks: 0, postOffices: 0, restaurants: 0, doctors: 0, hospitals: 0,
-      source: "here",
-    };
+    const transit = HERE_API_KEY && herePlaces.length > 0
+      ? hereBuildTransit(herePlaces, lat, lng)
+      : { busStops: 0, tramStops: 0, trainStations: 0, nearestBusM: null, nearestTrainM: null, kvaliteta: "slaba" as const, opis: "Ni podatkov o javnem prevozu", source: "unknown" as const };
 
-    const result: PlacesData = { transit, services };
+    const result: PlacesData = { transit, services: osmServices };
     const sourceMeta = {
-      version: 1,
+      version: 3,
       importedAt: new Date().toISOString(),
       categories: {
-        transit: { source: "here_places", confidence: "high" },
-        services: { source: "none", confidence: "none", note: "Čaka na OSM bulk import" },
+        transit: { source: HERE_API_KEY ? "here_places" : "none", confidence: HERE_API_KEY ? "high" : "none" },
+        services: { source: "osm_overpass_live", confidence: "high" },
       },
     };
     void dbSet(latGrid, lngGrid, result, sourceMeta);
@@ -260,5 +253,104 @@ export async function getPlacesData(lat: number, lng: number): Promise<PlacesDat
   } catch (err) {
     console.error("Places API error:", err);
     return null;
+  }
+}
+
+// ─── Live Overpass services query ────────────────────────────────────────────
+async function overpassServices(lat: number, lng: number, radiusM: number): Promise<ServicesInfo> {
+  const query = `
+    [out:json][timeout:12];
+    (
+      node["shop"="supermarket"](around:${radiusM},${lat},${lng});
+      node["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
+      node["amenity"="school"](around:${radiusM},${lat},${lng});
+      way["amenity"="school"](around:${radiusM},${lat},${lng});
+      node["amenity"="kindergarten"](around:${radiusM},${lat},${lng});
+      way["amenity"="kindergarten"](around:${radiusM},${lat},${lng});
+      node["leisure"="park"](around:${radiusM},${lat},${lng});
+      way["leisure"="park"](around:${radiusM},${lat},${lng});
+      node["amenity"="bank"](around:${radiusM},${lat},${lng});
+      node["amenity"="post_office"](around:${radiusM},${lat},${lng});
+      node["amenity"="restaurant"](around:${radiusM},${lat},${lng});
+      node["amenity"="doctors"](around:${radiusM},${lat},${lng});
+      node["amenity"="clinic"](around:${radiusM},${lat},${lng});
+      node["amenity"="hospital"](around:${radiusM},${lat},${lng});
+      node["leisure"="sports_centre"](around:${radiusM},${lat},${lng});
+      way["leisure"="sports_centre"](around:${radiusM},${lat},${lng});
+      node["highway"="bus_stop"](around:500,${lat},${lng});
+      node["railway"="tram_stop"](around:500,${lat},${lng});
+      node["railway"="station"](around:1000,${lat},${lng});
+    );
+    out body;
+  `;
+
+  const empty: ServicesInfo = {
+    supermarkets: 0, nearestSupermarketM: null,
+    pharmacies: 0, nearestPharmacyM: null,
+    schools: 0, kindergartens: 0,
+    parks: 0, nearestParkM: null,
+    banks: 0, postOffices: 0, restaurants: 0,
+    doctors: 0, hospitals: 0,
+    source: "osm",
+  };
+
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(14000),
+    });
+    if (!res.ok) return empty;
+
+    const data = await res.json() as { elements: Array<{ type: string; lat?: number; lon?: number; tags?: Record<string,string> }> };
+    const s = { ...empty };
+
+    const distM = (elat: number | undefined, elng: number | undefined) => {
+      if (elat == null || elng == null) return null;
+      const dlat = (elat - lat) * 111320;
+      const dlng = (elng - lng) * 111320 * Math.cos((lat * Math.PI) / 180);
+      return Math.round(Math.sqrt(dlat*dlat + dlng*dlng));
+    };
+
+    for (const el of data.elements) {
+      const tags = el.tags ?? {};
+      const d = distM(el.lat, el.lon);
+      const amenity = tags.amenity;
+      const shop = tags.shop;
+      const leisure = tags.leisure;
+      const highway = tags.highway;
+      const railway = tags.railway;
+
+      if (shop === "supermarket") {
+        s.supermarkets++;
+        if (d != null && (s.nearestSupermarketM == null || d < s.nearestSupermarketM)) s.nearestSupermarketM = d;
+      } else if (amenity === "pharmacy") {
+        s.pharmacies++;
+        if (d != null && (s.nearestPharmacyM == null || d < s.nearestPharmacyM)) s.nearestPharmacyM = d;
+      } else if (amenity === "school") {
+        s.schools++;
+      } else if (amenity === "kindergarten") {
+        s.kindergartens++;
+      } else if (leisure === "park") {
+        s.parks++;
+        if (d != null && (s.nearestParkM == null || d < s.nearestParkM)) s.nearestParkM = d;
+      } else if (amenity === "bank") {
+        s.banks++;
+      } else if (amenity === "post_office") {
+        s.postOffices++;
+      } else if (amenity === "restaurant") {
+        s.restaurants++;
+      } else if (amenity === "doctors" || amenity === "clinic") {
+        s.doctors++;
+      } else if (amenity === "hospital") {
+        s.hospitals++;
+      }
+      // bus/tram/train counted in transit section, skip here
+      void highway; void railway;
+    }
+    return s;
+  } catch {
+    return empty;
   }
 }
