@@ -2332,50 +2332,55 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng, naslov }: {
           </div>
         )}
         {vhodi && (
-          <div className="text-xs text-gray-400 space-y-1.5 mb-2 pt-2 border-t border-gray-100">
-            <p className="font-medium text-gray-500">Vhodni parametri izračuna:</p>
-            {/* Geometry */}
-            <div>
-              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Geometrija</span>
-              <p className="mt-0.5">
-                Površina sten: <span className="text-gray-600">{vhodi.wallAreaM2} m²</span>
-                {" · "}Streha/tla: <span className="text-gray-600">{vhodi.roofAreaM2} m²</span>
-                {" · "}A/V: <span className="text-gray-600">{vhodi.svRatio} m²/m³</span>
-                {" · "}Etaže: <span className="text-gray-600">{vhodi.floors ?? "?"} × {vhodi.avgFloorHeightM} m</span>
-                {vhodi.lidarUsed && <span className="ml-1 text-teal-600 font-medium">LiDAR</span>}
-              </p>
+          <details className="mb-2 pt-2 border-t border-gray-100 group">
+            <summary className="cursor-pointer select-none list-none flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              <span className="text-[9px] group-open:rotate-90 transition-transform inline-block">▶</span>
+              Vhodni parametri izračuna
+            </summary>
+            <div className="text-xs text-gray-400 space-y-1.5 mt-2">
+              {/* Geometry */}
+              <div>
+                <span className="text-gray-400 uppercase text-[9px] tracking-wide">Geometrija</span>
+                <p className="mt-0.5">
+                  Površina sten: <span className="text-gray-600">{vhodi.wallAreaM2} m²</span>
+                  {" · "}Streha/tla: <span className="text-gray-600">{vhodi.roofAreaM2} m²</span>
+                  {" · "}A/V: <span className="text-gray-600">{vhodi.svRatio} m²/m³</span>
+                  {" · "}Etaže: <span className="text-gray-600">{vhodi.floors ?? "?"} × {vhodi.avgFloorHeightM} m</span>
+                  {vhodi.lidarUsed && <span className="ml-1 text-teal-600 font-medium">LiDAR</span>}
+                </p>
+              </div>
+              {/* Thermal envelope */}
+              <div>
+                <span className="text-gray-400 uppercase text-[9px] tracking-wide">Toplotna lupina</span>
+                <p className="mt-0.5">
+                  U stena: <span className="text-gray-600">{vhodi.uWall}</span>
+                  {" · "}U streha: <span className="text-gray-600">{vhodi.uRoof}</span>
+                  {" · "}U tla: <span className="text-gray-600">{vhodi.uFloor}</span>
+                  {" · "}U okna: <span className="text-gray-600">{vhodi.uWindow} W/m²K</span>
+                  {" · "}g: <span className="text-gray-600">{vhodi.gWindow}</span>
+                  {" · "}ΔU mostovi: <span className="text-gray-600">{vhodi.thermalBridgeDeltaU}</span>
+                </p>
+              </div>
+              {/* Windows */}
+              <div>
+                <span className="text-gray-400 uppercase text-[9px] tracking-wide">Okna</span>
+                <p className="mt-0.5">
+                  Delež: <span className="text-gray-600">{Math.round(vhodi.windowRatio * 100)}%</span>
+                  {" · "}Površina: <span className="text-gray-600">~{vhodi.windowAreaM2} m²</span>
+                </p>
+              </div>
+              {/* Climate & ventilation */}
+              <div>
+                <span className="text-gray-400 uppercase text-[9px] tracking-wide">Klima in prezračevanje</span>
+                <p className="mt-0.5">
+                  HDD: <span className="text-gray-600">{vhodi.heatingDegreeDays} Kd/a</span>
+                  {" · "}Sončno J: <span className="text-gray-600">{vhodi.solarSouthKwhM2} kWh/m²a</span>
+                  {" · "}n_eff: <span className="text-gray-600">{vhodi.ventilationNEff} h⁻¹</span>
+                  {" · "}<span className="text-gray-600">{vhodi.ventilationSystem}</span>
+                </p>
+              </div>
             </div>
-            {/* Thermal envelope */}
-            <div>
-              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Toplotna lupina</span>
-              <p className="mt-0.5">
-                U stena: <span className="text-gray-600">{vhodi.uWall}</span>
-                {" · "}U streha: <span className="text-gray-600">{vhodi.uRoof}</span>
-                {" · "}U tla: <span className="text-gray-600">{vhodi.uFloor}</span>
-                {" · "}U okna: <span className="text-gray-600">{vhodi.uWindow} W/m²K</span>
-                {" · "}g: <span className="text-gray-600">{vhodi.gWindow}</span>
-                {" · "}ΔU mostovi: <span className="text-gray-600">{vhodi.thermalBridgeDeltaU}</span>
-              </p>
-            </div>
-            {/* Windows */}
-            <div>
-              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Okna</span>
-              <p className="mt-0.5">
-                Delež: <span className="text-gray-600">{Math.round(vhodi.windowRatio * 100)}%</span>
-                {" · "}Površina: <span className="text-gray-600">~{vhodi.windowAreaM2} m²</span>
-              </p>
-            </div>
-            {/* Climate & ventilation */}
-            <div>
-              <span className="text-gray-400 uppercase text-[9px] tracking-wide">Klima in prezračevanje</span>
-              <p className="mt-0.5">
-                HDD: <span className="text-gray-600">{vhodi.heatingDegreeDays} Kd/a</span>
-                {" · "}Sončno J: <span className="text-gray-600">{vhodi.solarSouthKwhM2} kWh/m²a</span>
-                {" · "}n_eff: <span className="text-gray-600">{vhodi.ventilationNEff} h⁻¹</span>
-                {" · "}<span className="text-gray-600">{vhodi.ventilationSystem}</span>
-              </p>
-            </div>
-          </div>
+          </details>
         )}
         <PodlogeButton stavba={stavba} part={part} lat={lat} lng={lng} naslov={naslov} />
       </section>
