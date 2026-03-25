@@ -56,6 +56,8 @@ export interface AmenityCount {
   hospitals: number;
   health_centres: number;
   industrial: number;
+  banks: number;
+  postOffices: number;
   parks: number;
   playgrounds: number;
   sports_centres: number;
@@ -131,6 +133,8 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       way["leisure"="sports_centre"](around:${radiusM},${lat},${lng});
       node["leisure"="fitness_centre"](around:${radiusM},${lat},${lng});
       node["leisure"="swimming_pool"](around:${radiusM},${lat},${lng});
+      node["amenity"="bank"](around:${radiusM},${lat},${lng});
+      node["amenity"="post_office"](around:${radiusM},${lat},${lng});
       node["highway"="bus_stop"](around:${radiusM},${lat},${lng});
       node["railway"="tram_stop"](around:${radiusM},${lat},${lng});
       node["railway"="station"](around:${radiusM},${lat},${lng});
@@ -175,6 +179,8 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       else if (leisure === "park") count.parks++;
       else if (leisure === "playground") count.playgrounds++;
       else if (leisure === "sports_centre" || leisure === "fitness_centre" || leisure === "swimming_pool") count.sports_centres++;
+      else if (amenity === "bank") count.banks++;
+      else if (amenity === "post_office") count.postOffices++;
       else if (highway === "bus_stop") count.bus_stops++;
       else if (railway === "tram_stop") count.tram_stops++;
       else if (railway === "station" || railway === "halt") count.train_stations++;
@@ -190,6 +196,7 @@ function emptyCount(): AmenityCount {
     universities: 0, schools: 0, kindergartens: 0, dormitories: 0,
     restaurants: 0, bars: 0, supermarkets: 0, pharmacies: 0,
     doctors: 0, hospitals: 0, health_centres: 0, industrial: 0,
+    banks: 0, postOffices: 0,
     parks: 0, playgrounds: 0, sports_centres: 0,
     bus_stops: 0, tram_stops: 0, train_stations: 0,
   };
@@ -266,8 +273,8 @@ function deriveCharacter(
   // Gastro/urbano
   if (amenity300.restaurants + amenity300.bars >= 5) tags.push("🍕 Živahno");
 
-  // Zdravstveno
-  if (amenity500.hospitals >= 1 || amenity500.doctors >= 3) tags.push("🏥 Zdravstveno");
+  // Zdravstveno — samo če je to resnično dominantna lastnost (ne samo bližina UKC)
+  if (amenity500.hospitals >= 2 && amenity500.doctors >= 5) tags.push("🏥 Zdravstveno");
 
   // Transit
   if (amenity300.tram_stops >= 1) tags.push("🚃 Tramvajska dostopnost");

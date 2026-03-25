@@ -846,13 +846,7 @@ export function PropertyCard({
             </div>
           )}
 
-          {placesData && (
-            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <OkolicaSection placesData={placesData!} />
-            </div>
-          )}
-
-          {/* Soseska — neighborhood intelligence */}
+          {/* Soseska — neighborhood intelligence (vključuje amenitije, ne OkolicaSection) */}
           {lat != null && lng != null && (
             <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
               <section>
