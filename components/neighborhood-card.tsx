@@ -117,9 +117,12 @@ export function NeighborhoodCard({ lat, lng }: Props) {
   if (p.popTotal != null)
     demoRows.push({ label: "Preb. v 500m celici", value: `${Math.round(p.popTotal as number).toLocaleString("sl-SI")}`, source: "SURS 500m" });
 
+  // Vedno prikažemo sekcijo — tudi če je delno naložena (timeout enega vira ne blokira vsega)
   const hasContent = profile.characterTags.length > 0 || profile.noiseLdenDb != null ||
     profile.pricePerM2_500m != null || amenityRows.length > 0 || demoRows.length > 0;
-  if (!hasContent) return null;
+  if (!hasContent && (profile as any)._error) {
+    return <p className="text-xs text-gray-400">Podatki začasno nedostopni (timeout)</p>;
+  }
 
   return (
     <div className="space-y-3">

@@ -111,25 +111,15 @@ type OsmElement = { type: string; lat?: number; lon?: number; center?: { lat: nu
 
 async function fetchAllAmenities(lat: number, lng: number): Promise<AmenityData> {
   const R = 1000; // en klic za 1km
-  const query = `[out:json][timeout:20];(
-node["amenity"~"^(university|college|school|kindergarten|restaurant|bar|pub|pharmacy|doctors|hospital|clinic|health_centre|bank|post_office)$"](around:${R},${lat},${lng});
-way["amenity"~"^(school|kindergarten|restaurant|hospital|clinic|health_centre|pharmacy|supermarket)$"](around:${R},${lat},${lng});
-way["building"="dormitory"](around:${R},${lat},${lng});
-node["shop"="supermarket"](around:${R},${lat},${lng});
-way["shop"="supermarket"](around:${R},${lat},${lng});
-way["landuse"="industrial"](around:${R},${lat},${lng});
-node["leisure"~"^(park|playground|sports_centre|fitness_centre|swimming_pool)$"](around:${R},${lat},${lng});
-way["leisure"~"^(park|sports_centre)$"](around:${R},${lat},${lng});
-node["highway"="bus_stop"](around:${R},${lat},${lng});
-node["railway"~"^(tram_stop|station|halt)$"](around:${R},${lat},${lng});
-);out center;`;
+  // Kompakten query — samo najpomembnejši amenitiji, timeout 12s
+  const query = `[out:json][timeout:12];(nwr["amenity"~"^(school|kindergarten|university|college|hospital|clinic|health_centre|pharmacy|restaurant|bar|pub|bank|post_office)$"](around:${R},${lat},${lng});nwr["shop"="supermarket"](around:${R},${lat},${lng});nwr["leisure"~"^(park|sports_centre|fitness_centre)$"](around:${R},${lat},${lng});node["highway"="bus_stop"](around:${R},${lat},${lng});node["railway"~"^(tram_stop|station|halt)$"](around:${R},${lat},${lng});way["landuse"="industrial"](around:${R},${lat},${lng}););out center;`;
 
   try {
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       body: `data=${encodeURIComponent(query)}`,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      signal: AbortSignal.timeout(18000),
+      signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return emptyAmenityData();
     const text = await res.text();
