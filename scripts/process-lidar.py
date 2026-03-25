@@ -342,8 +342,18 @@ def compute_building_height(
     cx: float, cy: float,
     stevilo_etaz: Optional[int] = None,
 ) -> dict:
-    """Building height = DMP - DMR at centroid."""
+    """Building height = DMP - DMR at centroid.
+
+    Corrections applied to get usable ceiling height:
+    - Use DMP median (not max/mean) — avoids roof ridge inflation
+    - Subtract roof structure offset per roof type
+    - Subtract floor slab thickness (0.25m × num_floors)
+    """
     result: dict = {}
+
+    # Roof structure offsets (DMP includes roof tiles/truss/insulation)
+    ROOF_OFFSET = {"flat": 0.30, "pitched": 0.60, "complex": 0.80}
+    SLAB_THICKNESS_M = 0.25  # per floor (concrete slab)
 
     dmr_val = sample_raster(dmr, dmr_transform, cx, cy)
     dmp_val = sample_raster(dmp, dmp_transform, cx, cy)
@@ -353,31 +363,52 @@ def compute_building_height(
     w_dmp = sample_raster_window(dmp, dmp_transform, cx, cy, 15)
 
     if dmr_val is not None and dmp_val is not None:
-        height = dmp_val - dmr_val
-        result["building_height_m"] = round(max(0.0, height), 2)
-
+        # Use median of window (more stable than max, avoids ridge spike)
         if w_dmr is not None and w_dmp is not None:
-            dmr_mean = float(np.nanmean(w_dmr))
-            dmp_max = float(np.nanmax(w_dmp[~np.isnan(w_dmp)])) if w_dmp[~np.isnan(w_dmp)].size > 0 else dmp_val
-            result["building_height_mean_m"] = round(max(0.0, dmp_max - dmr_mean), 2)
+            dmr_valid = w_dmr[~np.isnan(w_dmr)]
+            dmp_valid = w_dmp[~np.isnan(w_dmp)]
+            dmr_median = float(np.nanmedian(dmr_valid)) if dmr_valid.size > 0 else dmr_val
+            dmp_median = float(np.nanmedian(dmp_valid)) if dmp_valid.size > 0 else dmp_val
+            dmp_max = float(np.nanmax(dmp_valid)) if dmp_valid.size > 0 else dmp_val
+        else:
+            dmr_median = dmr_val
+            dmp_median = dmp_val
+            dmp_max = dmp_val
 
-            # Roof type from DMP variance in window
-            if w_dmp is not None and w_dmp.size > 4:
-                dmp_std = float(np.nanstd(w_dmp))
-                h = result["building_height_m"]
-                if h < 1.0:
-                    result["roof_type"] = "flat"
-                elif dmp_std < 0.3:
-                    result["roof_type"] = "flat"
-                elif dmp_std < 1.5:
-                    result["roof_type"] = "pitched"
-                else:
-                    result["roof_type"] = "complex"
+        # Raw height from DMP median - DMR median
+        raw_height = max(0.0, dmp_median - dmr_median)
+        result["building_height_m"] = round(raw_height, 2)
 
-    if stevilo_etaz and stevilo_etaz > 0:
-        h = result.get("building_height_m")
-        if h and h > 0:
-            result["floor_height_m"] = round(h / stevilo_etaz, 2)
+        # Also store max-based height for reference
+        result["building_height_mean_m"] = round(max(0.0, dmp_max - dmr_median), 2)
+
+        # Roof type from DMP variance in window
+        if w_dmp is not None and w_dmp.size > 4:
+            dmp_std = float(np.nanstd(w_dmp))
+            h = raw_height
+            if h < 1.0 or dmp_std < 0.3:
+                result["roof_type"] = "flat"
+            elif dmp_std < 1.5:
+                result["roof_type"] = "pitched"
+            else:
+                result["roof_type"] = "complex"
+        else:
+            result["roof_type"] = "pitched"  # default
+
+        # Corrected usable building height
+        roof_offset = ROOF_OFFSET.get(result.get("roof_type", "pitched"), 0.60)
+        num_floors = stevilo_etaz if stevilo_etaz and stevilo_etaz > 0 else 1
+        slab_total = SLAB_THICKNESS_M * num_floors
+
+        usable_height = max(0.0, raw_height - roof_offset - slab_total)
+        result["building_height_usable_m"] = round(usable_height, 2)
+
+        # Ceiling height per floor (corrected)
+        if num_floors > 0 and usable_height > 0:
+            result["floor_height_m"] = round(usable_height / num_floors, 2)
+        elif stevilo_etaz and stevilo_etaz > 0:
+            # Fallback: raw / floors (uncorrected, for audit)
+            result["floor_height_m"] = round(raw_height / stevilo_etaz, 2)
 
     return result
 
