@@ -106,63 +106,48 @@ function noiseLabel(lden: number | null): "tiho" | "zmerno" | "prometno" | "hrup
   return "hrupno";
 }
 
-// ── OSM Overpass amenity query ────────────────────────────────────────────────
-async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Promise<AmenityCount> {
-  const query = `
-    [out:json][timeout:10];
-    (
-      node["amenity"="university"](around:${radiusM},${lat},${lng});
-      node["amenity"="college"](around:${radiusM},${lat},${lng});
-      way["building"="dormitory"](around:${radiusM},${lat},${lng});
-      node["amenity"="school"](around:${radiusM},${lat},${lng});
-      way["amenity"="school"](around:${radiusM},${lat},${lng});
-      node["amenity"="kindergarten"](around:${radiusM},${lat},${lng});
-      way["amenity"="kindergarten"](around:${radiusM},${lat},${lng});
-      node["amenity"="restaurant"](around:${radiusM},${lat},${lng});
-      way["amenity"="restaurant"](around:${radiusM},${lat},${lng});
-      node["amenity"="bar"](around:${radiusM},${lat},${lng});
-      node["amenity"="pub"](around:${radiusM},${lat},${lng});
-      node["shop"="supermarket"](around:${radiusM},${lat},${lng});
-      way["shop"="supermarket"](around:${radiusM},${lat},${lng});
-      node["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
-      way["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
-      node["amenity"="doctors"](around:${radiusM},${lat},${lng});
-      node["amenity"="hospital"](around:${radiusM},${lat},${lng});
-      way["amenity"="hospital"](around:${radiusM},${lat},${lng});
-      node["amenity"="clinic"](around:${radiusM},${lat},${lng});
-      way["amenity"="clinic"](around:${radiusM},${lat},${lng});
-      node["amenity"="health_centre"](around:${radiusM},${lat},${lng});
-      way["amenity"="health_centre"](around:${radiusM},${lat},${lng});
-      way["landuse"="industrial"](around:${radiusM},${lat},${lng});
-      node["leisure"="park"](around:${radiusM},${lat},${lng});
-      way["leisure"="park"](around:${radiusM},${lat},${lng});
-      node["leisure"="playground"](around:${radiusM},${lat},${lng});
-      node["leisure"="sports_centre"](around:${radiusM},${lat},${lng});
-      way["leisure"="sports_centre"](around:${radiusM},${lat},${lng});
-      node["leisure"="fitness_centre"](around:${radiusM},${lat},${lng});
-      node["leisure"="swimming_pool"](around:${radiusM},${lat},${lng});
-      node["amenity"="bank"](around:${radiusM},${lat},${lng});
-      node["amenity"="post_office"](around:${radiusM},${lat},${lng});
-      node["highway"="bus_stop"](around:${radiusM},${lat},${lng});
-      node["railway"="tram_stop"](around:${radiusM},${lat},${lng});
-      node["railway"="station"](around:${radiusM},${lat},${lng});
-      node["railway"="halt"](around:${radiusM},${lat},${lng});
-    );
-    out center;
-  `;
+// ── OSM Overpass amenity query — en 1km klic, distanca filtrirana v JS ───────
+type OsmElement = { type: string; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string,string> };
+
+async function fetchAllAmenities(lat: number, lng: number): Promise<AmenityData> {
+  const R = 1000; // en klic za 1km
+  const query = `[out:json][timeout:20];(
+node["amenity"~"^(university|college|school|kindergarten|restaurant|bar|pub|pharmacy|doctors|hospital|clinic|health_centre|bank|post_office)$"](around:${R},${lat},${lng});
+way["amenity"~"^(school|kindergarten|restaurant|hospital|clinic|health_centre|pharmacy|supermarket)$"](around:${R},${lat},${lng});
+way["building"="dormitory"](around:${R},${lat},${lng});
+node["shop"="supermarket"](around:${R},${lat},${lng});
+way["shop"="supermarket"](around:${R},${lat},${lng});
+way["landuse"="industrial"](around:${R},${lat},${lng});
+node["leisure"~"^(park|playground|sports_centre|fitness_centre|swimming_pool)$"](around:${R},${lat},${lng});
+way["leisure"~"^(park|sports_centre)$"](around:${R},${lat},${lng});
+node["highway"="bus_stop"](around:${R},${lat},${lng});
+node["railway"~"^(tram_stop|station|halt)$"](around:${R},${lat},${lng});
+);out center;`;
 
   try {
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       body: `data=${encodeURIComponent(query)}`,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(18000),
     });
-    if (!res.ok) return emptyCount();
-    const data = await res.json() as { elements: Array<{ tags?: Record<string,string>; type?: string }> };
-    
-    const count = emptyCount();
+    if (!res.ok) return emptyAmenityData();
+    const text = await res.text();
+    if (!text.startsWith("{")) return emptyAmenityData(); // XML error response
+    const data = JSON.parse(text) as { elements: OsmElement[] };
+
+    const r300 = emptyCount(), r500 = emptyCount(), r1000 = emptyCount();
+
     for (const el of data.elements) {
+      const elLat = el.lat ?? el.center?.lat;
+      const elLon = el.lon ?? el.center?.lon;
+      if (elLat == null || elLon == null) continue;
+
+      // Haversine approx distance in meters
+      const dlat = (elLat - lat) * 111195;
+      const dlng = (elLon - lng) * Math.cos(lat * Math.PI / 180) * 111195;
+      const dist = Math.sqrt(dlat * dlat + dlng * dlng);
+
       const tags = el.tags ?? {};
       const amenity = tags.amenity;
       const building = tags.building;
@@ -172,34 +157,47 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       const railway = tags.railway;
       const shop = tags.shop;
 
-      if (amenity === "university" || amenity === "college") count.universities++;
-      else if (building === "dormitory") count.dormitories++;
-      else if (amenity === "school") count.schools++;
-      else if (amenity === "kindergarten") count.kindergartens++;
-      else if (amenity === "restaurant") count.restaurants++;
-      else if (amenity === "bar" || amenity === "pub") count.bars++;
-      else if (shop === "supermarket") count.supermarkets++;
-      else if (amenity === "pharmacy") count.pharmacies++;
-      else if (amenity === "doctors") count.doctors++;
-      else if (amenity === "hospital") count.hospitals++;
-      else if (amenity === "clinic" || amenity === "health_centre") count.health_centres++;
-      else if (landuse === "industrial") count.industrial++;
-      else if (leisure === "park") count.parks++;
-      else if (leisure === "playground") count.playgrounds++;
-      else if (leisure === "sports_centre" || leisure === "fitness_centre" || leisure === "swimming_pool") count.sports_centres++;
-      else if (amenity === "bank") count.banks++;
-      else if (amenity === "post_office") count.postOffices++;
-      else if (highway === "bus_stop") count.bus_stops++;
-      else if (railway === "tram_stop") count.tram_stops++;
-      else if (railway === "station" || railway === "halt") count.train_stations++;
+      const addTo = (c: AmenityCount) => {
+        if (amenity === "university" || amenity === "college") c.universities++;
+        else if (building === "dormitory") c.dormitories++;
+        else if (amenity === "school") c.schools++;
+        else if (amenity === "kindergarten") c.kindergartens++;
+        else if (amenity === "restaurant") c.restaurants++;
+        else if (amenity === "bar" || amenity === "pub") c.bars++;
+        else if (shop === "supermarket") c.supermarkets++;
+        else if (amenity === "pharmacy") c.pharmacies++;
+        else if (amenity === "hospital") c.hospitals++;
+        else if (amenity === "clinic" || amenity === "health_centre") c.health_centres++;
+        else if (landuse === "industrial") c.industrial++;
+        else if (leisure === "park") c.parks++;
+        else if (leisure === "playground") c.playgrounds++;
+        else if (leisure === "sports_centre" || leisure === "fitness_centre" || leisure === "swimming_pool") c.sports_centres++;
+        else if (amenity === "bank") c.banks++;
+        else if (amenity === "post_office") c.postOffices++;
+        else if (highway === "bus_stop") c.bus_stops++;
+        else if (railway === "tram_stop") c.tram_stops++;
+        else if (railway === "station" || railway === "halt") c.train_stations++;
+      };
+
+      if (dist <= 300) { addTo(r300); addTo(r500); addTo(r1000); }
+      else if (dist <= 500) { addTo(r500); addTo(r1000); }
+      else { addTo(r1000); }
     }
-      // Deduplikacija: vsaka fizična avtobusna/tramvajska postaja = 2 nodes v OSM (oba smeri)
-  count.bus_stops = Math.ceil(count.bus_stops / 2);
-  count.tram_stops = Math.ceil(count.tram_stops / 2);
-  return count;
+
+    // Deduplikacija bus/tram: vsaka fizična postaja = 2 nodes (obe smeri)
+    for (const c of [r300, r500, r1000]) {
+      c.bus_stops = Math.ceil(c.bus_stops / 2);
+      c.tram_stops = Math.ceil(c.tram_stops / 2);
+    }
+
+    return { r300, r500, r1000 };
   } catch {
-    return emptyCount();
+    return emptyAmenityData();
   }
+}
+
+function emptyAmenityData(): AmenityData {
+  return { r300: emptyCount(), r500: emptyCount(), r1000: emptyCount() };
 }
 
 function emptyCount(): AmenityCount {
@@ -374,14 +372,15 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
   }
 
   // Compute in parallel
-  const [noise, amenity300, amenity500, amenity1000, price, gridDemo] = await Promise.all([
+  const [noise, amenityData, price, gridDemo] = await Promise.all([
     fetchNoiseLden(lat, lng),
-    fetchOsmAmenities(lat, lng, 300),
-    fetchOsmAmenities(lat, lng, 500),
-    fetchOsmAmenities(lat, lng, 1000),
+    fetchAllAmenities(lat, lng),
     fetchEtnPrice500m(lat, lng),
     fetchGridDemographics(lat, lng),
   ]);
+  const amenity300 = amenityData.r300;
+  const amenity500 = amenityData.r500;
+  const amenity1000 = amenityData.r1000;
 
   // SURS grid demographics (500m cell)
   const statOkolisId: string | null = null;
@@ -393,7 +392,7 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
   const ageO65Pct: number | null = ageAvg != null ? Math.max(0, Math.round(ageAvg - 35)) : null;
   const eduTertiaryPct: number | null = gridDemo?.edct_3 ?? null;
 
-  const amenityData: AmenityData = { r300: amenity300, r500: amenity500, r1000: amenity1000 };
+  // amenityData je že AmenityData z r300/r500/r1000
   const nLabel = noiseLabel(noise);
   const { tags, type } = deriveCharacter(amenity300, amenity500, noise, ageO65Pct, ageU30Pct, eduTertiaryPct, ageAvg);
 
