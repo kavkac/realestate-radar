@@ -735,6 +735,33 @@ def compute_privacy_morphology(
 # DB UTILITIES
 # ─────────────────────────────────────────────
 
+def get_gurs_floor_heights(conn, eid_stavba: int) -> Optional[dict]:
+    """Fetch GURS declared floor heights from kn_etaze.
+    Returns dict with avg/min/max visina_etaze, or None if no data.
+    """
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT
+                COUNT(*) as floor_count,
+                AVG(visina_etaze) as avg_floor_height,
+                MIN(visina_etaze) as min_floor_height,
+                MAX(visina_etaze) as max_floor_height,
+                MIN(nadmorska_visina) as ground_elevation_m
+            FROM kn_etaze
+            WHERE eid_stavba = %s
+              AND visina_etaze IS NOT NULL
+              AND visina_etaze > 0.5
+              AND visina_etaze < 10.0
+        """, (eid_stavba,))
+        row = cur.fetchone()
+        if row and row["floor_count"] and row["floor_count"] > 0:
+            return dict(row)
+    except Exception as e:
+        log.debug(f"kn_etaze lookup failed for {eid_stavba}: {e}")
+    return None
+
+
 def get_buildings_for_bbox(
     conn, xmin: float, ymin: float, xmax: float, ymax: float
 ) -> list[dict]:
@@ -819,6 +846,7 @@ def upsert_batch(conn, rows: list[dict]) -> int:
         "road_exposure_score", "building_density_200m",
         "avg_building_height_200m_m", "open_space_ratio_200m",
         "viewshed_per_floor",
+        "ceiling_height_source",
         "pipeline_version", "dmr_tile_ids", "dmp_tile_ids", "quality_flag",
     ]
 
@@ -972,7 +1000,7 @@ def process_bbox(
             terrain = compute_terrain_features(dmr_arr, dmr_transform, cx, cy)
             row.update(terrain)
 
-            # Building height
+            # Building height (LiDAR)
             if dmp_arr is not None:
                 height = compute_building_height(
                     dmr_arr, dmr_transform,
@@ -981,6 +1009,19 @@ def process_bbox(
                     building.get("stevilo_etaz"),
                 )
                 row.update(height)
+
+            # GURS override: use declared visina_etaze if available
+            # (more accurate than LiDAR-derived ceiling height)
+            gurs_floors = get_gurs_floor_heights(conn, eid)
+            if gurs_floors and gurs_floors.get("avg_floor_height"):
+                avg_h = float(gurs_floors["avg_floor_height"])
+                row["floor_height_m"] = round(avg_h, 2)
+                row["ceiling_height_source"] = "gurs_declared"
+                # Ground elevation from GURS if LiDAR missed it
+                if row.get("elevation_m") is None and gurs_floors.get("ground_elevation_m"):
+                    row["elevation_m"] = round(float(gurs_floors["ground_elevation_m"]), 1)
+            else:
+                row.setdefault("ceiling_height_source", "lidar_corrected")
 
             # Solar
             lat, lon = epsg3794_to_wgs84(cx, cy)

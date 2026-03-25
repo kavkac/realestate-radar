@@ -44,7 +44,9 @@ CREATE TABLE IF NOT EXISTS lidar_building_features (
     building_height_m       NUMERIC(5,2),   -- max(DMP) - min(DMR) v footprintu
     building_height_mean_m  NUMERIC(5,2),   -- mean(DMP) - mean(DMR)
     roof_type               roof_kind       DEFAULT 'unknown',
-    floor_height_m          NUMERIC(4,2),   -- building_height / stevilo_etaz (NULL če ni)
+    building_height_usable_m NUMERIC(5,2),  -- korigirana bivalna višina (brez strehe + plošč)
+    floor_height_m          NUMERIC(4,2),   -- višina etaže: GURS visina_etaze ali LiDAR korigirano
+    ceiling_height_source   TEXT,           -- 'gurs_declared' | 'lidar_corrected' | 'estimated'
 
     -- ── SOLAR & LIGHT ──────────────────────────
     solar_radiation_annual_kwh_m2   NUMERIC(7,1),   -- letna sončna energija
