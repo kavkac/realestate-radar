@@ -44,7 +44,7 @@ export function NeighborhoodCard({ lat, lng }: Props) {
   const p = profile as any;
 
   // ── Amenity rows (enotni vir: OSM Overpass, 300m/500m/1km) ────────────────
-  type ARow = { icon: string; label: string; value: string; source: string };
+  type ARow = { icon: string; label: string; value: string };
   const amenityRows: ARow[] = [];
 
   if (a) {
@@ -52,59 +52,62 @@ export function NeighborhoodCard({ lat, lng }: Props) {
     const a5 = a.r500;
     const a1 = a.r1000;
 
-    if (a1.schools > 0)
-      amenityRows.push({ icon: "🏫", label: "Šole", value: `${a1.schools} v 1km`, source: "OSM" });
-    if (a1.kindergartens > 0)
-      amenityRows.push({ icon: "🧸", label: "Vrtci", value: `${a1.kindergartens} v 1km`, source: "OSM" });
+    // Šole/vrtci: 500m = tvoja soseska; 1km je preširoko za mestno jedro
+    if (a5.schools > 0)
+      amenityRows.push({ icon: "🏫", label: "Šole", value: `${a5.schools} v 500m` });
+    if (a5.kindergartens > 0)
+      amenityRows.push({ icon: "🧸", label: "Vrtci", value: `${a5.kindergartens} v 500m` });
+    // Univerze: samo prikaz, ne število (prevelika institucija za "soseskco")
     if (a1.universities > 0)
-      amenityRows.push({ icon: "🎓", label: "Univerze / fakultete", value: `${a1.universities}`, source: "OSM" });
+      amenityRows.push({ icon: "🎓", label: "Univerza / fakulteta v bližini", value: "da" });
 
     // Javni prevoz — prikaži najbližji radij z podatki
     const t3 = a3.bus_stops + a3.tram_stops + a3.train_stations;
     const t5 = a5.bus_stops + a5.tram_stops + a5.train_stations;
     const t1 = a1.bus_stops + a1.tram_stops + a1.train_stations;
     if (t3 > 0)
-      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `${t3} postaj v 300m`, source: "OSM" });
+      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `${t3} postaj v 300m` });
     else if (t5 > 0)
-      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `${t5} postaj v 500m`, source: "OSM" });
+      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `${t5} postaj v 500m` });
     else if (t1 > 0)
-      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `${t1} postaj v 1km`, source: "OSM" });
+      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `${t1} postaj v 1km` });
 
     // Zdravstvo — zdravniki so del ZD/bolnišnic, ne posebej
     if (a1.hospitals > 0)
-      amenityRows.push({ icon: "🏥", label: "Bolnišnica v bližini", value: `${a1.hospitals}`, source: "OSM" });
+      amenityRows.push({ icon: "🏥", label: "Bolnišnica v bližini", value: `${a1.hospitals}` });
     if (a1.health_centres > 0)
-      amenityRows.push({ icon: "🩺", label: "Zdravstveni domovi", value: `${a1.health_centres}`, source: "OSM" });
+      amenityRows.push({ icon: "🩺", label: "Zdravstveni domovi", value: `${a1.health_centres}` });
     if (a1.pharmacies > 0) {
       const dist = a5.pharmacies > 0 ? "· najbližja v 500m" : "· v 1km";
-      amenityRows.push({ icon: "💊", label: "Lekarne", value: `${a1.pharmacies} ${dist}`, source: "OSM" });
+      amenityRows.push({ icon: "💊", label: "Lekarne", value: `${a1.pharmacies} ${dist}` });
     }
 
     // Šport & parki
     if (a1.sports_centres > 0)
-      amenityRows.push({ icon: "⚽", label: "Športni objekti", value: `${a1.sports_centres}`, source: "OSM" });
+      amenityRows.push({ icon: "⚽", label: "Športni objekti", value: `${a1.sports_centres}` });
     if (a5.parks > 0)
-      amenityRows.push({ icon: "🌳", label: "Parki", value: `${a5.parks} v 500m`, source: "OSM" });
+      amenityRows.push({ icon: "🌳", label: "Parki", value: `${a5.parks} v 500m` });
     else if (a1.parks > 0)
-      amenityRows.push({ icon: "🌳", label: "Parki", value: `${a1.parks} v 1km`, source: "OSM" });
+      amenityRows.push({ icon: "🌳", label: "Parki", value: `${a1.parks} v 1km` });
 
     // Storitve
     if (a5.supermarkets > 0)
-      amenityRows.push({ icon: "🛒", label: "Trgovine / supermarketi", value: `${a5.supermarkets} v 500m`, source: "OSM" });
+      amenityRows.push({ icon: "🛒", label: "Trgovine / supermarketi", value: `${a5.supermarkets} v 500m` });
     else if (a1.supermarkets > 0)
-      amenityRows.push({ icon: "🛒", label: "Trgovine / supermarketi", value: `${a1.supermarkets} v 1km`, source: "OSM" });
-    if (a1.restaurants > 0)
-      amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `${a1.restaurants} v 1km`, source: "OSM" });
+      amenityRows.push({ icon: "🛒", label: "Trgovine / supermarketi", value: `${a1.supermarkets} v 1km` });
+    // Restavracije: 500m = soseskce; 1km inflated v mestnem jedru
+    if (a5.restaurants + a5.bars > 0)
+      amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `${a5.restaurants + a5.bars} v 500m` });
     // Banke — samo 500m radij (v 1km je preveč poslovalnic); cap 10+
     if (a5.banks > 0) {
       const bankCount = a5.banks > 10 ? "10+" : `${a5.banks}`;
-      amenityRows.push({ icon: "🏦", label: "Banke", value: `${bankCount} v 500m`, source: "OSM" });
+      amenityRows.push({ icon: "🏦", label: "Banke", value: `${bankCount} v 500m` });
     }
     if (a1.postOffices > 0)
-      amenityRows.push({ icon: "📮", label: "Pošte", value: `${a1.postOffices}`, source: "OSM" });
+      amenityRows.push({ icon: "📮", label: "Pošte", value: `${a1.postOffices}` });
 
     if (a1.industrial > 0)
-      amenityRows.push({ icon: "🏭", label: "Industrijska cona", value: "v bližini ⚠️", source: "OSM" });
+      amenityRows.push({ icon: "🏭", label: "Industrijska cona", value: "v bližini ⚠️" });
   }
 
   // ── Demografski stats ──────────────────────────────────────────────────────
@@ -126,6 +129,13 @@ export function NeighborhoodCard({ lat, lng }: Props) {
 
   return (
     <div className="space-y-3">
+      {/* Ime soseskce iz OSM is_in */}
+      {(profile as any).neighborhoodName && (
+        <p className="text-xs font-semibold text-gray-600 -mb-1">
+          📍 {(profile as any).neighborhoodName}
+        </p>
+      )}
+
       {/* Character tags */}
       {profile.characterTags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">

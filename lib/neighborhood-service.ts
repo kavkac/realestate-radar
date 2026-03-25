@@ -17,6 +17,29 @@ import proj4 from "proj4";
 proj4.defs("EPSG:3794", "+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9999 +x_0=500000 +y_0=-5000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
 const wgs84ToD96tm = proj4("WGS84", "EPSG:3794");
 
+/** Fetch soseska/četrt name via OSM is_in */
+async function fetchNeighborhoodName(lat: number, lng: number): Promise<string | null> {
+  try {
+    const q = `[out:json][timeout:8];is_in(${lat},${lng})->.a;area.a["place"~"^(suburb|quarter|neighbourhood|village)$"];out tags;`;
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST", body: `data=${encodeURIComponent(q)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    if (!text.startsWith("{")) return null;
+    const data = JSON.parse(text) as { elements: Array<{ tags?: Record<string, string> }> };
+    // Vzemi najbolj specifičen (neighbourhood > quarter > suburb)
+    const order = ["neighbourhood", "quarter", "suburb"];
+    for (const place of order) {
+      const el = data.elements.find(e => e.tags?.place === place);
+      if (el?.tags?.name) return el.tags.name;
+    }
+    return data.elements[0]?.tags?.name ?? null;
+  } catch { return null; }
+}
+
 /** Convert WGS84 lat/lng → nearest grid_demographics row */
 async function fetchGridDemographics(lat: number, lng: number): Promise<{
   age_avg: number | null; edct_1: number | null; edct_2: number | null; edct_3: number | null; pop_total: number | null;
@@ -92,6 +115,7 @@ export interface NeighborhoodProfile {
 
   // Izpeljano
   characterTags: string[];
+  neighborhoodName: string | null;
   neighborhoodType: string | null;
   walkingTargets?: WalkingResult[];
   proximityScore?: number; // -0.15 do +0.20, vrednostni multiplikator
@@ -219,7 +243,7 @@ async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> 
       returnGeometry: "false",
       f: "json",
     });
-    const res = await fetch(`${baseUrl}?${params}`, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch(`${baseUrl}?${params}`, { signal: AbortSignal.timeout(22000) });
     if (!res.ok) return null;
     const data = await res.json() as { results?: Array<{ layerName: string; attributes: Record<string, string> }> };
     if (!data.results?.length) return null;
@@ -282,7 +306,8 @@ function deriveCharacter(
   const tags: string[] = [];
 
   // Šolajoča / mladinska
-  if (amenity500.universities + amenity500.dormitories >= 2) tags.push("🎓 Študentsko");
+  // "Študentsko": mora biti res dominantno — fakutete + dormitoriji skupaj
+  if (amenity500.universities >= 3 && amenity500.dormitories >= 1) tags.push("🎓 Študentsko");
   else if (amenity500.schools >= 2 && (ageU30 ?? 0) > 30) tags.push("👨‍👩‍👧 Družinsko");
 
   // Starostna
@@ -357,6 +382,7 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
       amenity: c.amenity_data,
       pricePerM2_500m: c.price_per_m2_500m,
       characterTags: c.character_tags ?? [],
+      neighborhoodName: c.neighborhood_name ?? null,
       neighborhoodType: c.neighborhood_type,
     };
   }
@@ -371,6 +397,9 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
   const amenity300 = amenityData.r300;
   const amenity500 = amenityData.r500;
   const amenity1000 = amenityData.r1000;
+
+  // neighborhoodName je neblokirajočič — ne vpliva na timeout
+  const neighborhoodName = await fetchNeighborhoodName(lat, lng).catch(() => null);
 
   // SURS grid demographics (500m cell)
   const statOkolisId: string | null = null;
@@ -420,6 +449,7 @@ export async function getNeighborhoodProfile(lat: number, lng: number): Promise<
     amenity: amenityData,
     pricePerM2_500m: price,
     characterTags: tags,
+    neighborhoodName,
     neighborhoodType: type,
   };
 }

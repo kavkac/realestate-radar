@@ -850,7 +850,7 @@ export function PropertyCard({
           {lat != null && lng != null && (
             <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
               <section>
-                <Label vir="OSM · ARSO hrup · ETN">Karakter soseske</Label>
+                <Label vir="OSM · ARSO · ETN · SURS">Karakter soseske</Label>
                 <NeighborhoodCard lat={lat} lng={lng} />
               </section>
             </div>
