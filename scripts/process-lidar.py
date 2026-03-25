@@ -715,7 +715,7 @@ def get_buildings_for_bbox(
         cur.execute("""
             SELECT
                 eid_stavba, ko_id, st_stavbe,
-                stevilo_etaz, bruto_tlorisna_pov,
+                stevilo_etaz, stevilo_stanovanj, bruto_tlorisna_pov,
                 centroid_geom
             FROM gurs_kn_stavbe
             WHERE centroid_geom IS NOT NULL
@@ -787,6 +787,7 @@ def upsert_batch(conn, rows: list[dict]) -> int:
         "building_proximity_avg_m", "overlooked_score", "privacy_score",
         "road_exposure_score", "building_density_200m",
         "avg_building_height_200m_m", "open_space_ratio_200m",
+        "viewshed_per_floor",
         "pipeline_version", "dmr_tile_ids", "dmp_tile_ids", "quality_flag",
     ]
 
@@ -956,12 +957,44 @@ def process_bbox(
             row.update(solar)
 
             # Viewshed
-            observer_h = row.get("building_height_m") or 3.0
+            building_h = row.get("building_height_m") or 3.0
+            stevilo_etaz = building.get("stevilo_etaz") or 1
+            stevilo_stanovanj = building.get("stevilo_stanovanj") or 0
+
+            # Top floor viewshed (vse stavbe)
             viewshed = compute_viewshed_features(
                 dmr_arr, dmr_transform, cx, cy,
-                observer_height_m=max(3.0, float(observer_h)),
+                observer_height_m=max(3.0, float(building_h)),
             )
             row.update(viewshed)
+
+            # Per-etaža viewshed samo za večstanovanjske (stevilo_stanovanj > 1)
+            if stevilo_stanovanj and stevilo_stanovanj > 1 and stevilo_etaz and stevilo_etaz > 1:
+                per_floor = []
+                floor_h = float(building_h) / int(stevilo_etaz)
+                for floor_num in range(1, int(stevilo_etaz) + 1):
+                    observer_h_floor = floor_h * floor_num
+                    vs_floor = compute_viewshed_features(
+                        dmr_arr, dmr_transform, cx, cy,
+                        observer_height_m=max(1.5, observer_h_floor),
+                    )
+                    per_floor.append({
+                        "floor": floor_num,
+                        "score_360": vs_floor.get("viewshed_score_360"),
+                        "n": vs_floor.get("viewshed_n"),
+                        "ne": vs_floor.get("viewshed_ne"),
+                        "e": vs_floor.get("viewshed_e"),
+                        "se": vs_floor.get("viewshed_se"),
+                        "s": vs_floor.get("viewshed_s"),
+                        "sw": vs_floor.get("viewshed_sw"),
+                        "w": vs_floor.get("viewshed_w"),
+                        "nw": vs_floor.get("viewshed_nw"),
+                        "mountain": vs_floor.get("mountain_visibility_bool"),
+                        "horizon_m": vs_floor.get("horizon_distance_avg_m"),
+                    })
+                row["viewshed_per_floor"] = json.dumps(per_floor)
+            else:
+                row["viewshed_per_floor"] = None
 
             # Vegetation
             if dmp_arr is not None:

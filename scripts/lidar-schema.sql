@@ -56,10 +56,14 @@ CREATE TABLE IF NOT EXISTS lidar_building_features (
     shadow_morning_score             NUMERIC(4,3),   -- 0-1 zasenčenost zjutraj (9:00)
     shadow_afternoon_score           NUMERIC(4,3),   -- 0-1 zasenčenost popoldne (15:00)
 
-    -- ── VIEWSHED (iz vrha stavbe, r=1km) ───────
-    -- Per fasada: 0-100, višje = bolj odprt pogled
-    viewshed_score_360      NUMERIC(5,1),   -- povprečje vseh smeri
-    viewshed_n              NUMERIC(5,1),   -- sever
+    -- ── VIEWSHED ────────────────────────────────
+    --
+    -- Hiše (stevilo_stanovanj <= 1): samo top floor
+    -- Večstanovanjski (stevilo_stanovanj > 1): per etaža kot JSONB
+    --
+    -- Top floor viewshed (vse stavbe):
+    viewshed_score_360      NUMERIC(5,1),   -- povprečje vseh smeri, top floor
+    viewshed_n              NUMERIC(5,1),
     viewshed_ne             NUMERIC(5,1),
     viewshed_e              NUMERIC(5,1),
     viewshed_se             NUMERIC(5,1),
@@ -67,13 +71,17 @@ CREATE TABLE IF NOT EXISTS lidar_building_features (
     viewshed_sw             NUMERIC(5,1),
     viewshed_w              NUMERIC(5,1),
     viewshed_nw             NUMERIC(5,1),
-    horizon_distance_avg_m  NUMERIC(7,1),   -- povprečna razdalja do prve ovire
-    mountain_visibility_bool         BOOLEAN,        -- ali se vidijo gore (horizont >10°)
+    horizon_distance_avg_m  NUMERIC(7,1),
+    mountain_visibility_bool         BOOLEAN,
     mountain_visibility_distance_m   NUMERIC(7,1),
-    water_visibility_bool            BOOLEAN,        -- ali je voda vidna
+    water_visibility_bool            BOOLEAN,
     water_visibility_distance_m      NUMERIC(7,1),
-    green_visibility_pct             NUMERIC(5,1),   -- % zelenih površin v vidnem polju
-    openness_index                   NUMERIC(4,3),   -- 0-1 composite
+    green_visibility_pct             NUMERIC(5,1),
+    openness_index                   NUMERIC(4,3),
+
+    -- Per-etaža viewshed (samo večstanovanjski, stevilo_stanovanj > 1):
+    -- Format: [{"floor": 1, "score_360": 45.2, "n": 30.1, "ne": ..., "mountain": false}, ...]
+    viewshed_per_floor      JSONB,          -- NULL za hiše
 
     -- ── VEGETATION ─────────────────────────────
     canopy_cover_50m_pct    NUMERIC(5,1),   -- % drevesne krošnje r=50m
