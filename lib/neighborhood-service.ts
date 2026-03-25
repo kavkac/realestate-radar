@@ -207,31 +207,40 @@ function emptyCount(): AmenityCount {
 
 // ── ARSO noise (WMS GetFeatureInfo) ──────────────────────────────────────────
 async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> {
-  // ARSO hrupne karte — zahteva token (ni javno dostopen WMS)
-  // TODO: ko dobimo ARSO API token, implementirati pravi Lden lookup
-  // Fallback: Overpass highway density proxy (ni Lden, je aproksimacija)
+  // ARSO Atlas Okolja (javni, brez tokena) — strateške karte hrupa 2020
+  // Layer 344 = MOL Ljubljana ceste Ldvn, Layer 352 = DRSI državno ceste Ldvn
+  // Vrne max Lden vrednost iz presečišča hrupnih con
   try {
-    const query = `
-      [out:json][timeout:8];
-      (
-        way["highway"~"^(motorway|trunk|primary|secondary)$"](around:200,${lat},${lng});
-        way["highway"="tertiary"](around:100,${lat},${lng});
-      );
-      out count;
-    `;
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: `data=${encodeURIComponent(query)}`,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      signal: AbortSignal.timeout(8000),
+    const baseUrl = "https://gis.arso.gov.si/arcgis/rest/services/Atlasokolja_javni_D96/MapServer/identify";
+    const params = new URLSearchParams({
+      geometry: `${lng},${lat}`,
+      geometryType: "esriGeometryPoint",
+      sr: "4326",
+      layers: "all:344,352",  // MOL Ljubljana + DRSI državno
+      tolerance: "3",
+      mapExtent: `${lng - 0.01},${lat - 0.01},${lng + 0.01},${lat + 0.01}`,
+      imageDisplay: "200,200,96",
+      returnGeometry: "false",
+      f: "json",
     });
+    const res = await fetch(`${baseUrl}?${params}`, { signal: AbortSignal.timeout(10000) });
     if (!res.ok) return null;
-    const data = await res.json() as { elements: Array<{ tags?: { total?: string } }> };
-    const total = parseInt(data.elements[0]?.tags?.total ?? "0");
-    // Grubo: 0 = tiho (<45dB), 1-2 = zmerno (50-55dB), 3+ = prometno (60-70dB)
-    if (total === 0) return 42;
-    if (total <= 2) return 53;
-    return 63;
+    const data = await res.json() as { results?: Array<{ layerName: string; attributes: Record<string, string> }> };
+    if (!data.results?.length) return null;
+
+    // Vzemi maksimalni Lden iz vseh hrupnih con (LDVN = dan-večer-noč)
+    let maxLden: number | null = null;
+    for (const r of data.results) {
+      if (!r.layerName.includes("LDVN")) continue;  // samo Lden (ne Lnoc)
+      const razred = r.attributes.HRUP_RAZRED ?? "";
+      // Format: "55-60" → vzemi zgornjo mejo
+      const match = razred.match(/(\d+)-(\d+)/);
+      if (match) {
+        const upper = parseInt(match[2]);
+        if (maxLden === null || upper > maxLden) maxLden = upper;
+      }
+    }
+    return maxLden;
   } catch {
     return null;
   }

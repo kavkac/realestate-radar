@@ -140,16 +140,16 @@ export function NeighborhoodCard({ lat, lng }: Props) {
           {profile.noiseLdenDb != null && (
             <div>
               <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">
-                Hrupnost <SourceBadge label="OSM ceste~" />
+                Hrupnost (Lden) <SourceBadge label="ARSO 2020" />
               </p>
               <p className="font-semibold text-gray-800">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                {profile.noiseLdenDb} dB
+                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${
                   profile.noiseLabel === "tiho" ? "bg-green-50 text-green-700" :
                   profile.noiseLabel === "zmerno" ? "bg-yellow-50 text-yellow-700" :
                   profile.noiseLabel === "prometno" ? "bg-orange-50 text-orange-700" :
                   "bg-red-50 text-red-700"
                 }`}>{profile.noiseLabel}</span>
-                <span className="text-[9px] text-gray-400 ml-1">(aproks. na osnovi cestne gostote)</span>
               </p>
             </div>
           )}
