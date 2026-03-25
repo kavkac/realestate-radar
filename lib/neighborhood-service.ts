@@ -111,7 +111,7 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       node["railway"="station"](around:${radiusM},${lat},${lng});
       node["railway"="halt"](around:${radiusM},${lat},${lng});
     );
-    out count;
+    out center;
   `;
 
   try {
@@ -122,7 +122,7 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return emptyCount();
-    const data = await res.json() as { elements: Array<{ tags?: Record<string,string> }> };
+    const data = await res.json() as { elements: Array<{ tags?: Record<string,string>; type?: string }> };
     
     const count = emptyCount();
     for (const el of data.elements) {
