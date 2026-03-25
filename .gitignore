@@ -39,3 +39,4 @@ prisma/migrations/
 
 # omc
 .omc/
+lidar-data/
