@@ -227,7 +227,21 @@ function emptyCount(): AmenityCount {
 
 // ── ARSO noise (WMS GetFeatureInfo) ──────────────────────────────────────────
 async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> {
-  // ARSO Atlas Okolja (javni, brez tokena) — strateške karte hrupa 2020
+  // 1. Hitri DB lookup: grid_demographics.noise_lden (po bulk importu)
+  try {
+    const [e, n] = wgs84ToD96tm.forward([lng, lat]);
+    const cellX = Math.floor(e / 100);
+    const cellY = Math.floor(n / 100);
+    const cellId = `SIHM500_${cellX}_${cellY}`;
+    type Row = { noise_lden: number | null };
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT noise_lden FROM grid_demographics WHERE cell_id=$1 LIMIT 1`, cellId
+    );
+    const cached = rows[0]?.noise_lden;
+    if (cached != null) return cached;
+  } catch { /* fallback na ARSO API */ }
+
+  // 2. Fallback: ARSO Atlas Okolja (javni, brez tokena) — strateške karte hrupa 2020
   // Layer 344 = MOL Ljubljana ceste Ldvn, Layer 352 = DRSI državno ceste Ldvn
   // Vrne max Lden vrednost iz presečišča hrupnih con
   try {
