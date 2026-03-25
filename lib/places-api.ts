@@ -281,7 +281,7 @@ async function overpassServices(lat: number, lng: number, radiusM: number): Prom
       node["railway"="tram_stop"](around:500,${lat},${lng});
       node["railway"="station"](around:1000,${lat},${lng});
     );
-    out body;
+    out center;
   `;
 
   const empty: ServicesInfo = {
@@ -303,7 +303,7 @@ async function overpassServices(lat: number, lng: number, radiusM: number): Prom
     });
     if (!res.ok) return empty;
 
-    const data = await res.json() as { elements: Array<{ type: string; lat?: number; lon?: number; tags?: Record<string,string> }> };
+    const data = await res.json() as { elements: Array<{ type: string; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string,string> }> };
     const s = { ...empty };
 
     const distM = (elat: number | undefined, elng: number | undefined) => {
@@ -315,7 +315,9 @@ async function overpassServices(lat: number, lng: number, radiusM: number): Prom
 
     for (const el of data.elements) {
       const tags = el.tags ?? {};
-      const d = distM(el.lat, el.lon);
+      const elat = el.lat ?? el.center?.lat;
+      const elon = el.lon ?? el.center?.lon;
+      const d = distM(elat, elon);
       const amenity = tags.amenity;
       const shop = tags.shop;
       const leisure = tags.leisure;
