@@ -699,6 +699,7 @@ export async function getEtnAnaliza(
   idLega?: string | null,
   stNadstropja?: number | null,
   proximityScore?: number | null,
+  neighborhoodTags?: string[] | null,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 2);
@@ -952,7 +953,7 @@ export async function getEtnAnaliza(
       }
     }
     const lokacijskiPremium = lat != null && lng != null
-      ? izracunajLokacijskiPremium(lat, lng, osmAmenitiesCount, proximityScore)
+      ? izracunajLokacijskiPremium(lat, lng, osmAmenitiesCount, proximityScore, neighborhoodTags)
       : null;
     const lokacijskiFaktor = lokacijskiPremium?.skupniFaktor ?? 1;
     const povrsinaKor = area ? povrsinskaKorekcija(area) : 0;
@@ -1057,7 +1058,7 @@ export async function getEtnAnaliza(
 
   // Lokacijski premium
   const lokacijskiPremium = lat != null && lng != null
-    ? izracunajLokacijskiPremium(lat, lng, osmAmenitiesCount, proximityScore)
+    ? izracunajLokacijskiPremium(lat, lng, osmAmenitiesCount, proximityScore, neighborhoodTags)
     : null;
   const lokacijskiFaktor = lokacijskiPremium?.skupniFaktor ?? 1;
 

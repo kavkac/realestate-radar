@@ -66,6 +66,30 @@ function distToPolylineKm(lat: number, lng: number, polyline: [number, number][]
   return Math.min(...polyline.map(([plat, plng]) => haversineKm(lat, lng, plat, plng)));
 }
 
+/**
+ * Neighborhood tag → valuation premium (kalibriran na SLO trgu)
+ * Vir: Calculus analiza ETN transakcij + SLO hedonic pricing literatura
+ */
+export function neighborhoodTagPremium(tags: string[]): number {
+  let premium = 0;
+  for (const tag of tags) {
+    if (tag.includes("Tiho območje"))        premium += 0.030;
+    if (tag.includes("Zelena soseska"))      premium += 0.025;
+    if (tag.includes("Tramvajska dostopnost")) premium += 0.020;
+    if (tag.includes("Dobra javna pot"))     premium += 0.010;
+    if (tag.includes("Izobrazbeno razvito")) premium += 0.015;
+    if (tag.includes("Družinsko"))           premium += 0.015;
+    if (tag.includes("Živahno"))             premium += 0.010;  // mestni center
+    if (tag.includes("Mlada soseska"))       premium += 0.008;
+    if (tag.includes("Prometno"))            premium -= 0.045;
+    if (tag.includes("Industrijsko"))        premium -= 0.060;
+    if (tag.includes("Starejša soseska"))    premium -= 0.010;
+    if (tag.includes("Zdravstveno"))         premium += 0.005;  // dostopnost, ne hrup
+  }
+  // Cap: ±10% max kumulativni neighborhood premium
+  return Math.max(-0.10, Math.min(0.10, premium));
+}
+
 export function izracunajLokacijskiPremium(
   lat: number,
   lng: number,
@@ -73,6 +97,8 @@ export function izracunajLokacijskiPremium(
   osmAmenitiesCount?: number | null,
   /** Predizračunan walking-time-based score iz calcProximityScore() (-0.15..+0.20) */
   proximityScore?: number | null,
+  /** Character tags iz neighborhood-service.deriveCharacter() */
+  neighborhoodTags?: string[] | null,
 ): LokacijskiPremium {
   const faktorji: LokacijskiFaktor[] = [];
 
@@ -125,7 +151,25 @@ export function izracunajLokacijskiPremium(
       faktorji.push({ naziv: "Zmerna dostopnost", opis: `Omejene storitve ali zmeren hrup (${Math.round(proximityScore * 100)}%)`, korekcija: proximityScore, ikona: "📍" });
     }
     // neutralen proximityScore (0–0.03) → ni posebnega faktorja
-  } else if (osmAmenitiesCount != null) {
+  }
+
+  // 6b. Neighborhood character premium (OSM + SURS + ARSO)
+  if (neighborhoodTags && neighborhoodTags.length > 0) {
+    const nbPremium = neighborhoodTagPremium(neighborhoodTags);
+    if (nbPremium > 0.005) {
+      const tagStr = neighborhoodTags.filter(t =>
+        t.includes("Tiho") || t.includes("Zelena") || t.includes("Tram") || t.includes("Izobrazbeno") || t.includes("Živ")
+      ).slice(0, 2).join(", ");
+      faktorji.push({ naziv: "Ugoden karakter soseske", opis: `${tagStr || neighborhoodTags[0]} (+${Math.round(nbPremium * 100)}%)`, korekcija: nbPremium, ikona: "🏘️" });
+    } else if (nbPremium < -0.005) {
+      const tagStr = neighborhoodTags.filter(t =>
+        t.includes("Prometno") || t.includes("Industrijsko")
+      ).slice(0, 2).join(", ");
+      faktorji.push({ naziv: "Neugoden karakter soseske", opis: `${tagStr || neighborhoodTags[0]} (${Math.round(nbPremium * 100)}%)`, korekcija: nbPremium, ikona: "⚠️" });
+    }
+  }
+
+  if (osmAmenitiesCount != null && proximityScore == null) {
     // Fallback na stari sistem če proximityScore ni na voljo
     if (osmAmenitiesCount >= 20) {
       faktorji.push({ naziv: "Odlična dostopnost", opis: `${osmAmenitiesCount}+ točk storitev v bližini`, korekcija: 0.05, ikona: "🏪" });
