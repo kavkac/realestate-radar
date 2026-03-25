@@ -115,16 +115,24 @@ async function fetchOsmAmenities(lat: number, lng: number, radiusM: number): Pro
       node["amenity"="college"](around:${radiusM},${lat},${lng});
       way["building"="dormitory"](around:${radiusM},${lat},${lng});
       node["amenity"="school"](around:${radiusM},${lat},${lng});
+      way["amenity"="school"](around:${radiusM},${lat},${lng});
       node["amenity"="kindergarten"](around:${radiusM},${lat},${lng});
+      way["amenity"="kindergarten"](around:${radiusM},${lat},${lng});
       node["amenity"="restaurant"](around:${radiusM},${lat},${lng});
+      way["amenity"="restaurant"](around:${radiusM},${lat},${lng});
       node["amenity"="bar"](around:${radiusM},${lat},${lng});
       node["amenity"="pub"](around:${radiusM},${lat},${lng});
       node["shop"="supermarket"](around:${radiusM},${lat},${lng});
+      way["shop"="supermarket"](around:${radiusM},${lat},${lng});
       node["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
+      way["amenity"="pharmacy"](around:${radiusM},${lat},${lng});
       node["amenity"="doctors"](around:${radiusM},${lat},${lng});
       node["amenity"="hospital"](around:${radiusM},${lat},${lng});
+      way["amenity"="hospital"](around:${radiusM},${lat},${lng});
       node["amenity"="clinic"](around:${radiusM},${lat},${lng});
+      way["amenity"="clinic"](around:${radiusM},${lat},${lng});
       node["amenity"="health_centre"](around:${radiusM},${lat},${lng});
+      way["amenity"="health_centre"](around:${radiusM},${lat},${lng});
       way["landuse"="industrial"](around:${radiusM},${lat},${lng});
       node["leisure"="park"](around:${radiusM},${lat},${lng});
       way["leisure"="park"](around:${radiusM},${lat},${lng});
@@ -228,12 +236,18 @@ async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> 
     const data = await res.json() as { results?: Array<{ layerName: string; attributes: Record<string, string> }> };
     if (!data.results?.length) return null;
 
-    // Vzemi maksimalni Lden iz vseh hrupnih con (LDVN = dan-večer-noč)
+    // Vzemi maksimalni Lden iz vseh hrupnih con (LDVN = dan-večer-noč = Lden)
     let maxLden: number | null = null;
     for (const r of data.results) {
       if (!r.layerName.includes("LDVN")) continue;  // samo Lden (ne Lnoc)
-      const razred = r.attributes.HRUP_RAZRED ?? "";
-      // Format: "55-60" → vzemi zgornjo mejo
+      // Layer 344/352: atribut LDEN je direktna številka
+      const ldenVal = parseFloat(r.attributes.LDEN ?? "");
+      if (!isNaN(ldenVal)) {
+        if (maxLden === null || ldenVal > maxLden) maxLden = ldenVal;
+        continue;
+      }
+      // Fallback: OBMOCJE format "55-60" ali HRUP_RAZRED
+      const razred = r.attributes.OBMOCJE ?? r.attributes.HRUP_RAZRED ?? "";
       const match = razred.match(/(\d+)-(\d+)/);
       if (match) {
         const upper = parseInt(match[2]);
