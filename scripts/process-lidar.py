@@ -1010,18 +1010,45 @@ def process_bbox(
                 )
                 row.update(height)
 
-            # GURS override: use declared visina_etaze if available
-            # (more accurate than LiDAR-derived ceiling height)
+            # Ceiling height priority chain:
+            # 1. GURS visina_etaze (declared, most accurate)
+            # 2. LiDAR corrected (DMP median - roof - slabs)
+            # 3. Statistical fallback by building type/era
+
             gurs_floors = get_gurs_floor_heights(conn, eid)
             if gurs_floors and gurs_floors.get("avg_floor_height"):
+                # Priority 1: GURS declared
                 avg_h = float(gurs_floors["avg_floor_height"])
                 row["floor_height_m"] = round(avg_h, 2)
                 row["ceiling_height_source"] = "gurs_declared"
-                # Ground elevation from GURS if LiDAR missed it
                 if row.get("elevation_m") is None and gurs_floors.get("ground_elevation_m"):
                     row["elevation_m"] = round(float(gurs_floors["ground_elevation_m"]), 1)
+
+            elif row.get("floor_height_m") and 1.8 <= row["floor_height_m"] <= 5.0:
+                # Priority 2: LiDAR corrected (already set, sanity check)
+                row["ceiling_height_source"] = "lidar_corrected"
+
             else:
-                row.setdefault("ceiling_height_source", "lidar_corrected")
+                # Priority 3: Statistical fallback by building characteristics
+                # Based on Slovenian building stock averages (GURS/SURS research)
+                num_floors = building.get("stevilo_etaz") or 1
+                build_area = building.get("bruto_tlorisna_pov") or 0
+
+                if build_area and build_area < 60:
+                    # Small buildings (hiše): typically higher ceilings, older stock
+                    fallback_h = 2.75
+                elif num_floors and num_floors >= 5:
+                    # High-rise: socialist-era blocks, 2.55m typical
+                    fallback_h = 2.55
+                elif num_floors and num_floors >= 3:
+                    # Mid-rise residential: 2.65m
+                    fallback_h = 2.65
+                else:
+                    # Default residential Slovenia
+                    fallback_h = 2.70
+
+                row["floor_height_m"] = fallback_h
+                row["ceiling_height_source"] = "statistical_fallback"
 
             # Solar
             lat, lon = epsg3794_to_wgs84(cx, cy)
