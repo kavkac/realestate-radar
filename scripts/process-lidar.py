@@ -808,26 +808,36 @@ def detect_mansarda(floors: list[dict], roof_type: Optional[str] = None) -> dict
     return result
 
 
-def get_ren_ceiling_height(conn, eid_stavba: int) -> Optional[float]:
+def get_ren_ceiling_height(conn, eid_stavba: int) -> Optional[tuple]:
     """PRIMARY: Fetch svetla višina from ev_del_stavbe (REN).
-    Self-declared net ceiling height, 36.5% coverage.
-    Returns median of all units in building, or None.
+    Uses visina_etaze_net (era-corrected) column.
+    Returns (median_net_height, interpretation) or None.
+
+    interpretation:
+      'net'       — post-1960, trusted as svetla višina
+      'bruto'     — pre-1945, corrected by -0.60m (slab deduction)
+      'uncertain' — 1945-1960 transition era, use with caution
+      'unknown'   — missing year_built, raw value used
     """
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT visina_etaze::float
+            SELECT visina_etaze_net, visina_interpretation
             FROM ev_del_stavbe
             WHERE eid_stavba::bigint = %s
-              AND visina_etaze IS NOT NULL
-              AND visina_etaze::float BETWEEN 1.8 AND 6.0
+              AND visina_etaze_net IS NOT NULL
+              AND visina_etaze_net BETWEEN 1.8 AND 6.0
         """, (eid_stavba,))
-        vals = [r[0] for r in cur.fetchall()]
-        if vals:
+        rows = cur.fetchall()
+        if rows:
+            vals = [float(r[0]) for r in rows]
+            interps = [r[1] for r in rows]
             vals.sort()
             mid = len(vals) // 2
             median = vals[mid] if len(vals) % 2 else (vals[mid-1] + vals[mid]) / 2
-            return round(median, 2)
+            # Use most common interpretation
+            interp = max(set(interps), key=interps.count)
+            return (round(median, 2), interp)
     except Exception as e:
         log.debug(f"ev_del_stavbe lookup failed for {eid_stavba}: {e}")
     return None
@@ -1153,11 +1163,14 @@ def process_bbox(
             mansarda = detect_mansarda(gurs_per_floor, row.get("roof_type"))
             row.update(mansarda)
 
-            ren_height = get_ren_ceiling_height(conn, eid)
-            if ren_height:
-                # Priority 1: REN ev_del_stavbe — svetla višina, self-declared
+            ren_result = get_ren_ceiling_height(conn, eid)
+            if ren_result:
+                ren_height, ren_interp = ren_result
+                # Priority 1: REN ev_del_stavbe — era-corrected svetla višina
                 row["floor_height_m"] = ren_height
-                row["ceiling_height_source"] = "ren_declared"
+                row["ceiling_height_source"] = f"ren_{ren_interp}"
+                # Flag uncertain cases for frontend display
+                row["ceiling_height_uncertain"] = ren_interp in ("uncertain", "unknown")
 
             else:
                 gurs_floors = get_gurs_floor_heights(conn, eid)
