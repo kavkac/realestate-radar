@@ -353,7 +353,7 @@ def compute_building_height(
 
     # Roof structure offsets (DMP includes roof tiles/truss/insulation)
     ROOF_OFFSET = {"flat": 0.30, "pitched": 0.60, "complex": 0.80}
-    SLAB_THICKNESS_M = 0.25  # per floor (concrete slab)
+    SLAB_THICKNESS_M = 0.35  # per floor (slab + ceiling finish, per research) (concrete slab)
 
     dmr_val = sample_raster(dmr, dmr_transform, cx, cy)
     dmp_val = sample_raster(dmp, dmp_transform, cx, cy)
@@ -368,15 +368,17 @@ def compute_building_height(
             dmr_valid = w_dmr[~np.isnan(w_dmr)]
             dmp_valid = w_dmp[~np.isnan(w_dmp)]
             dmr_median = float(np.nanmedian(dmr_valid)) if dmr_valid.size > 0 else dmr_val
+            # Use p95 of DMP (not max — avoids chimneys/equipment; not median — underestimates)
+            dmp_p95 = float(np.nanpercentile(dmp_valid, 95)) if dmp_valid.size > 0 else dmp_val
             dmp_median = float(np.nanmedian(dmp_valid)) if dmp_valid.size > 0 else dmp_val
-            dmp_max = float(np.nanmax(dmp_valid)) if dmp_valid.size > 0 else dmp_val
+            dmp_max = dmp_p95  # use p95 as "max" throughout
         else:
             dmr_median = dmr_val
             dmp_median = dmp_val
             dmp_max = dmp_val
 
-        # Raw height from DMP median - DMR median
-        raw_height = max(0.0, dmp_median - dmr_median)
+        # Raw height: DMP p95 - DMR median (p95 avoids chimneys, median DMR is stable)
+        raw_height = max(0.0, dmp_p95 - dmr_median)
         result["building_height_m"] = round(raw_height, 2)
 
         # Also store max-based height for reference
@@ -806,8 +808,63 @@ def detect_mansarda(floors: list[dict], roof_type: Optional[str] = None) -> dict
     return result
 
 
+def get_ren_ceiling_height(conn, eid_stavba: int) -> Optional[float]:
+    """PRIMARY: Fetch svetla višina from ev_del_stavbe (REN).
+    Self-declared net ceiling height, 36.5% coverage.
+    Returns median of all units in building, or None.
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT visina_etaze::float
+            FROM ev_del_stavbe
+            WHERE eid_stavba::bigint = %s
+              AND visina_etaze IS NOT NULL
+              AND visina_etaze::float BETWEEN 1.8 AND 6.0
+        """, (eid_stavba,))
+        vals = [r[0] for r in cur.fetchall()]
+        if vals:
+            vals.sort()
+            mid = len(vals) // 2
+            median = vals[mid] if len(vals) % 2 else (vals[mid-1] + vals[mid]) / 2
+            return round(median, 2)
+    except Exception as e:
+        log.debug(f"ev_del_stavbe lookup failed for {eid_stavba}: {e}")
+    return None
+
+
+# ERA-BASED FALLBACK TABLE (data-driven from research)
+# Source: Slovenia building stock analysis, legal minima, typical construction
+ERA_CEILING_DEFAULTS = [
+    # (year_from, year_to, height_m, label)
+    (0,    1918, 3.60, "austro-hungarian"),
+    (1918, 1945, 3.10, "interwar"),
+    (1945, 1960, 2.70, "postwar-reconstruction"),
+    (1960, 1980, 2.55, "socialist-bloki"),
+    (1980, 2000, 2.60, "transition"),
+    (2000, 2015, 2.70, "modern"),
+    (2015, 9999, 2.80, "contemporary"),
+]
+
+def get_era_fallback(year_built: Optional[int], num_floors: Optional[int]) -> float:
+    """ERA-BASED fallback ceiling height.
+    Uses construction year → era mapping from Slovenian building stock research.
+    """
+    if year_built and 1800 <= year_built <= 2030:
+        for y_from, y_to, height, _ in ERA_CEILING_DEFAULTS:
+            if y_from <= year_built < y_to:
+                return height
+
+    # If no year: use floor count heuristic
+    if num_floors and num_floors >= 5:
+        return 2.55  # likely socialist block
+    elif num_floors and num_floors >= 3:
+        return 2.65
+    return 2.70  # national median fallback
+
+
 def get_gurs_floor_heights(conn, eid_stavba: int) -> Optional[dict]:
-    """Fetch GURS declared floor heights from kn_etaze.
+    """SECONDARY: Fetch GURS declared floor heights from kn_etaze (cadastral).
     Returns dict with avg/min/max visina_etaze, or None if no data.
     """
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -1085,47 +1142,54 @@ def process_bbox(
             # Ceiling height priority chain:
             # 1. GURS visina_etaze (declared, most accurate)
             # 2. LiDAR corrected (DMP median - roof - slabs)
-            # 3. Statistical fallback by building type/era
+            # ── CEILING HEIGHT PRIORITY CHAIN ────────────────────────────
+            # 1. ev_del_stavbe.visina_etaze  (REN svetla višina, 36.5% coverage)
+            # 2. kn_etaze.visina_etaze       (cadastral, 2% coverage)
+            # 3. LiDAR p95 corrected         (DMP - roof_offset - slabs)
+            # 4. Era-based fallback          (year_built → era → typical height)
 
-            # Per-floor GURS data (for mansarda detection)
+            # Per-floor GURS data (for mansarda detection, uses kn_etaze)
             gurs_per_floor = get_gurs_floor_heights_per_floor(conn, eid)
             mansarda = detect_mansarda(gurs_per_floor, row.get("roof_type"))
             row.update(mansarda)
 
-            gurs_floors = get_gurs_floor_heights(conn, eid)
-            if gurs_floors and gurs_floors.get("avg_floor_height"):
-                # Priority 1: GURS declared
-                avg_h = float(gurs_floors["avg_floor_height"])
-                row["floor_height_m"] = round(avg_h, 2)
-                row["ceiling_height_source"] = "gurs_declared"
-                if row.get("elevation_m") is None and gurs_floors.get("ground_elevation_m"):
-                    row["elevation_m"] = round(float(gurs_floors["ground_elevation_m"]), 1)
-
-            elif row.get("floor_height_m") and 1.8 <= row["floor_height_m"] <= 5.0:
-                # Priority 2: LiDAR corrected (already set, sanity check)
-                row["ceiling_height_source"] = "lidar_corrected"
+            ren_height = get_ren_ceiling_height(conn, eid)
+            if ren_height:
+                # Priority 1: REN ev_del_stavbe — svetla višina, self-declared
+                row["floor_height_m"] = ren_height
+                row["ceiling_height_source"] = "ren_declared"
 
             else:
-                # Priority 3: Statistical fallback by building characteristics
-                # Based on Slovenian building stock averages (GURS/SURS research)
-                num_floors = building.get("stevilo_etaz") or 1
-                build_area = building.get("bruto_tlorisna_pov") or 0
+                gurs_floors = get_gurs_floor_heights(conn, eid)
+                if gurs_floors and gurs_floors.get("avg_floor_height"):
+                    # Priority 2: kn_etaze cadastral survey
+                    row["floor_height_m"] = round(float(gurs_floors["avg_floor_height"]), 2)
+                    row["ceiling_height_source"] = "kn_etaze_declared"
+                    if row.get("elevation_m") is None and gurs_floors.get("ground_elevation_m"):
+                        row["elevation_m"] = round(float(gurs_floors["ground_elevation_m"]), 1)
 
-                if build_area and build_area < 60:
-                    # Small buildings (hiše): typically higher ceilings, older stock
-                    fallback_h = 2.75
-                elif num_floors and num_floors >= 5:
-                    # High-rise: socialist-era blocks, 2.55m typical
-                    fallback_h = 2.55
-                elif num_floors and num_floors >= 3:
-                    # Mid-rise residential: 2.65m
-                    fallback_h = 2.65
+                elif row.get("floor_height_m") and 1.8 <= row["floor_height_m"] <= 5.0:
+                    # Priority 3: LiDAR corrected (p95 nDMP / floors - 0.35m)
+                    row["ceiling_height_source"] = "lidar_corrected"
+
                 else:
-                    # Default residential Slovenia
-                    fallback_h = 2.70
+                    # Priority 4: Era-based fallback from ev_stavba.leto_izg_sta
+                    year_built = None
+                    try:
+                        cur2 = conn.cursor()
+                        cur2.execute(
+                            "SELECT leto_izg_sta FROM ev_stavba WHERE eid_stavba::text = %s LIMIT 1",
+                            (str(eid),)
+                        )
+                        r2 = cur2.fetchone()
+                        if r2 and r2[0]:
+                            year_built = int(str(r2[0]).strip())
+                    except Exception:
+                        pass
 
-                row["floor_height_m"] = fallback_h
-                row["ceiling_height_source"] = "statistical_fallback"
+                    num_floors = building.get("stevilo_etaz")
+                    row["floor_height_m"] = get_era_fallback(year_built, num_floors)
+                    row["ceiling_height_source"] = "era_fallback"
 
             # Solar
             lat, lon = epsg3794_to_wgs84(cx, cy)
