@@ -1,40 +1,39 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-function priceToColor(normalizedValue: number, alpha = 0.55): string {
-  const stops = [
-    [0.0,  [80,  50,  200]],
-    [0.15, [50,  120, 220]],
-    [0.3,  [60,  200, 200]],
-    [0.45, [80,  200, 80]],
-    [0.6,  [200, 220, 60]],
-    [0.72, [240, 180, 40]],
-    [0.85, [240, 100, 20]],
-    [1.0,  [220, 30,  20]],
-  ] as [number, [number, number, number]][];
+// Fixed absolute price thresholds — stable across all pan/zoom
+const PRICE_BANDS = [
+  { max: 1000,  color: [67,  56,  202], label: "< 1.000 €/m²" },
+  { max: 1500,  color: [37, 130, 220], label: "1.000–1.500" },
+  { max: 2000,  color: [34, 197, 194], label: "1.500–2.000" },
+  { max: 2500,  color: [74, 200, 100], label: "2.000–2.500" },
+  { max: 3000,  color: [202, 220, 50], label: "2.500–3.000" },
+  { max: 3500,  color: [245, 158, 11], label: "3.000–3.500" },
+  { max: 4500,  color: [239, 100, 20], label: "3.500–4.500" },
+  { max: Infinity, color: [220, 30, 20], label: "> 4.500 €/m²" },
+];
 
-  let lower = stops[0], upper = stops[stops.length - 1];
-  for (let i = 0; i < stops.length - 1; i++) {
-    if (normalizedValue >= stops[i][0] && normalizedValue <= stops[i + 1][0]) {
-      lower = stops[i]; upper = stops[i + 1]; break;
+function priceToNorm(price: number): number {
+  const max = 5000, min = 500;
+  return Math.min(Math.max((price - min) / (max - min), 0), 1);
+}
+
+function priceToColorRgb(price: number, alpha: number): string {
+  for (const band of PRICE_BANDS) {
+    if (price < band.max) {
+      const [r, g, b] = band.color;
+      return `rgba(${r},${g},${b},${alpha})`;
     }
   }
-  const t = (normalizedValue - lower[0]) / (upper[0] - lower[0] + 0.0001);
-  const r = Math.round(lower[1][0] + t * (upper[1][0] - lower[1][0]));
-  const g = Math.round(lower[1][1] + t * (upper[1][1] - lower[1][1]));
-  const b = Math.round(lower[1][2] + t * (upper[1][2] - lower[1][2]));
+  const [r, g, b] = PRICE_BANDS[PRICE_BANDS.length - 1].color;
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
 interface Point { lat: number; lng: number; price: number }
 
-interface TooltipState {
-  x: number;
-  y: number;
-  price: number;
-}
+interface TooltipState { x: number; y: number; price: number }
 
 interface Props { height?: string }
 
@@ -42,10 +41,135 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const layerGroup = useRef<L.LayerGroup | null>(null);
-  // Store raw points + normalization params for hover lookup
-  const pointsRef = useRef<Point[]>([]);
-  const normRef = useRef<{ p05: number; range: number }>({ p05: 0, range: 1 });
+  // All Slovenia points cached — loaded once
+  const allPointsRef = useRef<Point[]>([]);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const buildContours = useCallback(async (map: L.Map, points: Point[]) => {
+    if (!points.length || !layerGroup.current) return;
+    try {
+      // @ts-ignore
+      const { contours } = await import("d3-contour");
+
+      const zoom = map.getZoom();
+      const bounds = map.getBounds();
+
+      // Filter to visible points + small margin
+      const margin = 0.1;
+      const visible = points.filter(p =>
+        p.lat >= bounds.getSouth() - margin &&
+        p.lat <= bounds.getNorth() + margin &&
+        p.lng >= bounds.getWest() - margin &&
+        p.lng <= bounds.getEast() + margin
+      );
+      if (visible.length < 5) return;
+
+      // Grid cell size — zoom adaptive
+      const cellSize = zoom <= 8 ? 0.03 : zoom <= 10 ? 0.015 : zoom <= 12 ? 0.008 : 0.004;
+
+      // Expand bounds slightly for smooth edges
+      const latMin = bounds.getSouth() - cellSize * 3;
+      const latMax = bounds.getNorth() + cellSize * 3;
+      const lngMin = bounds.getWest() - cellSize * 3;
+      const lngMax = bounds.getEast() + cellSize * 3;
+
+      const cols = Math.max(2, Math.ceil((lngMax - lngMin) / cellSize));
+      const rows = Math.max(2, Math.ceil((latMax - latMin) / cellSize));
+
+      // Aggregate into grid using ALL points (not just visible)
+      const broader = points.filter(p =>
+        p.lat >= latMin - 0.3 && p.lat <= latMax + 0.3 &&
+        p.lng >= lngMin - 0.3 && p.lng <= lngMax + 0.3
+      );
+
+      const grid = new Float32Array(cols * rows).fill(0);
+      const counts = new Uint16Array(cols * rows).fill(0);
+
+      for (const p of broader) {
+        const ci = Math.floor((p.lng - lngMin) / cellSize);
+        const ri = Math.floor((p.lat - latMin) / cellSize);
+        if (ci < 0 || ci >= cols || ri < 0 || ri >= rows) continue;
+        const idx = ri * cols + ci;
+        grid[idx] += p.price;
+        counts[idx]++;
+      }
+
+      // Normalize using FIXED price scale (stable across pans)
+      const normalized = new Float32Array(cols * rows);
+      const hasData = new Uint8Array(cols * rows);
+      for (let i = 0; i < grid.length; i++) {
+        if (counts[i] > 0) {
+          normalized[i] = priceToNorm(grid[i] / counts[i]);
+          hasData[i] = 1;
+        }
+      }
+
+      // IDW gap fill
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r * cols + c;
+          if (hasData[idx]) continue;
+          let sum = 0, n = 0;
+          const radius = Math.min(4, Math.ceil(2 / cellSize * 0.01));
+          for (let dr = -radius; dr <= radius; dr++) {
+            for (let dc = -radius; dc <= radius; dc++) {
+              const nr = r + dr, nc = c + dc;
+              if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+              const ni = nr * cols + nc;
+              if (hasData[ni]) { sum += normalized[ni]; n++; }
+            }
+          }
+          if (n > 0) normalized[idx] = sum / n;
+          else normalized[idx] = priceToNorm(1500); // low-value default for no-data areas
+        }
+      }
+
+      // Fixed contour thresholds based on price bands
+      const priceThresholds = [1000, 1500, 2000, 2500, 3000, 3500, 4500, 5000];
+      const thresholds = priceThresholds.map(p => priceToNorm(p));
+
+      // @ts-ignore
+      const gen = contours().size([cols, rows]).thresholds(thresholds).smooth(true);
+      const contourData = gen(normalized as unknown as number[]);
+
+      layerGroup.current!.clearLayers();
+
+      for (let i = 0; i < contourData.length - 1; i++) {
+        const c = contourData[i];
+        if (!c.coordinates.length) continue;
+
+        // Midpoint price for this band
+        const midNorm = (c.value + (contourData[i + 1]?.value ?? 1)) / 2;
+        const midPrice = 500 + midNorm * 4500;
+
+        const geoJSON: GeoJSON.MultiPolygon = {
+          type: "MultiPolygon",
+          coordinates: c.coordinates.map((polygon: number[][][]) =>
+            polygon.map((ring: number[][]) =>
+              ring.map(([col, row]: number[]) => [
+                lngMin + col * cellSize,
+                latMin + row * cellSize,
+              ])
+            )
+          ),
+        };
+
+        // @ts-ignore
+        L.geoJSON(geoJSON, {
+          style: {
+            fillColor: priceToColorRgb(midPrice, 1),
+            fillOpacity: 0.32,
+            color: priceToColorRgb(midPrice, 0.7),
+            weight: 1.2,
+            opacity: 0.8,
+          },
+        }).addTo(layerGroup.current!);
+      }
+    } catch (e) {
+      console.error("Contour error", e);
+    }
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
@@ -58,32 +182,50 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
       maxZoom: 16,
     });
 
-    // Crosshair cursor
     (map.getContainer() as HTMLElement).style.cursor = "crosshair";
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OSM contributors",
-      opacity: 0.7,
+      opacity: 0.75,
     }).addTo(map);
 
     layerGroup.current = L.layerGroup().addTo(map);
     mapInstance.current = map;
 
-    // Hover: find nearest point and show price tooltip
+    // Load ALL Slovenia points ONCE
+    async function init() {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/heatmap?lat1=45.4&lng1=13.3&lat2=46.9&lng2=16.6&zoom=8");
+        if (!res.ok) return;
+        const data = await res.json();
+        allPointsRef.current = data.points ?? [];
+        await buildContours(map, allPointsRef.current);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    init();
+
+    // On zoom: recompute contours (same data, different grid resolution)
+    map.on("zoomend", () => buildContours(map, allPointsRef.current));
+    // On pan: recompute contours (filter to visible + margins)
+    map.on("moveend", () => buildContours(map, allPointsRef.current));
+
+    // Hover tooltip
     map.on("mousemove", (e: L.LeafletMouseEvent) => {
-      const pts = pointsRef.current;
+      const pts = allPointsRef.current;
       if (!pts.length) return;
       const { lat, lng } = e.latlng;
-      // Find nearest point (simple O(n) search, adequate for 2-5k points)
       let minDist = Infinity, nearest: Point | null = null;
       for (const p of pts) {
         const d = (p.lat - lat) ** 2 + (p.lng - lng) ** 2;
         if (d < minDist) { minDist = d; nearest = p; }
       }
-      // Only show tooltip if nearest point is within ~0.03° (~3km)
-      if (nearest && minDist < 0.03 ** 2) {
-        const containerPoint = map.latLngToContainerPoint(e.latlng);
-        setTooltip({ x: containerPoint.x, y: containerPoint.y, price: nearest.price });
+      if (nearest && minDist < 0.04 ** 2) {
+        const cp = map.latLngToContainerPoint(e.latlng);
+        setTooltip({ x: cp.x, y: cp.y, price: nearest.price });
       } else {
         setTooltip(null);
       }
@@ -91,172 +233,51 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
 
     map.on("mouseout", () => setTooltip(null));
 
-    async function loadContours() {
-      const zoom = map.getZoom();
-      const bounds = map.getBounds();
-      const url = `/api/heatmap?lat1=${bounds.getSouth()}&lng1=${bounds.getWest()}&lat2=${bounds.getNorth()}&lng2=${bounds.getEast()}&zoom=${zoom}`;
-
-      try {
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data.points || data.points.length < 10) return;
-
-        // @ts-ignore
-        const { contours } = await import("d3-contour");
-
-        const points: Point[] = data.points;
-        pointsRef.current = points;
-
-        const sorted = [...points].map(p => p.price).sort((a, b) => a - b);
-        const p05 = sorted[Math.floor(sorted.length * 0.05)];
-        const p95 = sorted[Math.floor(sorted.length * 0.95)];
-        const range = Math.max(p95 - p05, 300);
-        normRef.current = { p05, range };
-
-        const cellSize = zoom <= 9 ? 0.02 : zoom <= 11 ? 0.01 : 0.005;
-        const latMin = bounds.getSouth() - cellSize;
-        const latMax = bounds.getNorth() + cellSize;
-        const lngMin = bounds.getWest() - cellSize;
-        const lngMax = bounds.getEast() + cellSize;
-
-        const cols = Math.ceil((lngMax - lngMin) / cellSize);
-        const rows = Math.ceil((latMax - latMin) / cellSize);
-
-        const grid = new Float32Array(cols * rows).fill(-1);
-        const counts = new Uint16Array(cols * rows).fill(0);
-
-        for (const p of points) {
-          const ci = Math.floor((p.lng - lngMin) / cellSize);
-          const ri = Math.floor((p.lat - latMin) / cellSize);
-          if (ci < 0 || ci >= cols || ri < 0 || ri >= rows) continue;
-          const idx = ri * cols + ci;
-          if (grid[idx] === -1) grid[idx] = 0;
-          grid[idx] += p.price;
-          counts[idx]++;
-        }
-
-        const normalized = new Float32Array(cols * rows);
-        for (let i = 0; i < grid.length; i++) {
-          if (counts[i] > 0) {
-            normalized[i] = Math.min(Math.max((grid[i] / counts[i] - p05) / range, 0), 1);
-          } else {
-            normalized[i] = -1;
-          }
-        }
-
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const idx = r * cols + c;
-            if (normalized[idx] >= 0) continue;
-            let sum = 0, n = 0;
-            for (let dr = -2; dr <= 2; dr++) {
-              for (let dc = -2; dc <= 2; dc++) {
-                const nr = r + dr, nc = c + dc;
-                if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-                const ni = nr * cols + nc;
-                if (normalized[ni] >= 0) { sum += normalized[ni]; n++; }
-              }
-            }
-            normalized[idx] = n > 0 ? sum / n : 0.3;
-          }
-        }
-
-        const levels = 10;
-        const thresholds = Array.from({ length: levels + 1 }, (_, i) => i / levels);
-
-        // @ts-ignore
-        const contourGenerator = contours()
-          .size([cols, rows])
-          .thresholds(thresholds)
-          .smooth(true);
-
-        const contourData = contourGenerator(normalized as unknown as number[]);
-
-        layerGroup.current!.clearLayers();
-
-        for (let i = 0; i < contourData.length - 1; i++) {
-          const c = contourData[i];
-          if (!c.coordinates.length) continue;
-
-          const geoJSON: GeoJSON.MultiPolygon = {
-            type: "MultiPolygon",
-            coordinates: c.coordinates.map((polygon: number[][][]) =>
-              polygon.map((ring: number[][]) =>
-                ring.map(([col, row]: number[]) => [
-                  lngMin + col * cellSize,
-                  latMin + row * cellSize,
-                ])
-              )
-            ),
-          };
-
-          // @ts-ignore
-          L.geoJSON(geoJSON, {
-            style: {
-              fillColor: priceToColor(c.value, 0.5),
-              fillOpacity: 1,
-              color: "rgba(0,0,0,0.25)",
-              weight: 0.8,
-              opacity: 0.6,
-            },
-          }).addTo(layerGroup.current!);
-        }
-
-      } catch (e) {
-        console.error("Contour error", e);
-      }
-    }
-
-    loadContours();
-    map.on("moveend", loadContours);
-    map.on("zoomend", loadContours);
-
     return () => {
-      map.off("moveend", loadContours);
-      map.off("zoomend", loadContours);
       map.remove();
       mapInstance.current = null;
     };
-  }, []);
+  }, [buildContours]);
 
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm relative">
-      <div ref={mapRef} style={{ height }} />
+    <div className="rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+      <div className="relative" style={{ height }}>
+        <div ref={mapRef} className="w-full h-full" />
 
-      {/* Hover tooltip with crosshair indicator */}
-      {tooltip && (
-        <div
-          className="absolute pointer-events-none z-[1000]"
-          style={{ left: tooltip.x, top: tooltip.y, transform: "translate(-50%, -100%)" }}
-        >
-          {/* Crosshair */}
-          <div className="relative flex items-center justify-center mb-1">
-            <div className="absolute w-px h-4 bg-gray-800" />
-            <div className="absolute h-px w-4 bg-gray-800" />
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-[500]">
+            <div className="text-xs text-gray-400 animate-pulse">Nalagam cenovni heatmap…</div>
           </div>
-          {/* Price badge */}
-          <div className="bg-gray-900/90 text-white text-xs font-semibold px-2 py-1 rounded shadow-lg whitespace-nowrap -translate-y-2">
-            {tooltip.price.toLocaleString("sl-SI")} €/m²
-          </div>
-        </div>
-      )}
+        )}
 
-      <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-        <span className="font-medium text-gray-700">Cena €/m²:</span>
-        {[
-          ["rgba(80,50,200,0.8)",  "nizka"],
-          ["rgba(60,200,200,0.8)", "srednja"],
-          ["rgba(200,220,60,0.8)", "nadpovprečna"],
-          ["rgba(240,100,20,0.8)", "visoka"],
-          ["rgba(220,30,20,0.8)",  "najvišja"],
-        ].map(([c, l]) => (
-          <span key={l} className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 border border-black/10" style={{ background: c }} />
-            {l}
+        {tooltip && (
+          <div
+            className="absolute pointer-events-none z-[1000]"
+            style={{ left: tooltip.x, top: tooltip.y, transform: "translate(-50%, calc(-100% - 8px))" }}
+          >
+            <div className="flex items-center justify-center mb-0.5">
+              <div className="relative w-4 h-4">
+                <div className="absolute top-1/2 left-0 right-0 h-px bg-gray-900" />
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-900" />
+              </div>
+            </div>
+            <div className="bg-gray-900/90 text-white text-[11px] font-semibold px-2 py-1 rounded shadow-lg whitespace-nowrap">
+              {tooltip.price.toLocaleString("sl-SI")} €/m²
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="px-4 py-2.5 bg-white border-t border-gray-100 flex items-center gap-3 text-[11px] text-gray-500 flex-wrap">
+        <span className="font-medium text-gray-600 mr-1">€/m²:</span>
+        {PRICE_BANDS.slice(0, -1).map((b) => (
+          <span key={b.label} className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 border border-black/10"
+              style={{ background: `rgba(${b.color.join(",")},0.7)` }} />
+            {b.label}
           </span>
         ))}
-        <span className="ml-auto text-gray-400">Vir: ETN · GURS</span>
+        <span className="ml-auto text-gray-400">ETN · GURS</span>
       </div>
     </div>
   );
