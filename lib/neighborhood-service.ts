@@ -26,7 +26,7 @@ async function fetchNeighborhoodName(lat: number, lng: number): Promise<string |
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST", body: `data=${encodeURIComponent(q)}`,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
     const text = await res.text();
