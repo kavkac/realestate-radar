@@ -1,11 +1,9 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Color scale matching Edinburgh-style topographic price map
 function priceToColor(normalizedValue: number, alpha = 0.55): string {
-  // Blue → Cyan → Green → Yellow → Orange → Red
   const stops = [
     [0.0,  [80,  50,  200]],
     [0.15, [50,  120, 220]],
@@ -32,12 +30,22 @@ function priceToColor(normalizedValue: number, alpha = 0.55): string {
 
 interface Point { lat: number; lng: number; price: number }
 
+interface TooltipState {
+  x: number;
+  y: number;
+  price: number;
+}
+
 interface Props { height?: string }
 
 export default function PriceHeatmapMap({ height = "480px" }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const layerGroup = useRef<L.LayerGroup | null>(null);
+  // Store raw points + normalization params for hover lookup
+  const pointsRef = useRef<Point[]>([]);
+  const normRef = useRef<{ p05: number; range: number }>({ p05: 0, range: 1 });
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
@@ -50,6 +58,9 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
       maxZoom: 16,
     });
 
+    // Crosshair cursor
+    (map.getContainer() as HTMLElement).style.cursor = "crosshair";
+
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OSM contributors",
       opacity: 0.7,
@@ -57,6 +68,28 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
 
     layerGroup.current = L.layerGroup().addTo(map);
     mapInstance.current = map;
+
+    // Hover: find nearest point and show price tooltip
+    map.on("mousemove", (e: L.LeafletMouseEvent) => {
+      const pts = pointsRef.current;
+      if (!pts.length) return;
+      const { lat, lng } = e.latlng;
+      // Find nearest point (simple O(n) search, adequate for 2-5k points)
+      let minDist = Infinity, nearest: Point | null = null;
+      for (const p of pts) {
+        const d = (p.lat - lat) ** 2 + (p.lng - lng) ** 2;
+        if (d < minDist) { minDist = d; nearest = p; }
+      }
+      // Only show tooltip if nearest point is within ~0.03° (~3km)
+      if (nearest && minDist < 0.03 ** 2) {
+        const containerPoint = map.latLngToContainerPoint(e.latlng);
+        setTooltip({ x: containerPoint.x, y: containerPoint.y, price: nearest.price });
+      } else {
+        setTooltip(null);
+      }
+    });
+
+    map.on("mouseout", () => setTooltip(null));
 
     async function loadContours() {
       const zoom = map.getZoom();
@@ -73,16 +106,15 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
         const { contours } = await import("d3-contour");
 
         const points: Point[] = data.points;
+        pointsRef.current = points;
 
-        // Determine price percentiles for normalization
         const sorted = [...points].map(p => p.price).sort((a, b) => a - b);
         const p05 = sorted[Math.floor(sorted.length * 0.05)];
         const p95 = sorted[Math.floor(sorted.length * 0.95)];
         const range = Math.max(p95 - p05, 300);
+        normRef.current = { p05, range };
 
-        // Grid resolution: ~0.02° at country level, ~0.005° at city level
         const cellSize = zoom <= 9 ? 0.02 : zoom <= 11 ? 0.01 : 0.005;
-
         const latMin = bounds.getSouth() - cellSize;
         const latMax = bounds.getNorth() + cellSize;
         const lngMin = bounds.getWest() - cellSize;
@@ -91,7 +123,6 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
         const cols = Math.ceil((lngMax - lngMin) / cellSize);
         const rows = Math.ceil((latMax - latMin) / cellSize);
 
-        // Aggregate points into grid cells
         const grid = new Float32Array(cols * rows).fill(-1);
         const counts = new Uint16Array(cols * rows).fill(0);
 
@@ -105,17 +136,15 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
           counts[idx]++;
         }
 
-        // Average and normalize
         const normalized = new Float32Array(cols * rows);
         for (let i = 0; i < grid.length; i++) {
           if (counts[i] > 0) {
             normalized[i] = Math.min(Math.max((grid[i] / counts[i] - p05) / range, 0), 1);
           } else {
-            normalized[i] = -1; // no data
+            normalized[i] = -1;
           }
         }
 
-        // Fill gaps with nearby neighbor average (simple 1-pass IDW)
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
             const idx = r * cols + c;
@@ -133,7 +162,6 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
           }
         }
 
-        // Generate contour levels (10 bands)
         const levels = 10;
         const thresholds = Array.from({ length: levels + 1 }, (_, i) => i / levels);
 
@@ -145,27 +173,20 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
 
         const contourData = contourGenerator(normalized as unknown as number[]);
 
-        // Clear previous layers
         layerGroup.current!.clearLayers();
 
-        // Render each contour band as GeoJSON
         for (let i = 0; i < contourData.length - 1; i++) {
           const c = contourData[i];
           if (!c.coordinates.length) continue;
 
-          const fillColor = priceToColor(c.value, 0.5);
-          const strokeColor = "rgba(0,0,0,0.25)";
-
-          // Convert contour pixel coords to lat/lng GeoJSON
           const geoJSON: GeoJSON.MultiPolygon = {
             type: "MultiPolygon",
             coordinates: c.coordinates.map((polygon: number[][][]) =>
               polygon.map((ring: number[][]) =>
-                ring.map(([col, row]: number[]) => {
-                  const lng = lngMin + col * cellSize;
-                  const lat = latMin + row * cellSize;
-                  return [lng, lat];
-                })
+                ring.map(([col, row]: number[]) => [
+                  lngMin + col * cellSize,
+                  latMin + row * cellSize,
+                ])
               )
             ),
           };
@@ -173,9 +194,9 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
           // @ts-ignore
           L.geoJSON(geoJSON, {
             style: {
-              fillColor,
+              fillColor: priceToColor(c.value, 0.5),
               fillOpacity: 1,
-              color: strokeColor,
+              color: "rgba(0,0,0,0.25)",
               weight: 0.8,
               opacity: 0.6,
             },
@@ -200,16 +221,35 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
   }, []);
 
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm relative">
       <div ref={mapRef} style={{ height }} />
+
+      {/* Hover tooltip with crosshair indicator */}
+      {tooltip && (
+        <div
+          className="absolute pointer-events-none z-[1000]"
+          style={{ left: tooltip.x, top: tooltip.y, transform: "translate(-50%, -100%)" }}
+        >
+          {/* Crosshair */}
+          <div className="relative flex items-center justify-center mb-1">
+            <div className="absolute w-px h-4 bg-gray-800" />
+            <div className="absolute h-px w-4 bg-gray-800" />
+          </div>
+          {/* Price badge */}
+          <div className="bg-gray-900/90 text-white text-xs font-semibold px-2 py-1 rounded shadow-lg whitespace-nowrap -translate-y-2">
+            {tooltip.price.toLocaleString("sl-SI")} €/m²
+          </div>
+        </div>
+      )}
+
       <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
         <span className="font-medium text-gray-700">Cena €/m²:</span>
         {[
-          ["rgba(80,50,200,0.8)", "nizka"],
+          ["rgba(80,50,200,0.8)",  "nizka"],
           ["rgba(60,200,200,0.8)", "srednja"],
           ["rgba(200,220,60,0.8)", "nadpovprečna"],
           ["rgba(240,100,20,0.8)", "visoka"],
-          ["rgba(220,30,20,0.8)", "najvišja"],
+          ["rgba(220,30,20,0.8)",  "najvišja"],
         ].map(([c, l]) => (
           <span key={l} className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 border border-black/10" style={{ background: c }} />
