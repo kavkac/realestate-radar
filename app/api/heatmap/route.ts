@@ -38,27 +38,27 @@ export async function GET(req: NextRequest) {
   const sw = wgs84ToD96(Math.min(lat1, lat2), Math.min(lng1, lng2));
   const ne = wgs84ToD96(Math.max(lat1, lat2), Math.max(lng1, lng2));
 
-  const eMin = Math.floor(sw.e);
-  const eMax = Math.ceil(ne.e);
-  const nMin = Math.floor(sw.n);
-  const nMax = Math.ceil(ne.n);
+  // Clamp to Slovenia D-96 extent to avoid 0-row queries when bbox covers neighboring countries
+  const SLO_E_MIN = 370000, SLO_E_MAX = 620000;
+  const SLO_N_MIN = 20000,  SLO_N_MAX = 200000;
 
-  // Determine max points and sampling based on zoom
-  const maxPoints = zoom >= 13 ? 5000 : 2000;
+  const eMin = Math.max(Math.floor(sw.e), SLO_E_MIN);
+  const eMax = Math.min(Math.ceil(ne.e),  SLO_E_MAX);
+  const nMin = Math.max(Math.floor(sw.n), SLO_N_MIN);
+  const nMax = Math.min(Math.ceil(ne.n),  SLO_N_MAX);
+
+  // If bbox doesn't intersect Slovenia at all, return full Slovenia sample
+  const useFullSlovenia = eMin >= eMax || nMin >= nMax;
+
+  // Determine max points based on zoom
+  const maxPoints = zoom >= 13 ? 5000 : zoom >= 10 ? 3000 : 2500;
 
   // Query with random sampling to stay within limits
   const rows = await prisma.$queryRawUnsafe<PriceSurfaceRow[]>(
-    `SELECT e, n, price_eur_m2, n_comps
-     FROM continuous_price_surface
-     WHERE e BETWEEN $1 AND $2
-       AND n BETWEEN $3 AND $4
-     ORDER BY random()
-     LIMIT $5`,
-    eMin,
-    eMax,
-    nMin,
-    nMax,
-    maxPoints,
+    useFullSlovenia
+      ? `SELECT e, n, price_eur_m2, n_comps FROM continuous_price_surface ORDER BY random() LIMIT $1`
+      : `SELECT e, n, price_eur_m2, n_comps FROM continuous_price_surface WHERE e BETWEEN $1 AND $2 AND n BETWEEN $3 AND $4 ORDER BY random() LIMIT $5`,
+    ...(useFullSlovenia ? [maxPoints] : [eMin, eMax, nMin, nMax, maxPoints]),
   );
 
   if (rows.length === 0) {

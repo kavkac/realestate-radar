@@ -64,9 +64,9 @@ export default function PriceHeatmapMap({ height = "480px" }: Props) {
           map.removeLayer(heatLayer.current);
         }
 
-        // Zoom-adaptive radius: smaller at high zoom so individual cells are visible
-        const radius = zoom <= 8 ? 18 : zoom <= 10 ? 22 : zoom <= 12 ? 16 : zoom <= 14 ? 12 : 8;
-        const blur = Math.round(radius * 0.7);
+        // Zoom-adaptive radius: large blobs at country level, sharp at street level
+        const radius = zoom <= 8 ? 45 : zoom <= 9 ? 38 : zoom <= 10 ? 30 : zoom <= 11 ? 24 : zoom <= 12 ? 20 : zoom <= 13 ? 16 : zoom <= 14 ? 14 : 10;
+        const blur = Math.round(radius * 0.85);
 
         // @ts-ignore
         heatLayer.current = L.heatLayer(points, {

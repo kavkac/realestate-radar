@@ -794,10 +794,14 @@ export function PropertyCard({
 
           {/* 10. Cenovni heatmap — samo za prijavljene */}
           {isSignedIn && (
-            <section className="mt-6">
-              <h2 className="text-base font-semibold text-gray-800 mb-1">🗺️ Cenovni heatmap</h2>
-              <p className="text-xs text-gray-400 mb-3">Povprečne prodajne cene po regijah — ETN transakcije</p>
-              <PriceHeatmapMap height="440px" />
+            <section className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Cenovni heatmap</p>
+                  <p className="text-xs text-gray-400">Povprečne prodajne cene €/m² — ETN transakcije</p>
+                </div>
+              </div>
+              <PriceHeatmapMap height="400px" />
             </section>
           )}
         </div>
