@@ -262,6 +262,56 @@ export async function POST(request: NextRequest) {
     const steviloEtazFinal: number | null = stavba.steviloEtaz
       ?? (stavbaDbRow?.st_etaz ? parseInt(stavbaDbRow.st_etaz) || null : null);
 
+    // ── Ceiling height priority chain ──────────────────────────────────────
+    // Priority 1: ev_del_stavbe.visina_etaze_net / visina_etaze (per unit, from DB)
+    // Priority 2: kn_etaze.visina_etaze matched by eid_stavba + floor number
+    // Priority 3: GURS WFS visina/etaze (existing fallback in izracunajVisinoStropov)
+    // Priority 4: era defaults
+    type CeilingRow = { eid_del_stavbe: string; visina_net: string | null; visina: string | null };
+    const eidList = deliStavbe.map(d => d.eidDelStavbe).filter(Boolean);
+    let ceilingByUnit: Map<string, number> = new Map();
+
+    if (eidList.length > 0) {
+      const ceilingRows = await prisma.$queryRawUnsafe<CeilingRow[]>(
+        `SELECT eid_del_stavbe::text, visina_etaze_net::text as visina_net, visina_etaze::text as visina
+         FROM ev_del_stavbe
+         WHERE eid_del_stavbe = ANY($1::text[])
+           AND (visina_etaze_net IS NOT NULL OR visina_etaze IS NOT NULL)`,
+        eidList.map(String),
+      ).catch(() => [] as CeilingRow[]);
+
+      for (const r of ceilingRows) {
+        const raw = r.visina_net ?? r.visina;
+        const v = raw ? parseFloat(raw) : null;
+        if (v && v >= 1.8 && v <= 6.0) {
+          ceilingByUnit.set(r.eid_del_stavbe, v);
+        }
+      }
+
+      // Priority 2: kn_etaze fallback for units not yet covered
+      const missing = eidList.filter(e => !ceilingByUnit.has(String(e)));
+      if (missing.length > 0 && stavba.eidStavba) {
+        type KnRow = { eid_stavba: string; visina_etaze: string | null };
+        const knRows = await prisma.$queryRawUnsafe<KnRow[]>(
+          `SELECT eid_stavba::text, AVG(visina_etaze::numeric)::text as visina_etaze
+           FROM kn_etaze
+           WHERE eid_stavba = $1 AND visina_etaze IS NOT NULL
+           GROUP BY eid_stavba`,
+          stavba.eidStavba,
+        ).catch(() => [] as KnRow[]);
+
+        if (knRows[0]?.visina_etaze) {
+          const knV = parseFloat(knRows[0].visina_etaze);
+          if (knV >= 1.8 && knV <= 6.0) {
+            for (const eid of missing) {
+              ceilingByUnit.set(String(eid), knV);
+            }
+          }
+        }
+      }
+    }
+    // ── End ceiling height chain ────────────────────────────────────────────
+
     // Gas infrastructure — non-blocking, moved into parallel batch below
     const gasInfrastructurePromise =
       lat != null && lng != null
@@ -708,6 +758,7 @@ export async function POST(request: NextRequest) {
       deliStavbe: deliStavbe.map((d, i) => ({
         stDela: d.stDelaStavbe,
         povrsina: d.povrsina,
+        visinaEtaze: ceilingByUnit.get(String(d.eidDelStavbe)) ?? null,
         uporabnaPovrsina: d.uporabnaPovrsina,
         vrsta: namembnostResults[i]?.vrstaNamembnosti
           ? (VRSTA_DEJANSKE_RABE[namembnostResults[i]!.vrstaNamembnosti!] ?? d.vrsta)

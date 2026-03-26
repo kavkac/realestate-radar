@@ -198,7 +198,7 @@ export function izracunajLokacijskiPremium(
 
 export interface VisinaSstropov {
   visinaCm: number;
-  metoda: "izmerjena" | "ocenjena_leto" | "ocenjena_default";
+  metoda: "ren_declared" | "kn_declared" | "izmerjena" | "ocenjena_leto" | "ocenjena_default";
   opis: string;
   korekcija: number; // vrednostna korekcija
 }

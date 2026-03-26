@@ -57,6 +57,7 @@ interface LastnistvoRecord {
 interface DelStavbe {
   stDela: number;
   povrsina: number | null;
+  visinaEtaze?: number | null;
   uporabnaPovrsina: number | null;
   vrsta: string | null;
   letoObnoveInstalacij: number | null;
@@ -2773,12 +2774,23 @@ function OcenaVrednostiSection({
 }) {
   const [showExplanation, setShowExplanation] = useState(false);
 
-  // Višina stropov
-  const visinaStropov = izracunajVisinoStropov(
-    stavbaVisina ?? null,
-    stavbaSteviloEtaz ?? null,
-    stavbaLetoIzgradnje ?? null,
-  );
+  // Višina stropov — priority chain:
+  // 1. DB (ev_del_stavbe.visina_etaze_net) za izbrano enoto
+  // 2. GURS WFS visina/etaze (izračun)
+  // 3. Era fallback
+  const dbCeilingM = currentPart?.visinaEtaze ?? null;
+  const visinaStropov = dbCeilingM
+    ? {
+        visinaCm: Math.round(dbCeilingM * 100),
+        metoda: "ren_declared" as const,
+        opis: "Iz registra nepremičnin",
+        korekcija: dbCeilingM * 100 >= 320 ? 0.05 : dbCeilingM * 100 >= 290 ? 0.02 : dbCeilingM * 100 < 250 ? -0.03 : 0,
+      }
+    : izracunajVisinoStropov(
+        stavbaVisina ?? null,
+        stavbaSteviloEtaz ?? null,
+        stavbaLetoIzgradnje ?? null,
+      );
   const stropKorekcija = visinaStropov.korekcija;
 
   // Stavbne korekcije — izračunamo po mediani
@@ -3029,7 +3041,7 @@ function OcenaVrednostiSection({
           }] : []),
           // Višina stropov
           ...(visinaStropov.visinaCm > 0 ? [{
-            naziv: `${(visinaStropov.visinaCm / 100).toFixed(2)}m stropi${visinaStropov.metoda !== "izmerjena" ? " ~" : ""}`,
+            naziv: `${(visinaStropov.visinaCm / 100).toFixed(2)}m stropi${(visinaStropov.metoda === "izmerjena" || visinaStropov.metoda === "ren_declared" || visinaStropov.metoda === "kn_declared") ? "" : " ~"}`,
             ikona: "📐",
             opis: visinaStropov.opis,
             korekcija: visinaStropov.korekcija,
