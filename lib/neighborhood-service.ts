@@ -12,6 +12,8 @@
 
 import { prisma } from "@/lib/prisma";
 import proj4 from "proj4";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point as turfPoint } from "@turf/helpers";
 
 // D96/TM (EPSG:3794) converter for SIHM500 cell lookup
 proj4.defs("EPSG:3794", "+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9999 +x_0=500000 +y_0=-5000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
@@ -225,9 +227,36 @@ function emptyCount(): AmenityCount {
   };
 }
 
-// ── ARSO noise (WMS GetFeatureInfo) ──────────────────────────────────────────
+// ── ARSO noise — DB-first spatial query z turf.js ────────────────────────────
 async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> {
-  // 1. Hitri DB lookup: grid_demographics.noise_lden (po bulk importu)
+  // 1. DB lookup: arso_noise_ldvn tabela — bbox filter + point-in-polygon
+  try {
+    type NoiseRow = { lden: number; geom_geojson: unknown };
+    const candidates = await prisma.$queryRawUnsafe<NoiseRow[]>(
+      `SELECT lden, geom_geojson FROM arso_noise_ldvn
+       WHERE bbox_xmin <= $1 AND bbox_xmax >= $1
+         AND bbox_ymin <= $2 AND bbox_ymax >= $2`,
+      lng, lat
+    );
+
+    if (candidates.length > 0) {
+      const pt = turfPoint([lng, lat]);
+      let maxLden: number | null = null;
+      for (const row of candidates) {
+        try {
+          const geojson = (typeof row.geom_geojson === "string"
+            ? JSON.parse(row.geom_geojson)
+            : row.geom_geojson) as GeoJSON.MultiPolygon | GeoJSON.Polygon;
+          if (booleanPointInPolygon(pt, geojson)) {
+            if (maxLden === null || row.lden > maxLden) maxLden = row.lden;
+          }
+        } catch { /* skip malformed geometry */ }
+      }
+      if (maxLden !== null) return maxLden;
+    }
+  } catch { /* fallback na ARSO API */ }
+
+  // 2. Fallback: grid_demographics.noise_lden (stari bulk import)
   try {
     const [e, n] = wgs84ToD96tm.forward([lng, lat]);
     const cellX = Math.floor(e / 100);
@@ -241,16 +270,14 @@ async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> 
     if (cached != null) return cached;
   } catch { /* fallback na ARSO API */ }
 
-  // 2. Fallback: ARSO Atlas Okolja (javni, brez tokena) — strateške karte hrupa 2020
-  // Layer 344 = MOL Ljubljana ceste Ldvn, Layer 352 = DRSI državno ceste Ldvn
-  // Vrne max Lden vrednost iz presečišča hrupnih con
+  // 3. Fallback: ARSO Atlas Okolja (javni, brez tokena) — strateške karte hrupa 2020
   try {
     const baseUrl = "https://gis.arso.gov.si/arcgis/rest/services/Atlasokolja_javni_D96/MapServer/identify";
     const params = new URLSearchParams({
       geometry: `${lng},${lat}`,
       geometryType: "esriGeometryPoint",
       sr: "4326",
-      layers: "all:344,352",  // MOL Ljubljana + DRSI državno
+      layers: "all:344,352",
       tolerance: "3",
       mapExtent: `${lng - 0.01},${lat - 0.01},${lng + 0.01},${lat + 0.01}`,
       imageDisplay: "200,200,96",
@@ -262,17 +289,14 @@ async function fetchNoiseLden(lat: number, lng: number): Promise<number | null> 
     const data = await res.json() as { results?: Array<{ layerName: string; attributes: Record<string, string> }> };
     if (!data.results?.length) return null;
 
-    // Vzemi maksimalni Lden iz vseh hrupnih con (LDVN = dan-večer-noč = Lden)
     let maxLden: number | null = null;
     for (const r of data.results) {
-      if (!r.layerName.includes("LDVN")) continue;  // samo Lden (ne Lnoc)
-      // Layer 344/352: atribut LDEN je direktna številka
+      if (!r.layerName.includes("LDVN")) continue;
       const ldenVal = parseFloat(r.attributes.LDEN ?? "");
       if (!isNaN(ldenVal)) {
         if (maxLden === null || ldenVal > maxLden) maxLden = ldenVal;
         continue;
       }
-      // Fallback: OBMOCJE format "55-60" ali HRUP_RAZRED
       const razred = r.attributes.OBMOCJE ?? r.attributes.HRUP_RAZRED ?? "";
       const match = razred.match(/(\d+)-(\d+)/);
       if (match) {
