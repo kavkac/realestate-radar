@@ -392,6 +392,58 @@ export async function getStreetId(streetName: string): Promise<number | null> {
   return data.features[0].properties.UL_MID as number;
 }
 
+/**
+ * KN fallback: ko RPE ne vsebuje hišne številke (ST_HS = NULL),
+ * poiščemo EID_ULICA prek veljavne sosednje hišne številke na isti ulici,
+ * nato direktno prebrskamo KN:HISNE_STEVILKE_H po EID_ULICA + HS_STEVILKA.
+ */
+async function getHouseFromKnFallback(
+  ulMid: number,
+  houseNumber: string,
+  suffix?: string,
+): Promise<{ eidStavba: string; lat: number | null; lng: number | null } | null> {
+  // 1. Poišči katerokoli veljavno hišno številko na tej ulici v RPE, da dobimo HS_MID
+  const anyHsUrl = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:HS_G", `UL_MID=${ulMid}`) + "&count=1&SRSNAME=EPSG:4326";
+  const anyHsData = await fetchWfs(anyHsUrl);
+  if (!anyHsData || anyHsData.features.length === 0) return null;
+
+  const anyHsMid = anyHsData.features[0].properties.HS_MID as number;
+
+  // 2. Prek tega HS_MID dobimo EID_ULICA iz KN
+  const knRefUrl = buildWfsUrl(BASE_KN, "SI.GURS.KN:HISNE_STEVILKE_H", `ST_HS=${anyHsMid}`);
+  const knRefData = await fetchWfs(knRefUrl);
+  if (!knRefData || knRefData.features.length === 0) return null;
+
+  const eidUlica = String(knRefData.features[0].properties.EID_ULICA);
+
+  // 3. Poišči ciljno hišno številko direktno v KN
+  let knFilter = `EID_ULICA='${eidUlica}' AND HS_STEVILKA=${houseNumber} AND STATUS_VELJAVNOSTI='V'`;
+  if (suffix) knFilter += ` AND HS_DODATEK='${suffix}'`;
+  const knUrl = buildWfsUrl(BASE_KN, "SI.GURS.KN:HISNE_STEVILKE_H", knFilter);
+  const knData = await fetchWfs(knUrl);
+  if (!knData || knData.features.length === 0) return null;
+
+  const eidStavba = String(knData.features[0].properties.EID_STAVBA);
+
+  // 4. Koordinate: poizkusi iz RPE:HS_G z NA_MID + HS (approximate lookup)
+  let lat: number | null = null;
+  let lng: number | null = null;
+  try {
+    const naMid = anyHsData.features[0].properties.NA_MID as number;
+    const coordUrl = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:HS_G", `NA_MID=${naMid} AND HS=${houseNumber}`) + "&SRSNAME=EPSG:4326";
+    const coordData = await fetchWfs(coordUrl);
+    if (coordData && coordData.features.length > 0) {
+      const geom = coordData.features[0].geometry as { type?: string; coordinates?: number[] } | null;
+      if (geom?.type === "Point" && geom.coordinates) {
+        lng = geom.coordinates[0];
+        lat = geom.coordinates[1];
+      }
+    }
+  } catch { /* koordinate niso obvezne */ }
+
+  return { eidStavba, lat, lng };
+}
+
 /** Fallback za podeželske naslove brez ulice: išče po NASELJE + hišna številka */
 export async function getHouseBySettlement(
   settlementName: string,
@@ -920,6 +972,22 @@ export async function lookupByAddress(address: string): Promise<{
   } else {
     hsResult = await getHouseNumberId(ulMid, parsed.number, parsed.suffix);
   }
+
+  // KN fallback: naslov obstaja v KN, ampak ne v RPE (ST_HS = NULL — novogradnje, neusklajeni podatki)
+  if (!hsResult && ulMid) {
+    const knFallback = await getHouseFromKnFallback(ulMid, parsed.number, parsed.suffix);
+    if (knFallback) {
+      const [stavba, deliStavbe] = await Promise.all([
+        getBuilding(knFallback.eidStavba),
+        getBuildingParts(knFallback.eidStavba),
+      ]);
+      if (stavba) {
+        return { stavba, deliStavbe, lat: knFallback.lat, lng: knFallback.lng };
+      }
+    }
+    return null;
+  }
+
   if (!hsResult) return null;
 
   const eidStavba = await getBuildingEid(hsResult.hsMid);
