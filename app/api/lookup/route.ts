@@ -250,6 +250,18 @@ export async function POST(request: NextRequest) {
     // Track which external calls hit the timeout
     const timedOut: string[] = [];
 
+    // DB fallback for steviloEtaz — GURS WFS often returns null for this field
+    // ev_stavba.st_etaz is populated for 99%+ of buildings
+    const stavbaDbRow = stavba.steviloEtaz == null
+      ? await prisma.$queryRawUnsafe<{ st_etaz: string | null }[]>(
+          `SELECT st_etaz FROM ev_stavba WHERE ko_sifko = $1 AND stev_st = $2 LIMIT 1`,
+          stavba.koId,
+          stavba.stStavbe,
+        ).then(r => r[0] ?? null).catch(() => null)
+      : null;
+    const steviloEtazFinal: number | null = stavba.steviloEtaz
+      ?? (stavbaDbRow?.st_etaz ? parseInt(stavbaDbRow.st_etaz) || null : null);
+
     // Gas infrastructure — non-blocking, moved into parallel batch below
     const gasInfrastructurePromise =
       lat != null && lng != null
@@ -674,7 +686,7 @@ export async function POST(request: NextRequest) {
           fasade: stavba.letoObnoveFasade,
           strehe: stavba.letoObnoveStrehe,
         },
-        steviloEtaz: stavba.steviloEtaz,
+        steviloEtaz: steviloEtazFinal,
         steviloStanovanj: stavba.steviloStanovanj,
         povrsina: stavba.brutoTlorisnaPovrsina,
         konstrukcija: stavba.nosilnaKonstrukcija,
