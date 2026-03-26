@@ -11,7 +11,7 @@ interface Props {
 // Vir badge — konsistenten z EIZ auditor report
 function SourceBadge({ label }: { label: string }) {
   return (
-    <span className="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium border border-blue-100">
+    <span className="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium border border-blue-100 whitespace-nowrap inline-block">
       {label}
     </span>
   );
