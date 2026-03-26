@@ -5,7 +5,8 @@ import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { getAzbestRisk } from "@/lib/azbest";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { estimateEiz } from "@/lib/eiz-estimator";
-import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio, getEtnPropertySignals } from "@/lib/etn-lookup";
+import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio, getEtnPropertySignals, getPriceSurfaceEstimate, getPropertySignals, getSursGrid } from "@/lib/etn-lookup";
+import { wgs84ToD96 } from "@/lib/wgs84-to-d96";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
 import { fetchOsmBuildingData } from "@/lib/osm-api";
@@ -188,9 +189,20 @@ export async function POST(request: NextRequest) {
     // If no unit selected → use total building area (sum of all units)
     const selectedUnit = delStavbe != null ? deliStavbe.find(d => d.stDelaStavbe === delStavbe) : null;
     const totalBuildingArea = deliStavbe.reduce((sum, d) => sum + (d.uporabnaPovrsina ?? d.povrsina ?? 0), 0) || null;
+
+    // Za ETN analizo: ko ni enote izbrane, ne smemo uporabiti totalBuildingArea
+    // (bi iskali "stanovanje 3000m²" → napačni comparables).
+    // Namesto tega uporabimo povprečno površino stanovanjskih enot ali null (brez filtra).
+    const stanovanjskeEnote = deliStavbe.filter(d => {
+      const v = ((d as unknown as { vrstaRabe?: string; vrsta?: string }).vrstaRabe ?? (d as unknown as { vrsta?: string }).vrsta ?? "").toLowerCase();
+      return v.includes("stanovan") || v === "" || v === "neznano";
+    });
+    const avgUnitArea = stanovanjskeEnote.length > 0
+      ? stanovanjskeEnote.reduce((sum, d) => sum + (d.uporabnaPovrsina ?? d.povrsina ?? 0), 0) / stanovanjskeEnote.length
+      : null;
     const useableArea = selectedUnit
       ? (selectedUnit.uporabnaPovrsina ?? selectedUnit.povrsina ?? null)
-      : totalBuildingArea;
+      : (avgUnitArea ?? null);
 
     // Also compute selected unit area separately for display
     const selectedUnitArea = selectedUnit
@@ -258,7 +270,10 @@ export async function POST(request: NextRequest) {
         : Promise.resolve(null);
 
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, KN namembnost, and rental yield in parallel
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    // Convert lat/lng to D-96/TM for spatial lookups
+    const d96Coords = lat != null && lng != null ? wgs84ToD96(lat, lng) : null;
+
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -279,6 +294,9 @@ export async function POST(request: NextRequest) {
       airbnbStatsPromise,
       getKoRentalYield(stavba.koId).catch(() => null),
       getSaleToListRatio(stavba.koId).catch(() => null),
+      d96Coords ? getPriceSurfaceEstimate(d96Coords.e, d96Coords.n).catch(() => null) : Promise.resolve(null),
+      stavba.eidStavba ? getPropertySignals(parseInt(stavba.eidStavba, 10)).catch(() => null) : Promise.resolve(null),
+      d96Coords ? getSursGrid(d96Coords.e, d96Coords.n).catch(() => null) : Promise.resolve(null),
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
@@ -558,6 +576,65 @@ export async function POST(request: NextRequest) {
       if (withDonos) etnNajemAnalizaFinal = withDonos;
     }
 
+    // === BLENDED ESTIMATE ===
+    let blendedEstimate: { eur_m2: number; method: string; etn_weight: number; surface_weight: number } | null = null;
+    const etnEurM2 = etnAnalizaFinal?.medianaCenaM2 ?? null;
+    const surfaceEurM2 = priceSurface?.price_eur_m2 ?? null;
+
+    if (etnEurM2 != null && surfaceEurM2 != null) {
+      const etnComps = etnAnalizaFinal?.steviloTransakcij ?? 0;
+      const etnWeight = etnComps < 3 ? 0.2 : 0.6;
+      const surfaceWeight = 1 - etnWeight;
+      blendedEstimate = {
+        eur_m2: Math.round(etnWeight * etnEurM2 + surfaceWeight * surfaceEurM2),
+        method: etnComps < 3 ? "surface-dominant" : "etn-dominant",
+        etn_weight: etnWeight,
+        surface_weight: surfaceWeight,
+      };
+    }
+
+    // === PROPERTY SIGNAL MODIFIERS ===
+    const appliedModifiers: string[] = [];
+    if (blendedEstimate && propSignals) {
+      let multiplier = 1.0;
+
+      if (propSignals.river_view === true) {
+        multiplier *= 1.03;
+        appliedModifiers.push("river_view +3%");
+      }
+
+      if (propSignals.is_heritage === true) {
+        multiplier *= 1.02 * 0.95; // +2% prestige, -5% cost → net ~-3%
+        appliedModifiers.push("heritage +2% prestige, -5% cost (net -3%)");
+      }
+
+      if (propSignals.heritage_neighborhood_score != null && propSignals.heritage_neighborhood_score >= 5) {
+        multiplier *= 1.01;
+        appliedModifiers.push("heritage_neighborhood +1%");
+      }
+
+      if (propSignals.energy_rating) {
+        const rating = propSignals.energy_rating.toUpperCase();
+        const energyModifiers: Record<string, number> = {
+          A1: 0.08, A2: 0.08,
+          B1: 0.04, B2: 0.04,
+          C: 0,
+          D: -0.03,
+          E: -0.07,
+          F: -0.12, G: -0.12,
+        };
+        const mod = energyModifiers[rating];
+        if (mod != null && mod !== 0) {
+          multiplier *= (1 + mod);
+          appliedModifiers.push(`energy_rating ${rating} ${mod > 0 ? "+" : ""}${Math.round(mod * 100)}%`);
+        }
+      }
+
+      if (multiplier !== 1.0) {
+        blendedEstimate.eur_m2 = Math.round(blendedEstimate.eur_m2 * multiplier);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       naslov: address,
@@ -640,6 +717,10 @@ export async function POST(request: NextRequest) {
       koRentalYield: koRentalYield ?? null,
       saleToListRatio: saleToListRatio ?? null,
       airbnbStats: airbnbStats ?? null,
+      priceSurface: priceSurface ?? null,
+      propertySignals: propSignals ?? null,
+      sursGrid: sursGrid ?? null,
+      blendedEstimate: blendedEstimate ? { ...blendedEstimate, appliedModifiers } : null,
       propertyContext,
       trustedCorrections,
       correctionMap,
