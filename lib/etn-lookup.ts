@@ -1217,3 +1217,117 @@ export async function getEtnPropertySignals(
     zadnjaTransakcija: r.datum_sklenitve_pogodbe ? String(r.datum_sklenitve_pogodbe) : null,
   };
 }
+
+// === CONTINUOUS PRICE SURFACE ===
+
+export interface PriceSurfaceEstimate {
+  price_eur_m2: number;
+  ci_lo: number;
+  ci_hi: number;
+  n_comps: number;
+  vitality_score: number | null;
+  amenity_score: number | null;
+  acc_transit: number | null;
+}
+
+export async function getPriceSurfaceEstimate(e: number, n: number): Promise<PriceSurfaceEstimate | null> {
+  try {
+    type Row = {
+      price_eur_m2: number;
+      ci_lo: number;
+      ci_hi: number;
+      n_comps: number;
+      vitality_score: number | null;
+      amenity_score: number | null;
+      acc_transit: number | null;
+    };
+
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT price_eur_m2, ci_lo, ci_hi, n_comps, vitality_score, amenity_score, acc_transit
+       FROM continuous_price_surface
+       WHERE e BETWEEN $1 - 1000 AND $1 + 1000
+         AND n BETWEEN $2 - 1000 AND $2 + 1000
+       ORDER BY |/((e - $1)^2 + (n - $2)^2)
+       LIMIT 1`,
+      e, n
+    );
+
+    if (!rows || rows.length === 0) return null;
+
+    const r = rows[0];
+    return {
+      price_eur_m2: Number(r.price_eur_m2),
+      ci_lo: Number(r.ci_lo),
+      ci_hi: Number(r.ci_hi),
+      n_comps: Number(r.n_comps),
+      vitality_score: r.vitality_score != null ? Number(r.vitality_score) : null,
+      amenity_score: r.amenity_score != null ? Number(r.amenity_score) : null,
+      acc_transit: r.acc_transit != null ? Number(r.acc_transit) : null,
+    };
+  } catch (err) {
+    console.error("[getPriceSurfaceEstimate] error:", err);
+    return null;
+  }
+}
+
+// === PROPERTY SIGNALS (stavba-level) ===
+
+export interface PropertySignals {
+  river_view: boolean | null;
+  is_heritage: boolean | null;
+  heritage_neighborhood_score: number | null;
+  transit_nearest_m: number | null;
+  energy_rating: string | null;
+}
+
+export async function getPropertySignals(stavbaEid: number): Promise<PropertySignals | null> {
+  try {
+    type Row = { signals: Record<string, unknown> };
+
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT signals FROM property_signals WHERE stavba_eid = $1 LIMIT 1`,
+      stavbaEid
+    );
+
+    if (!rows || rows.length === 0) return null;
+
+    const s = rows[0].signals;
+    if (!s || typeof s !== "object") return null;
+
+    return {
+      river_view: typeof s.river_view === "boolean" ? s.river_view : null,
+      is_heritage: typeof s.is_heritage === "boolean" ? s.is_heritage : null,
+      heritage_neighborhood_score: s.heritage_neighborhood_score != null ? Number(s.heritage_neighborhood_score) : null,
+      transit_nearest_m: s.transit_nearest_m != null ? Number(s.transit_nearest_m) : null,
+      energy_rating: typeof s.energy_rating === "string" ? s.energy_rating : null,
+    };
+  } catch (err) {
+    console.error("[getPropertySignals] error:", err);
+    return null;
+  }
+}
+
+// === SURS GRID 500m ===
+
+export async function getSursGrid(e: number, n: number): Promise<Record<string, unknown> | null> {
+  try {
+    type Row = { data: Record<string, unknown> };
+
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT data FROM surs_grid_500m
+       WHERE x_coord BETWEEN $1 - 1000 AND $1 + 1000
+         AND y_coord BETWEEN $2 - 1000 AND $2 + 1000
+       ORDER BY |/((x_coord - $1)^2 + (y_coord - $2)^2)
+       LIMIT 1`,
+      e, n
+    );
+
+    if (!rows || rows.length === 0) return null;
+
+    const d = rows[0].data;
+    return d && typeof d === "object" ? d : null;
+  } catch (err) {
+    console.error("[getSursGrid] error:", err);
+    return null;
+  }
+}
