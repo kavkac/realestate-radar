@@ -853,6 +853,7 @@ export function PropertyCard({
               selectedUnitArea={selectedUnitArea}
               stavbaVisina={stavba.visina}
               stavbaSteviloEtaz={stavba.steviloEtaz}
+              selectedUnitVisinaEtaze={currentPart?.visinaEtaze ?? (deliStavbe.length === 1 ? deliStavbe[0].visinaEtaze : null)}
               stavbaLetoIzgradnje={stavba.letoIzgradnje}
               stavbaKonstrukcija={stavba.konstrukcija}
               stavbaLetoObnove={stavba.letoObnove}
@@ -2724,6 +2725,7 @@ function OcenaVrednostiSection({
   selectedUnitArea,
   stavbaVisina,
   stavbaSteviloEtaz,
+  selectedUnitVisinaEtaze,
   stavbaLetoIzgradnje,
   stavbaKonstrukcija,
   stavbaLetoObnove,
@@ -2753,6 +2755,7 @@ function OcenaVrednostiSection({
   selectedUnitArea?: number | null;
   stavbaVisina?: number | null;
   stavbaSteviloEtaz?: number | null;
+  selectedUnitVisinaEtaze?: number | null;
   stavbaLetoIzgradnje?: number | null;
   stavbaKonstrukcija?: string | null;
   stavbaLetoObnove?: { fasade: number | null; strehe: number | null } | null;
@@ -2778,7 +2781,7 @@ function OcenaVrednostiSection({
   // 1. DB (ev_del_stavbe.visina_etaze_net) za izbrano enoto
   // 2. GURS WFS visina/etaze (izračun)
   // 3. Era fallback
-  const dbCeilingM = currentPart?.visinaEtaze ?? null;
+  const dbCeilingM = selectedUnitVisinaEtaze ?? null;
   const visinaStropov = dbCeilingM
     ? {
         visinaCm: Math.round(dbCeilingM * 100),
