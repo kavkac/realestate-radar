@@ -17,6 +17,14 @@ import { prisma } from "@/lib/prisma";
 import { getNeighborhoodProfile, calcProximityScore, getNearestWalkingTargets } from "@/lib/neighborhood-service";
 import { parseListingText, calcListingValuationDelta, type ListingSignals } from "@/lib/listing-nlp";
 
+// Helper: race a promise against a timeout — returns null if timeout fires
+function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => { onTimeout?.(); resolve(null); }, ms)),
+  ]) as Promise<T | null>;
+}
+
 const LookupSchema = z.object({
   address: z.string().min(3, "Naslov mora vsebovati vsaj 3 znake"),
   delStavbe: z.number().optional(),
@@ -239,22 +247,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Track which external calls hit the timeout
+    const timedOut: string[] = [];
+
     // Gas infrastructure — non-blocking, moved into parallel batch below
     const gasInfrastructurePromise =
       lat != null && lng != null
-        ? checkGasInfrastructure(lat, lng).catch(() => null)
+        ? withTimeout(checkGasInfrastructure(lat, lng).catch(() => null), 5000, () => timedOut.push('gasInfrastructure'))
         : Promise.resolve(null);
 
     // OSM Overpass enrichment (non-blocking, parallel)
     const osmDataPromise =
       lat != null && lng != null
-        ? fetchOsmBuildingData(lat, lng).catch(() => null)
+        ? withTimeout(fetchOsmBuildingData(lat, lng).catch(() => null), 5000, () => timedOut.push('osmData'))
         : Promise.resolve(null);
 
     // Google Places — transit + amenitete (non-blocking, per-usage pricing ~$0.13/lookup)
     const placesDataPromise =
       lat != null && lng != null
-        ? getPlacesData(lat, lng).catch(() => null)
+        ? withTimeout(getPlacesData(lat, lng).catch(() => null), 5000, () => timedOut.push('placesData'))
         : Promise.resolve(null);
 
     // Oglasne cene — vzporedno z ostalimi klici
@@ -263,13 +274,13 @@ export async function POST(request: NextRequest) {
     // LPP bus lines via Overpass relations (non-blocking)
     const lppLinesPromise =
       lat != null && lng != null
-        ? getLppLineCount(lat, lng).catch(() => null)
+        ? withTimeout(getLppLineCount(lat, lng).catch(() => null), 5000, () => timedOut.push('lppLines'))
         : Promise.resolve(null);
 
     // Airbnb short-term rental stats (non-blocking)
     const airbnbStatsPromise =
       lat != null && lng != null
-        ? getAirbnbStats(lat, lng, 500).catch(() => null)
+        ? withTimeout(getAirbnbStats(lat, lng, 500).catch(() => null), 5000, () => timedOut.push('airbnbStats'))
         : Promise.resolve(null);
 
     // Fetch energy certificate, parcele, REN vrednost, ETN analysis, ownership, EV, KN namembnost, and rental yield in parallel
@@ -285,14 +296,14 @@ export async function POST(request: NextRequest) {
         stStavbe: stavba.stStavbe,
         stDelaStavbe,
       }).catch(() => ({ cert: null, source: null as "stanovanje" | "stavba" | null })),
-      getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
-      getRenVrednost(stavba.koId, stavba.stStavbe),
+      withTimeout(getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null), 6000, () => timedOut.push('parcele')),
+      withTimeout(getRenVrednost(stavba.koId, stavba.stStavbe), 6000, () => timedOut.push('renVrednost')),
       // ETN — single call, no sequential fallback
       getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba ?? null, lat, lng, null, stavba.stStavbe).catch(() => null),
       getEtnNajemAnaliza(stavba.koId, useableArea).catch(() => null),
-      getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
-      lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
-      lat != null && lng != null ? getPoplavnaNevarnost(lat, lng).catch(() => null) : Promise.resolve(null),
+      withTimeout(getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null), 5000, () => timedOut.push('tipPolozaja')),
+      lat != null && lng != null ? withTimeout(getSeizmicnaCona(lat, lng).catch(() => null), 5000, () => timedOut.push('seizmicniPodatki')) : Promise.resolve(null),
+      lat != null && lng != null ? withTimeout(getPoplavnaNevarnost(lat, lng).catch(() => null), 5000, () => timedOut.push('poplavnaNevarnost')) : Promise.resolve(null),
       osmDataPromise,
       lppLinesPromise,
       airbnbStatsPromise,
@@ -317,7 +328,7 @@ export async function POST(request: NextRequest) {
       ),
       // Gas infrastructure now parallel (was sequential await before)
       gasInfrastructurePromise,
-      ...ownershipUnits.map((d) => getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>)),
+      ...ownershipUnits.map((d) => withTimeout(getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>), 5000, () => timedOut.push('ownership')).then(r => r ?? [])),
     ]);
 
     // Load trusted corrections for this stavba (public corrections from verified users)
@@ -643,6 +654,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      _meta: {
+        fast: true,
+        timedOut: Array.from(new Set(timedOut)),
+      },
       naslov: address,
       lat,
       lng,
