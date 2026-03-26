@@ -151,19 +151,35 @@ export function NeighborhoodCard({ lat, lng }: Props) {
       {(profile.noiseLdenDb != null || profile.pricePerM2_500m != null) && (
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           {profile.noiseLdenDb != null && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">
-                Hrupnost (Lden) <SourceBadge label="ARSO 2020" />
+            <div className={`rounded-xl px-3 py-2.5 ${
+              profile.noiseLabel === "tiho" ? "bg-green-50 border border-green-100" :
+              profile.noiseLabel === "zmerno" ? "bg-yellow-50 border border-yellow-100" :
+              profile.noiseLabel === "prometno" ? "bg-orange-50 border border-orange-100" :
+              "bg-red-50 border border-red-100"
+            }`}>
+              <p className="text-[10px] uppercase tracking-wide font-semibold mb-1 ${
+                profile.noiseLabel === 'tiho' ? 'text-green-600' :
+                profile.noiseLabel === 'zmerno' ? 'text-yellow-600' :
+                profile.noiseLabel === 'prometno' ? 'text-orange-600' : 'text-red-600'
+              }">
+                {profile.noiseLabel === "tiho" ? "🌿" :
+                 profile.noiseLabel === "zmerno" ? "🔉" :
+                 profile.noiseLabel === "prometno" ? "🔊" : "📢"} Hrupnost
               </p>
-              <p className="font-semibold text-gray-800">
-                {profile.noiseLdenDb} dB
-                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                  profile.noiseLabel === "tiho" ? "bg-green-50 text-green-700" :
-                  profile.noiseLabel === "zmerno" ? "bg-yellow-50 text-yellow-700" :
-                  profile.noiseLabel === "prometno" ? "bg-orange-50 text-orange-700" :
-                  "bg-red-50 text-red-700"
-                }`}>{profile.noiseLabel}</span>
+              <p className={`text-xl font-bold ${
+                profile.noiseLabel === "tiho" ? "text-green-700" :
+                profile.noiseLabel === "zmerno" ? "text-yellow-700" :
+                profile.noiseLabel === "prometno" ? "text-orange-700" :
+                "text-red-700"
+              }`}>
+                {profile.noiseLdenDb} <span className="text-sm font-normal">dB Lden</span>
               </p>
+              <p className={`text-xs mt-0.5 font-medium capitalize ${
+                profile.noiseLabel === "tiho" ? "text-green-600" :
+                profile.noiseLabel === "zmerno" ? "text-yellow-600" :
+                profile.noiseLabel === "prometno" ? "text-orange-600" :
+                "text-red-600"
+              }`}>{profile.noiseLabel} · ARSO 2020</p>
             </div>
           )}
           {profile.pricePerM2_500m != null && (
