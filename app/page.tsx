@@ -1,15 +1,9 @@
 import { Suspense } from "react";
-import dynamic from "next/dynamic";
 import { AddressSearch } from "@/components/address-search";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Link from "next/link";
 import { HeaderSavedButton } from "@/components/header-saved-button";
 import { UserMenu } from "@/components/user-menu";
-
-const PriceHeatmapMap = dynamic(() => import("@/components/price-heatmap-map"), {
-  ssr: false,
-  loading: () => <div className="h-[500px] rounded-lg bg-gray-100 animate-pulse" />,
-});
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const L = Link as any;
 
@@ -55,12 +49,6 @@ export default function HomePage() {
           </Suspense>
         </div>
 
-        {/* Price Heatmap — for all users */}
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">🗺️ Cenovni heatmap — Slovenija</h2>
-          <p className="text-sm text-gray-500 mb-3">Povprečne cene nepremičnin po regijah. Temnejša barva = višja cena.</p>
-          <PriceHeatmapMap height="500px" />
-        </div>
       </section>
 
       <footer className="border-t py-8 px-4">

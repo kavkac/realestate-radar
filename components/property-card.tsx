@@ -12,6 +12,7 @@ import type { SeizmicniPodatki, PoplavnaNevarnost } from "@/lib/arso-api";
 import { izracunajOcenaStanja } from "@/lib/gurs-api";
 
 const CadastralMap = dynamic(() => import("./cadastral-map"), { ssr: false });
+const PriceHeatmapMap = dynamic(() => import("@/components/price-heatmap-map"), { ssr: false });
 
 // Info tooltip — prikaže razlagalni tekst ob hover
 function InfoTooltip({ text }: { text: string }) {
@@ -790,6 +791,15 @@ export function PropertyCard({
             energijskiRazred={energetskaIzkaznica?.razred}
             tipStavbe={tipProdaje === "enota" ? "stanovanje" : tipProdaje === "stavba" ? "stavba" : "parcela"}
           />
+
+          {/* 10. Cenovni heatmap — samo za prijavljene */}
+          {isSignedIn && (
+            <section className="mt-6">
+              <h2 className="text-base font-semibold text-gray-800 mb-1">🗺️ Cenovni heatmap</h2>
+              <p className="text-xs text-gray-400 mb-3">Povprečne prodajne cene po regijah — ETN transakcije</p>
+              <PriceHeatmapMap height="440px" />
+            </section>
+          )}
         </div>
 
         {/* ── DESNI SIDEBAR — referenčni podatki ── */}
