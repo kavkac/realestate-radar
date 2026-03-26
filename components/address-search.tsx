@@ -192,6 +192,7 @@ export function AddressSearch() {
 
     let street = "";
     let streetNumber = "";
+    let locality = "";
 
     for (const comp of place.address_components) {
       if (comp.types.includes("route")) {
@@ -200,12 +201,17 @@ export function AddressSearch() {
       if (comp.types.includes("street_number")) {
         streetNumber = comp.long_name;
       }
+      // Zajemi mesto/naselje za disambiguacijo (npr. Tržaška cesta obstaja v več mestih)
+      if (!locality && (comp.types.includes("locality") || comp.types.includes("sublocality") || comp.types.includes("postal_town"))) {
+        locality = comp.long_name;
+      }
     }
 
     if (street && streetNumber) {
-      setAddress(`${street} ${streetNumber}`);
+      const base = `${street} ${streetNumber}`;
+      setAddress(locality ? `${base}, ${locality}` : base);
     } else if (street) {
-      setAddress(street);
+      setAddress(locality ? `${street}, ${locality}` : street);
     }
   }, []);
 

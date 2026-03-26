@@ -381,7 +381,7 @@ async function fetchWfs(url: string): Promise<WfsResponse | null> {
 
 // --- Public API ---
 
-export async function getStreetId(streetName: string): Promise<number | null> {
+export async function getStreetId(streetName: string, city?: string): Promise<number | null> {
   const url = buildWfsUrl(
     BASE_RPE,
     "SI.GURS.RPE:UL_G",
@@ -389,6 +389,26 @@ export async function getStreetId(streetName: string): Promise<number | null> {
   );
   const data = await fetchWfs(url);
   if (!data || data.features.length === 0) return null;
+
+  // Če je ulica dvoumna (več zadetkov) in imamo mesto, poiščemo pravo s pomočjo naselja
+  if (data.features.length > 1 && city) {
+    const cityNorm = city.trim().toUpperCase();
+    // Poišči NA_MID za to naselje
+    const naUrl = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:NA_G", `NA_UIME ILIKE '${city.trim()}'`);
+    const naData = await fetchWfs(naUrl);
+    if (naData && naData.features.length > 0) {
+      const naMid = naData.features[0].properties.NA_MID as number;
+      const match = data.features.find((f) => f.properties.NA_MID === naMid);
+      if (match) return match.properties.UL_MID as number;
+    }
+    // Fallback: primerjaj po imenu naselja v feature properties
+    const fallback = data.features.find((f) => {
+      const naName = String(f.properties.NA_MID ?? "");
+      return naName.toUpperCase().includes(cityNorm);
+    });
+    if (fallback) return fallback.properties.UL_MID as number;
+  }
+
   return data.features[0].properties.UL_MID as number;
 }
 
@@ -942,14 +962,17 @@ export function parseAddress(raw: string): {
   street: string;
   number: string;
   suffix?: string;
+  city?: string;
 } | null {
   const trimmed = raw.trim();
-  const match = trimmed.match(/^(.+?)\s+(\d+)\s*([A-Za-z]?)$/);
+  // Podpira format "Ulica 121" ali "Ulica 121, Mesto" ali "Ulica 121A, Mesto"
+  const match = trimmed.match(/^(.+?)\s+(\d+)\s*([A-Za-z]?)(?:\s*,\s*(.+))?$/);
   if (!match) return null;
   return {
     street: match[1].trim(),
     number: match[2],
     suffix: match[3] ? match[3].toUpperCase() : undefined,
+    city: match[4] ? match[4].trim() : undefined,
   };
 }
 
@@ -963,7 +986,7 @@ export async function lookupByAddress(address: string): Promise<{
   const parsed = parseAddress(address);
   if (!parsed) return null;
 
-  const ulMid = await getStreetId(parsed.street);
+  const ulMid = await getStreetId(parsed.street, parsed.city);
 
   // Fallback za podeželske naslove brez ulice (npr. "Spodnje Loke 30")
   let hsResult;
