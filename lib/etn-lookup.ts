@@ -858,7 +858,7 @@ export async function getEtnAnaliza(
     const koRows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT
         p.pogodbena_cena_odskodnina::float AS cena,
-        COALESCE(d.uporabna_povrsina, d.povrsina_dela_stavbe)::float AS povrsina,
+        d.povrsina_dela_stavbe::float AS povrsina,
         COALESCE(d.leto::text, EXTRACT(YEAR FROM TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY'))::text) AS leto,
         d.ime_ko,
         p.datum_sklenitve_pogodbe AS datum

@@ -188,25 +188,27 @@ export async function POST(request: NextRequest) {
     // If a specific unit is selected → use that unit's area
     // If no unit selected → use total building area (sum of all units)
     const selectedUnit = delStavbe != null ? deliStavbe.find(d => d.stDelaStavbe === delStavbe) : null;
-    const totalBuildingArea = deliStavbe.reduce((sum, d) => sum + (d.uporabnaPovrsina ?? d.povrsina ?? 0), 0) || null;
+    // Skupna površina (povrsina) je tržni standard — to je kar ETN beleži in kar kupci vidijo.
+    // Uporabna površina je manjša in je ne smemo mešati z ETN metriko.
+    const totalBuildingArea = deliStavbe.reduce((sum, d) => sum + (d.povrsina ?? d.uporabnaPovrsina ?? 0), 0) || null;
 
     // Za ETN analizo: ko ni enote izbrane, ne smemo uporabiti totalBuildingArea
     // (bi iskali "stanovanje 3000m²" → napačni comparables).
-    // Namesto tega uporabimo povprečno površino stanovanjskih enot ali null (brez filtra).
+    // Namesto tega uporabimo povprečno skupno površino stanovanjskih enot.
     const stanovanjskeEnote = deliStavbe.filter(d => {
       const v = ((d as unknown as { vrstaRabe?: string; vrsta?: string }).vrstaRabe ?? (d as unknown as { vrsta?: string }).vrsta ?? "").toLowerCase();
       return v.includes("stanovan") || v === "" || v === "neznano";
     });
     const avgUnitArea = stanovanjskeEnote.length > 0
-      ? stanovanjskeEnote.reduce((sum, d) => sum + (d.uporabnaPovrsina ?? d.povrsina ?? 0), 0) / stanovanjskeEnote.length
+      ? stanovanjskeEnote.reduce((sum, d) => sum + (d.povrsina ?? d.uporabnaPovrsina ?? 0), 0) / stanovanjskeEnote.length
       : null;
     const useableArea = selectedUnit
-      ? (selectedUnit.uporabnaPovrsina ?? selectedUnit.povrsina ?? null)
+      ? (selectedUnit.povrsina ?? selectedUnit.uporabnaPovrsina ?? null)
       : (avgUnitArea ?? null);
 
     // Also compute selected unit area separately for display
     const selectedUnitArea = selectedUnit
-      ? (selectedUnit.uporabnaPovrsina ?? selectedUnit.povrsina ?? null)
+      ? (selectedUnit.povrsina ?? selectedUnit.uporabnaPovrsina ?? null)
       : null;
 
     // Determine property type for ETN filtering
@@ -224,7 +226,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Enota v majhni stavbi — size-based + unicode-safe override
       const unitArea = selectedUnit
-        ? (selectedUnit.uporabnaPovrsina ?? selectedUnit.povrsina ?? null)
+        ? (selectedUnit.povrsina ?? selectedUnit.uporabnaPovrsina ?? null)
         : null;
       if (unitArea != null && (unitArea as number) > 25) {
         const raba = (etnDejanskaRaba ?? "").toLowerCase();
