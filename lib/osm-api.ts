@@ -34,7 +34,7 @@ export async function fetchOsmBuildingData(
 out tags;`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12_000);
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",

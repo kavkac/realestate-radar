@@ -239,11 +239,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check gas infrastructure via ZK GJI
-    const gasInfrastructure =
+    // Gas infrastructure — non-blocking, moved into parallel batch below
+    const gasInfrastructurePromise =
       lat != null && lng != null
-        ? await checkGasInfrastructure(lat, lng).catch(() => null)
-        : null;
+        ? checkGasInfrastructure(lat, lng).catch(() => null)
+        : Promise.resolve(null);
 
     // OSM Overpass enrichment (non-blocking, parallel)
     const osmDataPromise =
@@ -276,18 +276,19 @@ export async function POST(request: NextRequest) {
     // Convert lat/lng to D-96/TM for spatial lookups
     const d96Coords = lat != null && lng != null ? wgs84ToD96(lat, lng) : null;
 
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, evResults, namembnostResults, ...ownershipResults] = await Promise.all([
+    // Cap ownership lookups to first 8 units to avoid 20+ parallel GURS calls
+    const ownershipUnits = deliStavbe.slice(0, 8);
+
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, evResults, namembnostResults, gasInfrastructure, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
         stDelaStavbe,
-      }).catch(() => ({ cert: null, source: null as "stanovanje" | "stavba" | null }))
-  ,
+      }).catch(() => ({ cert: null, source: null as "stanovanje" | "stavba" | null })),
       getParcele(stavba.koId, stavba.stStavbe, lat, lng, stavba.obrisGeom ?? null),
       getRenVrednost(stavba.koId, stavba.stStavbe),
-      getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba, lat, lng, null, stavba.stStavbe)
-        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, null, null, lat, lng, null, stavba.stStavbe).catch(() => null))
-        .catch(() => null),
+      // ETN — single call, no sequential fallback
+      getEtnAnaliza(stavba.koId, useableArea, null, etnDejanskaRaba ?? null, lat, lng, null, stavba.stStavbe).catch(() => null),
       getEtnNajemAnaliza(stavba.koId, useableArea).catch(() => null),
       getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null),
       lat != null && lng != null ? getSeizmicnaCona(lat, lng).catch(() => null) : Promise.resolve(null),
@@ -314,7 +315,9 @@ export async function POST(request: NextRequest) {
             .catch(() => null)
         )
       ),
-      ...deliStavbe.map((d) => getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>)),
+      // Gas infrastructure now parallel (was sequential await before)
+      gasInfrastructurePromise,
+      ...ownershipUnits.map((d) => getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>)),
     ]);
 
     // Load trusted corrections for this stavba (public corrections from verified users)
@@ -688,7 +691,7 @@ export async function POST(request: NextRequest) {
         prostori: d.prostori,
         etazaDelStavbe: d.etazaDelStavbe,
         vrstaStanovanjaUradno: d.vrstaStanovanjaUradno,
-        lastnistvo: ownershipResults[i] ?? [],
+        lastnistvo: i < ownershipUnits.length ? (ownershipResults[i] ?? []) : [],
         vrednotenje: evResults[i]
           ? {
               posplosenaVrednost: evResults[i]!.posplosenaVrednost,

@@ -73,7 +73,7 @@ out tags;
         "User-Agent": "RealEstateRadar/1.0 research@realestate-radar.si",
       },
       body: `data=${encodeURIComponent(query)}`,
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!res.ok) {
