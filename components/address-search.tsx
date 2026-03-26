@@ -709,6 +709,9 @@ export function AddressSearch() {
               poplavnaNevarnost={activeTab.data.poplavnaNevarnost as never}
               listingNlpSignals={(activeTab.data as unknown as { listingNlpSignals?: import('@/lib/listing-nlp').ListingSignals }).listingNlpSignals}
               listingNlpDatum={(activeTab.data as unknown as { listingNlpDatum?: string }).listingNlpDatum}
+              blendedEstimate={(activeTab.data as unknown as { blendedEstimate?: import('@/components/property-card').PropertyCardProps['blendedEstimate'] }).blendedEstimate}
+              priceSurface={(activeTab.data as unknown as { priceSurface?: import('@/components/property-card').PropertyCardProps['priceSurface'] }).priceSurface}
+              propertySignals={(activeTab.data as unknown as { propertySignals?: import('@/components/property-card').PropertyCardProps['propertySignals'] }).propertySignals}
               onRefresh={handleRefreshActiveTab}
               requestedDel={activeTab.del}
               onClearDel={() => {

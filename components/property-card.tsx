@@ -229,7 +229,7 @@ interface AirbnbStats {
   radiusM: number;
 }
 
-interface PropertyCardProps {
+export interface PropertyCardProps {
   naslov: string;
   enolicniId: { koId: number; stStavbe: number; stDelaStavbe: number | null };
   stavba: {
@@ -281,6 +281,29 @@ interface PropertyCardProps {
   airbnbStats?: AirbnbStats | null;
   listingNlpSignals?: import("@/lib/listing-nlp").ListingSignals | null;
   listingNlpDatum?: string | null;
+  blendedEstimate?: {
+    eur_m2: number;
+    method: string;
+    etn_weight: number;
+    surface_weight: number;
+    appliedModifiers?: string[];
+  } | null;
+  priceSurface?: {
+    price_eur_m2: number;
+    ci_lo: number;
+    ci_hi: number;
+    n_comps: number;
+    vitality_score: number | null;
+    amenity_score: number | null;
+    acc_transit: number | null;
+  } | null;
+  propertySignals?: {
+    river_view: boolean | null;
+    is_heritage: boolean | null;
+    heritage_neighborhood_score: number | null;
+    transit_nearest_m: number | null;
+    energy_rating: string | null;
+  } | null;
   onRefresh?: () => void; // Trigger re-fetch of lookup data (after corrections saved)
 }
 
@@ -388,6 +411,9 @@ export function PropertyCard({
   airbnbStats,
   listingNlpSignals,
   listingNlpDatum,
+  blendedEstimate,
+  priceSurface,
+  propertySignals,
   onRefresh,
 }: PropertyCardProps) {
   const [selectedDel, setSelectedDel] = useState<number | null>(null);
@@ -827,6 +853,9 @@ export function PropertyCard({
               oglasneAnalize={oglasneAnalize}
               koRentalYield={koRentalYield}
               saleToListRatio={saleToListRatio}
+              blendedEstimate={blendedEstimate}
+              priceSurface={priceSurface}
+              propertySignals={propertySignals}
             />
           </div>
 
@@ -2695,6 +2724,9 @@ function OcenaVrednostiSection({
   oglasneAnalize,
   koRentalYield,
   saleToListRatio,
+  blendedEstimate,
+  priceSurface,
+  propertySignals,
 }: {
   renVrednost?: { vrednost: number; datumOcene: string } | null;
   currentPartVrednotenje?: { posplosenaVrednost: number | null; vrednostNaM2: number | null } | null;
@@ -2721,6 +2753,9 @@ function OcenaVrednostiSection({
   oglasneAnalize?: OglasneAnalize | null;
   koRentalYield?: KoRentalYield | null;
   saleToListRatio?: SaleToListRatio | null;
+  blendedEstimate?: PropertyCardProps['blendedEstimate'];
+  priceSurface?: PropertyCardProps['priceSurface'];
+  propertySignals?: PropertyCardProps['propertySignals'];
 }) {
   const [showExplanation, setShowExplanation] = useState(false);
 
@@ -2757,8 +2792,16 @@ function OcenaVrednostiSection({
     tramStopsCount: osmTramStops,
   });
 
+  // Property signals faktorji
+  const signalsFaktorji: string[] = [];
+  if (propertySignals?.river_view) signalsFaktorji.push("🌊 Pogled na vodo +3%");
+  if (propertySignals?.is_heritage) signalsFaktorji.push("🏛️ Kulturna dediščina -3% neto");
+  if ((propertySignals?.heritage_neighborhood_score ?? 0) >= 5) signalsFaktorji.push(`🏺 ${propertySignals!.heritage_neighborhood_score} heritage objektov v soseščini +1%`);
+  if (propertySignals?.transit_nearest_m != null) signalsFaktorji.push(`🚌 ${propertySignals.transit_nearest_m}m do postaje`);
+
   // Compute ETN-based value estimates using correct areas
-  const mediana = etnAnaliza?.medianaCenaM2 ?? null;
+  // Use blended estimate if available, otherwise fall back to ETN mediana
+  const mediana = blendedEstimate?.eur_m2 ?? etnAnaliza?.medianaCenaM2 ?? null;
   const energyFactor = etnAnaliza?.energetskaKorekcija
     ? 1 + etnAnaliza.energetskaKorekcija.faktor
     : 1;
@@ -2981,6 +3024,8 @@ function OcenaVrednostiSection({
           ...(etnAnaliza.lokacijskiPremium?.faktorji ?? []),
           // Stavbne korekcije
           ...stavbneKorekcije.faktorji,
+          // Property signals
+          ...signalsFaktorji.map(s => ({ naziv: s, ikona: "", opis: s, korekcija: 0 })),
         ];
         if (vsiFaktorji.length === 0) return null;
         return (
@@ -3000,6 +3045,17 @@ function OcenaVrednostiSection({
           </div>
         );
       })()}
+
+      {blendedEstimate && (
+        <div className="rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 mt-2">
+          <p className="text-[10px] text-purple-600 font-medium">
+            🔀 Blended ocena · ETN {Math.round(blendedEstimate.etn_weight * 100)}% + Price surface {Math.round(blendedEstimate.surface_weight * 100)}%
+            {blendedEstimate.appliedModifiers && blendedEstimate.appliedModifiers.length > 0 && (
+              <span className="ml-1">· {blendedEstimate.appliedModifiers.join(", ")}</span>
+            )}
+          </p>
+        </div>
+      )}
 
       {!hasSelectedUnit && !unitMin && totalBuildingArea && (
         <p className="text-[10px] text-gray-400 mt-1.5 italic">Izberite enoto za vrednost posamezne enote</p>
