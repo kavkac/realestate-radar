@@ -361,6 +361,7 @@ async function fetchWfs(url: string): Promise<WfsResponse | null> {
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
     const text = await res.text();
