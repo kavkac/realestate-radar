@@ -3,365 +3,239 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fixed absolute price bands — stable colors regardless of viewport
-const PRICE_BANDS = [
-  { max: 1000,  color: [67,  56,  202] as [number,number,number], label: "< 1.000 €/m²" },
-  { max: 1500,  color: [37, 130, 220] as [number,number,number],  label: "1.000–1.500" },
-  { max: 2000,  color: [34, 197, 194] as [number,number,number],  label: "1.500–2.000" },
-  { max: 2500,  color: [74, 200, 100] as [number,number,number],  label: "2.000–2.500" },
-  { max: 3000,  color: [202, 220, 50] as [number,number,number],  label: "2.500–3.000" },
-  { max: 3500,  color: [245, 158, 11] as [number,number,number],  label: "3.000–3.500" },
-  { max: 4500,  color: [239, 100, 20] as [number,number,number],  label: "3.500–4.500" },
-  { max: Infinity, color: [220, 30, 20] as [number,number,number], label: "> 4.500 €/m²" },
-];
-
-const MIN_PRICE = 500, MAX_PRICE = 5500;
-
-// Color ramp — full spectrum blue→cyan→green→yellow→orange→red
+// Viewport-adaptive color scale
 const COLOR_STOPS: [number, [number,number,number]][] = [
-  [0.00, [67,  56,  202]],
-  [0.12, [37, 130, 220]],
-  [0.25, [34, 197, 194]],
-  [0.40, [74, 200, 100]],
-  [0.55, [180, 215, 60]],
-  [0.68, [245, 190, 20]],
-  [0.80, [245, 130, 15]],
-  [0.90, [235, 70,  20]],
-  [1.00, [200, 20,  20]],
+  [0.00, [59,  130, 246]],  // blue
+  [0.20, [34,  197, 194]],  // teal
+  [0.40, [74,  200, 100]],  // green
+  [0.60, [234, 179,  8]],   // yellow
+  [0.80, [249, 115, 22]],   // orange
+  [1.00, [239,  68, 68]],   // red
 ];
 
-// Viewport-adaptive coloring: normalizes to local p05–p95 range
-// So whether you're in rural SLO (800–1200) or LJ center (3000–4500),
-// you always see the full color spectrum → maximum contrast
-let viewportP05 = MIN_PRICE;
-let viewportP95 = MAX_PRICE;
-
-function priceToNorm(price: number) {
-  return Math.min(Math.max((price - MIN_PRICE) / (MAX_PRICE - MIN_PRICE), 0), 1);
-}
-
-function priceToNormAdaptive(price: number) {
-  const range = Math.max(viewportP95 - viewportP05, 200);
-  return Math.min(Math.max((price - viewportP05) / range, 0), 1);
-}
-
-function normToColor(t: number, alpha = 0.28): string {
-  let lower = COLOR_STOPS[0], upper = COLOR_STOPS[COLOR_STOPS.length - 1];
+function normToRgb(t: number): [number,number,number] {
+  const clamped = Math.max(0, Math.min(1, t));
   for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
-    if (t >= COLOR_STOPS[i][0] && t <= COLOR_STOPS[i + 1][0]) {
-      lower = COLOR_STOPS[i]; upper = COLOR_STOPS[i + 1]; break;
+    const [t0, c0] = COLOR_STOPS[i];
+    const [t1, c1] = COLOR_STOPS[i + 1];
+    if (clamped <= t1) {
+      const f = (clamped - t0) / (t1 - t0 + 0.0001);
+      return [
+        Math.round(c0[0] + f * (c1[0] - c0[0])),
+        Math.round(c0[1] + f * (c1[1] - c0[1])),
+        Math.round(c0[2] + f * (c1[2] - c0[2])),
+      ];
     }
   }
-  const f = (t - lower[0]) / (upper[0] - lower[0] + 0.001);
-  const r = Math.round(lower[1][0] + f * (upper[1][0] - lower[1][0]));
-  const g = Math.round(lower[1][1] + f * (upper[1][1] - lower[1][1]));
-  const b = Math.round(lower[1][2] + f * (upper[1][2] - lower[1][2]));
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-function priceToFill(price: number, alpha = 0.28): string {
-  return normToColor(priceToNormAdaptive(price), alpha);
-}
-
-function gaussianBlur(data: Float32Array, w: number, h: number, sigma: number): Float32Array {
-  const radius = Math.ceil(sigma * 2.5);
-  const kernel: number[] = [];
-  let ksum = 0;
-  for (let i = -radius; i <= radius; i++) {
-    const v = Math.exp(-0.5 * (i * i) / (sigma * sigma));
-    kernel.push(v);
-    ksum += v;
-  }
-  const kn = kernel.map(v => v / ksum);
-
-  const tmp = new Float32Array(w * h);
-  for (let r = 0; r < h; r++) {
-    for (let c = 0; c < w; c++) {
-      let sum = 0;
-      for (let k = -radius; k <= radius; k++) {
-        const nc = Math.max(0, Math.min(w - 1, c + k));
-        sum += data[r * w + nc] * kn[k + radius];
-      }
-      tmp[r * w + c] = sum;
-    }
-  }
-
-  const out = new Float32Array(w * h);
-  for (let r = 0; r < h; r++) {
-    for (let c = 0; c < w; c++) {
-      let sum = 0;
-      for (let k = -radius; k <= radius; k++) {
-        const nr = Math.max(0, Math.min(h - 1, r + k));
-        sum += tmp[nr * w + c] * kn[k + radius];
-      }
-      out[r * w + c] = sum;
-    }
-  }
-  return out;
+  return COLOR_STOPS[COLOR_STOPS.length - 1][1];
 }
 
 interface Point { lat: number; lng: number; price: number }
 interface TooltipState { x: number; y: number; price: number }
-interface Props {
-  height?: string;
-  centerLat?: number;
-  centerLng?: number;
-}
+interface Props { height?: string; centerLat?: number; centerLng?: number }
 
-export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng }: Props) {
+export default function PriceHeatmapMap({ height = "400px", centerLat, centerLng }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
-  const layerGroup = useRef<L.LayerGroup | null>(null);
   const pointsRef = useRef<Point[]>([]);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [legendRange, setLegendRange] = useState<[number, number]>([1000, 4000]);
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
     const hasProp = centerLat != null && centerLng != null;
     const initCenter: [number, number] = hasProp ? [centerLat!, centerLng!] : [46.12, 14.99];
-    const initZoom = hasProp ? 15 : 9;
+    const initZoom = hasProp ? 16 : 9;
 
     const map = L.map(mapRef.current, {
       center: initCenter,
       zoom: initZoom,
-      zoomControl: false,       // static snapshot — no controls
+      zoomControl: false,
+      attributionControl: false,
       dragging: false,
       scrollWheelZoom: false,
       doubleClickZoom: false,
       touchZoom: false,
       keyboard: false,
-      attributionControl: true,
     });
 
-    (map.getContainer() as HTMLElement).style.cursor = "crosshair";
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OSM contributors",
-      opacity: 0.90,
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 20,
+      opacity: 0.85,
     }).addTo(map);
 
-    layerGroup.current = L.layerGroup().addTo(map);
     mapInstance.current = map;
 
-    async function loadContours() {
-      setLoading(true);
-      try {
-        const bounds = map.getBounds();
-        // High-res local fetch — use zoom 14 for small bbox
-        const zoom = hasProp ? 15 : 9;
-        const margin = hasProp ? 0.005 : 0;
-        const url = `/api/heatmap?lat1=${bounds.getSouth() - margin}&lng1=${bounds.getWest() - margin}&lat2=${bounds.getNorth() + margin}&lng2=${bounds.getEast() + margin}&zoom=${zoom}`;
+    // Create canvas overlay that covers the map
+    const canvas = canvasRef.current!;
+    const resizeCanvas = () => {
+      if (!mapRef.current) return;
+      canvas.width = mapRef.current.offsetWidth;
+      canvas.height = mapRef.current.offsetHeight;
+    };
+    resizeCanvas();
 
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data.points || data.points.length < 5) return;
-
-        // @ts-ignore
-        const { contours } = await import("d3-contour");
-
-        const points: Point[] = data.points;
+    // Fetch data using lat1/lng1/lat2/lng2 params
+    const bounds = map.getBounds();
+    const margin = hasProp ? 0.005 : 0;
+    const url = `/api/heatmap?lat1=${bounds.getSouth() - margin}&lng1=${bounds.getWest() - margin}&lat2=${bounds.getNorth() + margin}&lng2=${bounds.getEast() + margin}&zoom=16`;
+    fetch(url)
+      .then(r => r.json())
+      .then((data: { points?: Point[] }) => {
+        const points: Point[] = data.points ?? [];
         pointsRef.current = points;
-
-        // Viewport-adaptive normalization — update global P05/P95 from local data
-        const pricesSorted = [...points].map(p => p.price).sort((a, b) => a - b);
-        viewportP05 = pricesSorted[Math.floor(pricesSorted.length * 0.05)] ?? MIN_PRICE;
-        viewportP95 = pricesSorted[Math.floor(pricesSorted.length * 0.95)] ?? MAX_PRICE;
-
-        // High-res grid for local view
-        const cellSize = hasProp ? 0.006 : 0.025;
-        const latMin = bounds.getSouth() - cellSize * 4;
-        const latMax = bounds.getNorth() + cellSize * 4;
-        const lngMin = bounds.getWest() - cellSize * 4;
-        const lngMax = bounds.getEast() + cellSize * 4;
-
-        const cols = Math.max(2, Math.ceil((lngMax - lngMin) / cellSize));
-        const rows = Math.max(2, Math.ceil((latMax - latMin) / cellSize));
-
-        const grid = new Float32Array(cols * rows).fill(0);
-        const counts = new Uint16Array(cols * rows).fill(0);
-
-        for (const p of points) {
-          const ci = Math.floor((p.lng - lngMin) / cellSize);
-          const ri = Math.floor((p.lat - latMin) / cellSize);
-          if (ci < 0 || ci >= cols || ri < 0 || ri >= rows) continue;
-          const idx = ri * cols + ci;
-          grid[idx] += p.price;
-          counts[idx]++;
-        }
-
-        const normalized = new Float32Array(cols * rows);
-        const hasData = new Uint8Array(cols * rows);
-        for (let i = 0; i < grid.length; i++) {
-          if (counts[i] > 0) {
-            normalized[i] = priceToNorm(grid[i] / counts[i]);
-            hasData[i] = 1;
-          }
-        }
-
-        // Step 1: Fill empty cells with IDW from nearby data cells
-        const fillRadius = hasProp ? 8 : 5;
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const idx = r * cols + c;
-            if (hasData[idx]) continue;
-            let wsum = 0, n = 0;
-            for (let dr = -fillRadius; dr <= fillRadius; dr++) {
-              for (let dc = -fillRadius; dc <= fillRadius; dc++) {
-                const nr = r + dr, nc = c + dc;
-                if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-                const ni = nr * cols + nc;
-                if (!hasData[ni]) continue;
-                const dist2 = dr * dr + dc * dc;
-                const w = 1.0 / (dist2 + 0.5);
-                wsum += normalized[ni] * w;
-                n += w;
-              }
-            }
-            normalized[idx] = n > 0 ? wsum / n : priceToNorm(hasProp ? 2500 : 1800);
-          }
-        }
-
-        // Step 2: Gaussian blur for smooth gradients (eliminates diamond artifacts)
-        const sigma = hasProp ? 2.0 : 1.5;
-        const blurred = gaussianBlur(normalized, cols, rows, sigma);
-        for (let i = 0; i < normalized.length; i++) normalized[i] = blurred[i];
-
-        // Granular price thresholds for smoother gradient
-        const priceThresholds = [800, 1100, 1400, 1700, 2000, 2300, 2600, 2900, 3200, 3600, 4000, 4500];
-        const thresholds = priceThresholds.map(p => priceToNorm(p));
-
-        // @ts-ignore
-        const gen = contours().size([cols, rows]).thresholds(thresholds).smooth(true);
-        const contourData = gen(normalized as unknown as number[]);
-
-        layerGroup.current!.clearLayers();
-
-        for (let i = 0; i < contourData.length - 1; i++) {
-          const c = contourData[i];
-          if (!c.coordinates.length) continue;
-
-          const midPrice = i < priceThresholds.length - 1
-            ? (priceThresholds[i] + priceThresholds[i + 1]) / 2
-            : priceThresholds[priceThresholds.length - 1] + 200;
-
-          const geoJSON: GeoJSON.MultiPolygon = {
-            type: "MultiPolygon",
-            coordinates: c.coordinates.map((poly: number[][][]) =>
-              poly.map((ring: number[][]) =>
-                ring.map(([col, row]: number[]) => [
-                  lngMin + col * cellSize,
-                  latMin + row * cellSize,
-                ])
-              )
-            ),
-          };
-
-          // @ts-ignore
-          L.geoJSON(geoJSON, {
-            style: {
-              fillColor: priceToFill(midPrice, 0.42),
-              fillOpacity: 0.28,
-              color: priceToFill(midPrice, 0.65),
-              weight: 1.0,
-              opacity: 0.5,
-            },
-          }).addTo(layerGroup.current!);
-        }
-
-        // Property location marker (crosshair pin)
-        if (hasProp) {
-          const propIcon = L.divIcon({
-            className: "",
-            html: `<div style="width:14px;height:14px;background:#fff;border:3px solid #1d4ed8;border-radius:50%;box-shadow:0 0 0 2px rgba(29,78,216,0.3)"></div>`,
-            iconSize: [14, 14],
-            iconAnchor: [7, 7],
-          });
-          L.marker([centerLat!, centerLng!], { icon: propIcon, interactive: false })
-            .addTo(layerGroup.current!);
-        }
-
-      } catch (e) {
-        console.error("Contour error", e);
-      } finally {
         setLoading(false);
-      }
-    }
+        renderHeatmap(map, canvas, points);
+      })
+      .catch(() => setLoading(false));
 
-    loadContours();
-
-    // Hover tooltip
-    map.on("mousemove", (e: L.LeafletMouseEvent) => {
+    // Mousemove for tooltip
+    const container = mapRef.current!;
+    const onMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
       const pts = pointsRef.current;
-      if (!pts.length) return;
-      const { lat, lng } = e.latlng;
-      let minDist = Infinity, nearest: Point | null = null;
+      if (pts.length === 0) return;
+      const ll = map.containerPointToLatLng([mx, my]);
+      let best: Point | null = null, bestD = Infinity;
       for (const p of pts) {
-        const d = (p.lat - lat) ** 2 + (p.lng - lng) ** 2;
-        if (d < minDist) { minDist = d; nearest = p; }
+        const d = (p.lat - ll.lat) ** 2 + (p.lng - ll.lng) ** 2;
+        if (d < bestD) { bestD = d; best = p; }
       }
-      const threshold = hasProp ? 0.025 ** 2 : 0.05 ** 2;
-      if (nearest && minDist < threshold) {
-        const cp = map.latLngToContainerPoint(e.latlng);
-        setTooltip({ x: cp.x, y: cp.y, price: nearest.price });
+      if (best && bestD < 0.01) {
+        setTooltip({ x: mx, y: my, price: best.price });
       } else {
         setTooltip(null);
       }
-    });
-
-    map.on("mouseout", () => setTooltip(null));
+    };
+    const onMouseLeave = () => setTooltip(null);
+    container.addEventListener("mousemove", onMouseMove);
+    container.addEventListener("mouseleave", onMouseLeave);
 
     return () => {
+      container.removeEventListener("mousemove", onMouseMove);
+      container.removeEventListener("mouseleave", onMouseLeave);
       map.remove();
       mapInstance.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function renderHeatmap(map: L.Map, canvas: HTMLCanvasElement, points: Point[]) {
+    if (points.length === 0) return;
+    const ctx = canvas.getContext("2d")!;
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Compute viewport P05/P95 for adaptive color range
+    const sorted = [...points].map(p => p.price).sort((a, b) => a - b);
+    const p05 = sorted[Math.floor(sorted.length * 0.05)] ?? 1000;
+    const p95 = sorted[Math.floor(sorted.length * 0.95)] ?? 4000;
+    setLegendRange([Math.round(p05 / 100) * 100, Math.round(p95 / 100) * 100]);
+
+    // Build pixel grid — use STEP pixels for performance
+    const STEP = 4; // render every 4px
+    const imageData = ctx.createImageData(W, H);
+    const data = imageData.data;
+
+    // Pre-project all data points to canvas pixels
+    type Px = { px: number; py: number; price: number };
+    const projected: Px[] = points.map(p => {
+      const pt = map.latLngToContainerPoint([p.lat, p.lng]);
+      return { px: pt.x, py: pt.y, price: p.price };
+    });
+
+    // IDW radius in pixels — ~80px covers ~300m at zoom 16
+    const R = 80;
+    const R2 = R * R;
+
+    for (let y = 0; y < H; y += STEP) {
+      for (let x = 0; x < W; x += STEP) {
+        let wsum = 0, psum = 0, n = 0;
+        for (const p of projected) {
+          const dx = x - p.px, dy = y - p.py;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > R2) continue;
+          const w = 1 / (d2 + 1);
+          wsum += w;
+          psum += w * p.price;
+          n++;
+        }
+        if (n === 0) continue;
+        const price = psum / wsum;
+        const t = Math.max(0, Math.min(1, (price - p05) / (p95 - p05 + 1)));
+        const [r, g, b] = normToRgb(t);
+        const alpha = Math.min(200, n * 30); // more opaque where denser
+
+        // Fill STEP×STEP block
+        for (let dy = 0; dy < STEP && y + dy < H; dy++) {
+          for (let dx = 0; dx < STEP && x + dx < W; dx++) {
+            const idx = ((y + dy) * W + (x + dx)) * 4;
+            data[idx]     = r;
+            data[idx + 1] = g;
+            data[idx + 2] = b;
+            data[idx + 3] = alpha;
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    // Apply CSS blur for smooth gradient appearance
+    canvas.style.filter = "blur(8px)";
+    canvas.style.opacity = "0.65";
+  }
+
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-100 shadow-sm">
-      <div className="relative" style={{ height }}>
-        <div ref={mapRef} className="w-full h-full" />
+    <div className="relative overflow-hidden rounded-xl" style={{ height }}>
+      <div ref={mapRef} className="absolute inset-0" />
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ mixBlendMode: "multiply" }}
+      />
 
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-[500]">
-            <div className="text-xs text-gray-400 animate-pulse">Nalagam cenovni heatmap…</div>
-          </div>
-        )}
-
-        {tooltip && (
-          <div
-            className="absolute pointer-events-none z-[1000]"
-            style={{ left: tooltip.x, top: tooltip.y, transform: "translate(-50%, calc(-100% - 10px))" }}
-          >
-            <div className="flex justify-center mb-0.5">
-              <div className="relative w-4 h-4">
-                <div className="absolute top-1/2 left-0 right-0 h-px bg-gray-900 opacity-80" />
-                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-900 opacity-80" />
-              </div>
-            </div>
-            <div className="bg-gray-900/90 text-white text-[11px] font-semibold px-2 py-1 rounded shadow-lg whitespace-nowrap">
-              {Math.round(tooltip.price).toLocaleString("sl-SI")} €/m²
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="px-4 py-2.5 bg-white border-t border-gray-100 flex items-center gap-2 text-[10px] text-gray-500">
-        <span className="font-medium text-gray-600 mr-1">€/m²:</span>
-        {/* Continuous gradient bar */}
-        <div className="flex items-center gap-1.5 flex-1">
-          <span className="text-gray-400">{viewportP05.toLocaleString("sl-SI")}</span>
-          <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{
-            background: `linear-gradient(to right, ${
-              COLOR_STOPS.map(([t, [r,g,b]]) => `rgba(${r},${g},${b},0.8) ${Math.round(t*100)}%`).join(", ")
-            })`
-          }} />
-          <span className="text-gray-400">{viewportP95.toLocaleString("sl-SI")}</span>
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-[500]">
+          <div className="text-xs text-gray-400 animate-pulse">Nalagam cenovni heatmap…</div>
         </div>
-        <span className="ml-2 text-gray-400 flex-shrink-0">ETN · GURS</span>
+      )}
+
+      {tooltip && (
+        <div
+          className="absolute pointer-events-none z-[1000]"
+          style={{ left: tooltip.x, top: tooltip.y, transform: "translate(-50%, calc(-100% - 8px))" }}
+        >
+          <div className="bg-gray-900/90 text-white text-[11px] font-semibold px-2 py-1 rounded shadow-lg whitespace-nowrap">
+            {Math.round(tooltip.price).toLocaleString("sl-SI")} €/m²
+          </div>
+        </div>
+      )}
+
+      {/* Property pin */}
+      {centerLat != null && centerLng != null && mapInstance.current && (
+        <div className="absolute z-[600] pointer-events-none" style={{
+          left: "50%", top: "50%", transform: "translate(-50%, -50%)"
+        }}>
+          <div className="w-4 h-4 rounded-full bg-blue-600 border-2 border-white shadow-lg" />
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="absolute bottom-2 left-2 right-2 z-[600] pointer-events-none">
+        <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 flex items-center gap-2 text-[10px] text-gray-500 shadow-sm">
+          <span className="font-medium text-gray-600">{legendRange[0].toLocaleString("sl-SI")}</span>
+          <div className="flex-1 h-2 rounded-full" style={{
+            background: `linear-gradient(to right, ${COLOR_STOPS.map(([t, [r,g,b]]) => `rgb(${r},${g},${b}) ${Math.round(t*100)}%`).join(", ")})`
+          }} />
+          <span className="font-medium text-gray-600">{legendRange[1].toLocaleString("sl-SI")} €/m²</span>
+          <span className="text-gray-400 ml-1">ETN</span>
+        </div>
       </div>
     </div>
   );

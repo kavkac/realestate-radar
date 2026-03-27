@@ -796,11 +796,11 @@ export function PropertyCard({
           {/* 10. Cenovni heatmap — samo za prijavljene */}
           {isSignedIn && (
             <section className="mt-6 pt-5 border-t border-gray-100">
-              <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Cenovni heatmap</p>
-              <p className="text-xs text-gray-400 mb-3">Povprečne prodajne cene €/m² — ETN transakcije · GURS</p>
-              <div className="w-full rounded-xl overflow-hidden ring-1 ring-gray-100 shadow-sm">
-                <PriceHeatmapMap height="380px" centerLat={lat ?? undefined} centerLng={lng ?? undefined} />
+              <div className="flex items-baseline justify-between mb-2">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium">Cenovni heatmap</p>
+                <p className="text-[10px] text-gray-400">ETN transakcije · GURS</p>
               </div>
+              <PriceHeatmapMap height="360px" centerLat={lat ?? undefined} centerLng={lng ?? undefined} />
             </section>
           )}
         </div>
