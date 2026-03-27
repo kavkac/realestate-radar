@@ -207,7 +207,11 @@ export function izracunajVisinoStropov(
   visinaStvabe: number | null,
   steviloEtaz: number | null,
   letoIzgradnje: number | null,
+  idLega?: string | null,
 ): VisinaSstropov {
+  // Mansardna/podstrešna stanovanja — GURS id_lega vsebuje "MANSARDA" ali "PODSTREŠJE"
+  // Poševni strop pomeni manjšo povprečno svetlo višino (~80% normalne)
+  const isMansarda = idLega != null && /mansard|podstreš|podstre[sš]/i.test(idLega);
   // Metoda 1: Iz izmerjene višine stavbe / število etaž
   if (visinaStvabe && visinaStvabe > 0 && steviloEtaz && steviloEtaz > 0) {
     // GURS VISINA_H2–H3 vključuje strešno konstrukcijo za stare stavbe:
@@ -224,11 +228,13 @@ export function izracunajVisinoStropov(
     const netoCm = Math.round((brutoNaEtazo - slabThickness) * 100);
 
     if (netoCm >= 200 && netoCm <= 500) {
-      const korekcija = netoCm >= 320 ? 0.05 : netoCm >= 290 ? 0.02 : netoCm < 250 ? -0.03 : 0;
+      // Mansardna korekcija: poševni strop → ~80% povprečne svetle višine
+      const adjustedCm = isMansarda ? Math.round(netoCm * 0.80) : netoCm;
+      const korekcija = adjustedCm >= 320 ? 0.05 : adjustedCm >= 290 ? 0.02 : adjustedCm < 250 ? -0.03 : 0;
       return {
-        visinaCm: netoCm,
+        visinaCm: adjustedCm,
         metoda: "izmerjena",
-        opis: `${brutoNaEtazo.toFixed(1)}m neto / etažo`,
+        opis: isMansarda ? `Mansarda · ${brutoNaEtazo.toFixed(1)}m poševno` : `${brutoNaEtazo.toFixed(1)}m neto / etažo`,
         korekcija,
       };
     }
@@ -237,15 +243,20 @@ export function izracunajVisinoStropov(
   // Metoda 2: Ocena iz leta izgradnje (kalibrirano na realne meritve)
   // Vrednosti so svetla višina (neto), ne etažna višina
   if (letoIzgradnje) {
-    if (letoIzgradnje < 1918) return { visinaCm: 320, metoda: "ocenjena_leto", opis: "Predvojna gradnja", korekcija: 0.04 };
-    if (letoIzgradnje < 1945) return { visinaCm: 300, metoda: "ocenjena_leto", opis: "Medvojna gradnja", korekcija: 0.02 };
-    if (letoIzgradnje < 1965) return { visinaCm: 280, metoda: "ocenjena_leto", opis: "Povojska gradnja", korekcija: 0.01 };
-    if (letoIzgradnje < 1990) return { visinaCm: 260, metoda: "ocenjena_leto", opis: "Socialistična gradnja", korekcija: 0 };
-    if (letoIzgradnje < 2005) return { visinaCm: 265, metoda: "ocenjena_leto", opis: "Gradnja 90ih", korekcija: 0 };
-    return { visinaCm: 270, metoda: "ocenjena_leto", opis: "Sodobna gradnja", korekcija: 0.01 };
+    const base = letoIzgradnje < 1918 ? { visinaCm: 320, opis: "Predvojna gradnja", korekcija: 0.04 as number }
+      : letoIzgradnje < 1945 ? { visinaCm: 300, opis: "Medvojna gradnja", korekcija: 0.02 as number }
+      : letoIzgradnje < 1965 ? { visinaCm: 280, opis: "Povojska gradnja", korekcija: 0.01 as number }
+      : letoIzgradnje < 1990 ? { visinaCm: 260, opis: "Socialistična gradnja", korekcija: 0 as number }
+      : letoIzgradnje < 2005 ? { visinaCm: 265, opis: "Gradnja 90ih", korekcija: 0 as number }
+      : { visinaCm: 270, opis: "Sodobna gradnja", korekcija: 0.01 as number };
+    if (isMansarda) {
+      return { visinaCm: Math.round(base.visinaCm * 0.80), metoda: "ocenjena_leto", opis: `Mansarda · ${base.opis}`, korekcija: -0.03 };
+    }
+    return { ...base, metoda: "ocenjena_leto" };
   }
 
-  return { visinaCm: 260, metoda: "ocenjena_default", opis: "Povprečna vrednost", korekcija: 0 };
+  const defaultCm = isMansarda ? 208 : 260;
+  return { visinaCm: defaultCm, metoda: "ocenjena_default", opis: isMansarda ? "Mansarda · povprečna vrednost" : "Povprečna vrednost", korekcija: isMansarda ? -0.03 : 0 };
 }
 
 export interface StavbnaKorekcija {

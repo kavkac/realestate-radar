@@ -795,10 +795,12 @@ export function PropertyCard({
 
           {/* 10. Cenovni heatmap — samo za prijavljene */}
           {isSignedIn && (
-            <section className="mt-6 pt-5 border-t border-gray-100 px-1">
+            <section className="mt-6 pt-5 border-t border-gray-100">
               <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Cenovni heatmap</p>
               <p className="text-xs text-gray-400 mb-3">Povprečne prodajne cene €/m² — ETN transakcije · GURS</p>
-              <PriceHeatmapMap height="420px" centerLat={lat ?? undefined} centerLng={lng ?? undefined} />
+              <div className="w-full">
+                <PriceHeatmapMap height="420px" centerLat={lat ?? undefined} centerLng={lng ?? undefined} />
+              </div>
             </section>
           )}
         </div>
@@ -2552,11 +2554,6 @@ function PropertyContextSection({
     ? `Povp. ${airbnbStats.avgPriceNight} €/noč · ~${airbnbStats.avgOccupancyPct}% zasedenost · ${airbnbStats.nListings} oglasov`
     : null;
 
-  // TODO: Bremena/hipoteke - podatki iz Zemljiške knjige niso dostopni preko GURS WFS.
-  // Zemljiška knjiga je ločen register, ki ga vodijo sodišča. Za dostop bi potrebovali
-  // integracijo z e-ZK (https://evlozisce.sodisce.si/) ali scraping javnih izpiskov.
-  const bremenaValue = "Podatki se nalagajo";
-
   return (
     <div>
       <Label>Kontekst nepremičnine</Label>
@@ -2565,7 +2562,7 @@ function PropertyContextSection({
       <ContextRow label="Trg" value={trgValue} />
       {airbnbValue && <ContextRow label="Kratkoročni najem" value={airbnbValue} />}
       <ContextRow label="Tveganja" value={tveganjaValue} alert={tveganjaAlert} />
-      <ContextRow label="Bremena (ZK)" value={bremenaValue} />
+      <ContextRow label="Bremena (ZK)" value="Preverite na e-ZK (sodisce.si)" />
     </div>
   );
 }
@@ -2913,17 +2910,21 @@ function OcenaVrednostiSection({
   // Oglasne cene blok
   const oglasneAnalizBlock = oglasneAnalize && oglasneAnalize.steviloOglasov > 0 ? (
     <div className="rounded-lg border border-orange-100 bg-orange-50 px-4 py-3 mt-3">
-      <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-        Oglasne cene <span className="text-[10px] text-gray-400">({oglasneAnalize.portal})</span>
-      </p>
+      <p className="text-xs font-medium text-gray-600 mb-1">Trenutne oglasne cene</p>
       <p className="text-lg font-bold text-gray-800">
         {oglasneAnalize.medianaCenaM2.toLocaleString("sl-SI")} €/m²
+        <span className="ml-1.5 text-xs font-normal text-gray-400">mediana</span>
       </p>
-      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-        <span className="text-[10px] text-gray-400">
-          mediana · {oglasneAnalize.steviloOglasov} oglasov
-          {oglasneAnalize.vir !== "ko" && <span className="ml-1">(razširjeno iskanje)</span>}
-        </span>
+      <p className="text-[11px] text-gray-400 mt-0.5">
+        Na podlagi {oglasneAnalize.steviloOglasov} aktivnih oglasov
+        {oglasneAnalize.vir !== "ko" ? " v širši okolici" : " v isti KO"}
+        {" "}· {oglasneAnalize.portal}
+      </p>
+      <p className="text-[10px] text-gray-400 mt-0.5 italic">
+        Oglasne cene so zahtevane cene prodajalcev, ne realizirane — dejanske transakcije so praviloma nižje.
+      </p>
+      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+        <span className="text-[10px] text-gray-400"></span>
         {oglasneAnalize.razlikaEtnOglas != null && (
           <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
             oglasneAnalize.razlikaEtnOglas > 5
