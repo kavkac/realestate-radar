@@ -1,6 +1,22 @@
 import { prisma } from "./prisma";
 import { izracunajLokacijskiPremium, type LokacijskiPremium } from "./location-premium";
 
+// Indeks cen nepremičnin — multiplikatorji na raven 2025
+// Stara cena × faktor = enakovredna cena 2025
+const ICN_FACTOR: Record<number, number> = {
+  2010: 2.20, 2011: 2.10, 2012: 2.05, 2013: 2.00, 2014: 1.90,
+  2015: 1.80, 2016: 1.68, 2017: 1.55, 2018: 1.45, 2019: 1.38,
+  2020: 1.32, 2021: 1.18, 2022: 1.08, 2023: 1.04, 2024: 1.01,
+  2025: 1.00,
+};
+
+function icnFactor(year: number | null | undefined): number {
+  if (!year) return 1.10;
+  if (year >= 2025) return 1.00;
+  if (year <= 2010) return 2.20;
+  return ICN_FACTOR[year] ?? 1.10;
+}
+
 // === KALIBRACIJSKI FAKTORJI (backtest 19,183 ETN stanovanij 2021-2022 vs 2023-2024 mediane) ===
 // Generirano avtomatsko — ne urejaj ročno. Ponovno generiraj z: calibration/backtest.py
 const KO_KALIBRACIJSKI_FAKTOR: Record<string, number> = {
@@ -717,8 +733,11 @@ export async function getEtnAnaliza(
         const cena = Number(r.cena);
         const povrsina = Number(r.povrsina);
         if (!isFinite(cena) || !isFinite(povrsina) || povrsina <= 0) return null;
-        const cenaM2 = cena / povrsina;
+        const cenaM2Raw = cena / povrsina;
         const leto = parseInt(r.leto ?? "0");
+
+        // ICN adjustment: inflate historical price to 2025 level
+        const cenaM2 = cenaM2Raw * icnFactor(leto || null);
 
         // Parse date for seasonal adjustment and time-weighting
         const datumInfo = parseDatumTransakcije(r.datum);

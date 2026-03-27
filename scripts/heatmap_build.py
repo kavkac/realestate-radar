@@ -3,6 +3,24 @@ from scipy.spatial import cKDTree
 from psycopg2.extras import execute_values
 import warnings; warnings.filterwarnings('ignore')
 
+# Indeks cen nepremičnin — multiplikatorji na raven 2025
+# Multiplikator: stara_cena × faktor = cena_2025
+# Stanovanja SLO: 2019 avg ~1,900 €/m², 2025 ~2,700 €/m² → faktor 2019 = 2700/1900 ≈ 1.42
+PRICE_INDEX_TO_2025 = {
+    2010: 2.20, 2011: 2.10, 2012: 2.05, 2013: 2.00, 2014: 1.90,
+    2015: 1.80, 2016: 1.68, 2017: 1.55, 2018: 1.45, 2019: 1.38,
+    2020: 1.32, 2021: 1.18, 2022: 1.08, 2023: 1.04, 2024: 1.01,
+    2025: 1.00,
+}
+
+def icn_factor(leto):
+    """Return multiplier to adjust historical price to 2025 level."""
+    if pd.isna(leto): return 1.10  # conservative default for unknown year
+    yr = int(leto)
+    if yr >= 2025: return 1.00
+    if yr <= 2010: return 2.20
+    return PRICE_INDEX_TO_2025.get(yr, 1.10)
+
 DB = 'postgresql://postgres:BXevJxzMDrFQUvjwDkZunQdpNHSJgdTz@switchback.proxy.rlwy.net:31940/railway'
 
 print("=== HEATMAP BUILD (with categories) ===")
@@ -37,6 +55,9 @@ df_s['n']    = pd.to_numeric(df_s['n_centroid'], errors='coerce')
 df_s['leto'] = pd.to_numeric(df_s['datum_sklenitve_pogodbe'].str[-4:], errors='coerce')
 df_s = df_s[(df_s['trznost_posla']=='1') & df_s['cena'].between(20000,5000000) & df_s['pov'].between(15,300) & df_s['e'].notna()].copy()
 df_s['eur_m2'] = df_s['cena'] / df_s['pov']
+df_s['icn_factor'] = df_s['leto'].apply(icn_factor)
+df_s['eur_m2'] = df_s['eur_m2'] * df_s['icn_factor']
+df_s = df_s[df_s['eur_m2'].between(300, 15000)].copy()
 df_s['age']  = 2025 - df_s['leto'].fillna(2020)
 df_s['tw']   = np.exp(-np.log(2)/2 * df_s['age'])
 df_s['source'] = 'prodaja'
@@ -65,6 +86,8 @@ rent_tmp['najemnina'] = pd.to_numeric(rent_tmp['najemnina'], errors='coerce')
 rent_tmp['leto'] = pd.to_numeric(rent_tmp['leto'], errors='coerce')
 rent_tmp = rent_tmp[rent_tmp['najemnina'].between(50,5000) & rent_tmp['pov'].between(15,300) & rent_tmp['e'].notna()].copy()
 rent_tmp['rent_m2_mes'] = rent_tmp['najemnina'] / rent_tmp['pov']
+rent_tmp['icn_factor'] = rent_tmp['leto'].apply(icn_factor)
+rent_tmp['rent_m2_mes'] = rent_tmp['rent_m2_mes'] * rent_tmp['icn_factor']
 rent_tmp['age'] = 2025 - rent_tmp['leto'].fillna(2020)
 rent_tmp['tw'] = np.exp(-np.log(2)/2 * rent_tmp['age'])
 r_pts = rent_tmp[['e','n']].values
@@ -107,6 +130,8 @@ rent_d['najemnina']= pd.to_numeric(rent_d['najemnina'], errors='coerce')
 rent_d['leto']     = pd.to_numeric(rent_d['leto'], errors='coerce')
 rent_d = rent_d[rent_d['najemnina'].between(50,5000) & rent_d['pov'].between(15,300) & rent_d['e'].notna()].copy()
 rent_d['rent_m2_mes'] = rent_d['najemnina'] / rent_d['pov']
+rent_d['icn_factor'] = rent_d['leto'].apply(icn_factor)
+rent_d['rent_m2_mes'] = rent_d['rent_m2_mes'] * rent_d['icn_factor']
 rent_d['age'] = 2025 - rent_d['leto'].fillna(2020)
 rent_d['tw']  = np.exp(-np.log(2)/2 * rent_d['age'])
 

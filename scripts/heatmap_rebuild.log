@@ -1,0 +1,37 @@
+=== HEATMAP BUILD (with categories) ===
+1. ETN prodaje...
+   9,315 transakcij
+   Categories: {'residential': 8758, 'other': 288, 'commercial': 211, 'garage': 38, 'storage': 15, 'agricultural': 5}
+2. ETN najemi -> implied vrednosti...
+2a. Yield surface (inline)...
+   Yield surface: 9013 parov, median yield=4.3%
+   Racunam implied vrednosti...
+   155,153 veljavnih implied vrednosti
+   Implied median: 1902 EUR/m2
+3. Zdruzujem tocke...
+   Skupaj: 164,468 tock
+   Prodaje: 9,315
+   Implied: 155,153
+   By category: {'residential': 163911, 'other': 288, 'commercial': 211, 'garage': 38, 'storage': 15, 'agricultural': 5}
+3b. DB migration...
+   DB migration done
+
+4. Adaptive heatmap compute [all] (164,468 pts)...
+   [all] 32,777 active cells
+
+4. Adaptive heatmap compute [residential] (163,911 pts)...
+   [residential] 32,776 active cells
+
+4. Adaptive heatmap compute [commercial] (211 pts)...
+   [commercial] 18,703 active cells
+
+5. Writing 84,256 cells to DB...
+   Written 84,256 cells
+   all: 32,777 cells in DB
+   residential: 32,776 cells in DB
+   commercial: 18,703 cells in DB
+   LJ center [all]: avg=2667 max=4,214 EUR/m2 (30 cells)
+   LJ center [residential]: avg=2673 max=4,214 EUR/m2 (30 cells)
+   LJ center [commercial]: avg=2165 max=2,801 EUR/m2 (30 cells)
+
+Done!

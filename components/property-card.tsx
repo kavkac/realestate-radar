@@ -798,7 +798,7 @@ export function PropertyCard({
             <section className="mt-6 pt-5 border-t border-gray-100 px-1">
               <p className="text-[11px] uppercase tracking-wide text-gray-400 font-medium mb-0.5">Cenovni heatmap</p>
               <p className="text-xs text-gray-400 mb-3">Povprečne prodajne cene €/m² — ETN transakcije · GURS</p>
-              <PriceHeatmapMap height="420px" />
+              <PriceHeatmapMap height="420px" centerLat={lat ?? undefined} centerLng={lng ?? undefined} />
             </section>
           )}
         </div>
