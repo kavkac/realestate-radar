@@ -182,9 +182,10 @@ export function NeighborhoodCard({ lat, lng }: Props) {
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           {profile.noiseLdenDb != null && (
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">
-                Hrupnost (Lden) <SourceBadge label="ARSO 2020" />
-              </p>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Hrupnost (Lden)</span>
+                <SourceBadge label="ARSO 2020" />
+              </div>
               <p className="font-semibold text-gray-800">
                 {profile.noiseLdenDb} dB
                 <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${
