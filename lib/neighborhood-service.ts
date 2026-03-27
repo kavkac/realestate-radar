@@ -62,10 +62,22 @@ async function fetchGridDemographics(lat: number, lng: number): Promise<{
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface AmenityNearest {
+  supermarket?: { name?: string; distM: number };
+  pharmacy?: { name?: string; distM: number };
+  bus_stop?: { name?: string; distM: number };
+  park?: { name?: string; distM: number };
+  health_centre?: { name?: string; distM: number };
+  sports_centre?: { name?: string; distM: number };
+  bank?: { name?: string; distM: number };
+  post_office?: { name?: string; distM: number };
+}
+
 export interface AmenityData {
   r300: AmenityCount;
   r500: AmenityCount;
   r1000: AmenityCount;
+  nearest: AmenityNearest;
 }
 
 export interface AmenityCount {
@@ -153,6 +165,11 @@ async function fetchAllAmenities(lat: number, lng: number): Promise<AmenityData>
     const data = JSON.parse(text) as { elements: OsmElement[] };
 
     const r300 = emptyCount(), r500 = emptyCount(), r1000 = emptyCount();
+    const nearest: AmenityNearest = {};
+    const updateNearest = (key: keyof AmenityNearest, name: string | undefined, distM: number) => {
+      const cur = nearest[key];
+      if (!cur || distM < cur.distM) nearest[key] = { name, distM };
+    };
 
     for (const el of data.elements) {
       const elLat = el.lat ?? el.center?.lat;
@@ -172,6 +189,19 @@ async function fetchAllAmenities(lat: number, lng: number): Promise<AmenityData>
       const highway = tags.highway;
       const railway = tags.railway;
       const shop = tags.shop;
+
+      const name = tags.name || tags["name:sl"] || undefined;
+      const distRounded = Math.round(dist);
+
+      // Track nearest of each key category
+      if (shop === "supermarket") updateNearest("supermarket", name, distRounded);
+      if (amenity === "pharmacy") updateNearest("pharmacy", name, distRounded);
+      if (highway === "bus_stop" || railway === "tram_stop") updateNearest("bus_stop", name, distRounded);
+      if (leisure === "park") updateNearest("park", name, distRounded);
+      if (amenity === "clinic" || amenity === "health_centre") updateNearest("health_centre", name, distRounded);
+      if (leisure === "sports_centre" || leisure === "fitness_centre") updateNearest("sports_centre", name, distRounded);
+      if (amenity === "bank") updateNearest("bank", name, distRounded);
+      if (amenity === "post_office") updateNearest("post_office", name, distRounded);
 
       const addTo = (c: AmenityCount) => {
         if (amenity === "university" || amenity === "college") c.universities++;
@@ -206,14 +236,14 @@ async function fetchAllAmenities(lat: number, lng: number): Promise<AmenityData>
       c.tram_stops = Math.ceil(c.tram_stops / 2);
     }
 
-    return { r300, r500, r1000 };
+    return { r300, r500, r1000, nearest };
   } catch {
     return emptyAmenityData();
   }
 }
 
 function emptyAmenityData(): AmenityData {
-  return { r300: emptyCount(), r500: emptyCount(), r1000: emptyCount() };
+  return { r300: emptyCount(), r500: emptyCount(), r1000: emptyCount(), nearest: {} };
 }
 
 function emptyCount(): AmenityCount {

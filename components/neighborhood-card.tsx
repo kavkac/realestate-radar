@@ -52,89 +52,105 @@ export function NeighborhoodCard({ lat, lng }: Props) {
     const a5 = a.r500;
     const a1 = a.r1000;
 
-    // Helper: najbližji radij kjer je count > 0
-    const nearest = (r300: number, r500: number, r1000: number): string | null => {
-      if (r300 > 0) return "~300m";
-      if (r500 > 0) return "~500m";
-      if (r1000 > 0) return "~1km";
-      return null;
+    const nr = a.nearest;
+
+    // Helper: format razdalja z imenom
+    const fmtDist = (distM: number): string => {
+      if (distM < 100) return `${distM}m`;
+      if (distM < 1000) return `~${Math.round(distM / 50) * 50}m`;
+      return `~${(distM / 1000).toFixed(1)}km`;
+    };
+    const fmtNearest = (n: { name?: string; distM: number } | undefined): string | null => {
+      if (!n) return null;
+      const d = fmtDist(n.distM);
+      return n.name ? `${n.name} · ${d}` : d;
     };
 
-    // ── VSAKODNEVNE STORITVE — prikaži razdaljo do najbližjega ──────────────
+    // ── VSAKODNEVNE STORITVE — razdalja + ime + število ────────────────────
 
-    // Supermarket: razdalja do najbližjega je ključna informacija
-    const superDist = nearest(a3.supermarkets ?? 0, a5.supermarkets, a1.supermarkets);
-    if (superDist) amenityRows.push({ icon: "🛒", label: "Supermarket", value: `najbližji ${superDist}` });
+    // Supermarket: ime najbližjega + razdalja + skupno število v 1km
+    if (nr.supermarket || a1.supermarkets > 0) {
+      const nearStr = fmtNearest(nr.supermarket);
+      const totalStr = a1.supermarkets > 1 ? ` · ${a1.supermarkets} v 1km` : "";
+      amenityRows.push({ icon: "🛒", label: "Supermarket", value: nearStr ? `${nearStr}${totalStr}` : `${a1.supermarkets} v 1km` });
+    }
 
-    // Lekarna: najbližja razdalja
-    const pharmDist = nearest(a3.pharmacies ?? 0, a5.pharmacies, a1.pharmacies);
-    if (pharmDist) amenityRows.push({ icon: "💊", label: "Lekarna", value: `najbližja ${pharmDist}` });
+    // Lekarna: ime najbližje + razdalja
+    if (nr.pharmacy || a1.pharmacies > 0) {
+      const nearStr = fmtNearest(nr.pharmacy);
+      const totalStr = a1.pharmacies > 1 ? ` · ${a1.pharmacies} v 1km` : "";
+      amenityRows.push({ icon: "💊", label: "Lekarna", value: nearStr ? `${nearStr}${totalStr}` : `${a1.pharmacies} v 1km` });
+    }
 
-    // Javni prevoz: razdalja do postaje
-    const t3 = (a3.bus_stops ?? 0) + (a3.tram_stops ?? 0) + (a3.train_stations ?? 0);
-    const t5 = a5.bus_stops + a5.tram_stops + a5.train_stations;
+    // Javni prevoz: postaja + razdalja + skupno število v okolici
+    const t3 = (a3.bus_stops ?? 0) + (a3.tram_stops ?? 0);
+    const t5 = a5.bus_stops + a5.tram_stops;
     const t1 = a1.bus_stops + a1.tram_stops + a1.train_stations;
-    if (t3 > 0)
-      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `postaja ~300m hoje` });
-    else if (t5 > 0)
-      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `postaja ~500m hoje` });
-    else if (t1 > 0)
-      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value: `postaja ~1km hoje` });
+    if (t1 > 0) {
+      const nearStr = fmtNearest(nr.bus_stop);
+      const closestRange = t3 > 0 ? "v 300m" : t5 > 0 ? "v 500m" : "v 1km";
+      const countStr = t3 > 0 ? `${t3} postaj ${closestRange}` : t5 > 0 ? `${t5} postaj ${closestRange}` : `${t1} postaj ${closestRange}`;
+      const value = nearStr ? `najbližja ${nearStr.split("·")[1]?.trim() ?? nearStr} · ${countStr}` : countStr;
+      amenityRows.push({ icon: "🚌", label: "Javni prevoz", value });
+    }
 
-    // Park: razdalja do najbližjega
-    const parkDist = nearest(a3.parks ?? 0, a5.parks, a1.parks);
-    if (parkDist) amenityRows.push({ icon: "🌳", label: "Park / zelena površina", value: `najbližji ${parkDist}` });
+    // Park: ime + razdalja
+    if (nr.park || a1.parks > 0) {
+      const nearStr = fmtNearest(nr.park);
+      amenityRows.push({ icon: "🌳", label: "Park", value: nearStr ?? `v 1km` });
+    }
 
     // ── STORITVE V SOSEŠKI ─────────────────────────────────────────────────
 
-    // Šole: število v 500m (za starše je to ključni radij)
     if (a5.schools > 0)
       amenityRows.push({ icon: "🏫", label: "Šole", value: `${Math.min(a5.schools, 5)} v 500m` });
     else if (a1.schools > 0)
-      amenityRows.push({ icon: "🏫", label: "Šola", value: `najbližja ~1km` });
+      amenityRows.push({ icon: "🏫", label: "Šola", value: `najbližja v 1km` });
     if (a5.kindergartens > 0)
       amenityRows.push({ icon: "🧸", label: "Vrtci", value: `${Math.min(a5.kindergartens, 5)} v 500m` });
 
-    // Univerze: cap na 3, nad 3 je samo "v bližini"
-    const uniCount = Math.min(a5.universities ?? 0, 3) || Math.min(a1.universities, 3);
+    const uniCount = Math.min((a5.universities ?? 0) || a1.universities, 3);
     if (uniCount === 1) amenityRows.push({ icon: "🎓", label: "Fakulteta", value: `v bližini` });
     else if (uniCount > 1) amenityRows.push({ icon: "🎓", label: "Univerzetno okolje", value: `${uniCount}+ fakultet v bližini` });
 
     // ── ZDRAVSTVO ──────────────────────────────────────────────────────────
 
-    // Zdravstveni dom: razdalja
-    const zdDist = nearest(a3.health_centres ?? 0, a5.health_centres ?? 0, a1.health_centres);
-    if (zdDist) amenityRows.push({ icon: "🩺", label: "Zdravstveni dom", value: `${zdDist}` });
-
-    // Bolnišnica: samo če v 1km (redka, a pomembna)
+    if (nr.health_centre || a1.health_centres > 0) {
+      const nearStr = fmtNearest(nr.health_centre);
+      amenityRows.push({ icon: "🩺", label: "Zdravstveni dom", value: nearStr ?? `v 1km` });
+    }
     if (a1.hospitals > 0)
       amenityRows.push({ icon: "🏥", label: "Bolnišnica", value: `v 1km` });
 
-    // ── GOSTINSTVO — opisno, ne surovo število ────────────────────────────
+    // ── GOSTINSTVO — opisno za večje, število za manjše ───────────────────
 
     const restoTotal = a5.restaurants + a5.bars;
     if (restoTotal >= 30)
-      amenityRows.push({ icon: "🍽️", label: "Gostinstvo", value: `izjemno živahna soseska` });
+      amenityRows.push({ icon: "🍽️", label: "Gostinstvo", value: `izjemno živahna soseska (${restoTotal}+ v 500m)` });
     else if (restoTotal >= 10)
-      amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `živahna ponudba v 500m` });
+      amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `${restoTotal} v 500m — živahna ponudba` });
     else if (restoTotal >= 3)
       amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `${restoTotal} v 500m` });
     else if (a1.restaurants + a1.bars >= 3)
-      amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `v bližini ~1km` });
+      amenityRows.push({ icon: "🍽️", label: "Restavracije / bari", value: `${a1.restaurants + a1.bars} v 1km` });
 
     // ── OSTALE STORITVE ────────────────────────────────────────────────────
 
-    // Šport: razdalja do najbližjega
-    const sportDist = nearest(a3.sports_centres ?? 0, a5.sports_centres ?? 0, a1.sports_centres);
-    if (sportDist) amenityRows.push({ icon: "⚽", label: "Šport / fitnes", value: `${sportDist}` });
+    if (nr.sports_centre || a1.sports_centres > 0) {
+      const nearStr = fmtNearest(nr.sports_centre);
+      amenityRows.push({ icon: "⚽", label: "Šport / fitnes", value: nearStr ?? `v 1km` });
+    }
 
-    // Banka: samo razdalja (ne število)
-    const bankDist = nearest(a3.banks ?? 0, a5.banks, a1.banks);
-    if (bankDist) amenityRows.push({ icon: "🏦", label: "Banka", value: `${bankDist}` });
+    if (nr.bank || a5.banks > 0) {
+      const nearStr = fmtNearest(nr.bank);
+      const totalStr = a5.banks > 1 ? ` · ${a5.banks} v 500m` : "";
+      amenityRows.push({ icon: "🏦", label: "Banka", value: nearStr ? `${nearStr}${totalStr}` : `${a5.banks} v 500m` });
+    }
 
-    // Pošta: razdalja
-    const postDist = nearest(0, a5.postOffices ?? 0, a1.postOffices);
-    if (postDist) amenityRows.push({ icon: "📮", label: "Pošta", value: `${postDist}` });
+    if (nr.post_office || a1.postOffices > 0) {
+      const nearStr = fmtNearest(nr.post_office);
+      amenityRows.push({ icon: "📮", label: "Pošta", value: nearStr ?? `v 1km` });
+    }
 
     if (a1.industrial > 0)
       amenityRows.push({ icon: "🏭", label: "Industrijska cona", value: "v bližini ⚠️" });
