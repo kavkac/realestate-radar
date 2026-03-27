@@ -11,7 +11,7 @@ interface Props {
 // Vir badge — konsistenten z EIZ auditor report
 function SourceBadge({ label }: { label: string }) {
   return (
-    <span className="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium border border-blue-100 whitespace-nowrap inline-block">
+    <span className="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium border border-blue-100 whitespace-nowrap inline-block normal-case tracking-normal" style={{ fontVariant: "normal", textTransform: "none", letterSpacing: "normal" }}>
       {label}
     </span>
   );
@@ -59,7 +59,7 @@ export function NeighborhoodCard({ lat, lng }: Props) {
       amenityRows.push({ icon: "🧸", label: "Vrtci", value: `${a5.kindergartens} v 500m` });
     // Univerze: samo prikaz, ne število (prevelika institucija za "soseskco")
     if (a1.universities > 0)
-      amenityRows.push({ icon: "🎓", label: "Univerza / fakulteta v bližini", value: "da" });
+      amenityRows.push({ icon: "🎓", label: "Univerza / fakulteta", value: `${a1.universities} v 1km` });
 
     // Javni prevoz — prikaži najbližji radij z podatki
     const t3 = a3.bus_stops + a3.tram_stops + a3.train_stations;
@@ -74,9 +74,9 @@ export function NeighborhoodCard({ lat, lng }: Props) {
 
     // Zdravstvo — zdravniki so del ZD/bolnišnic, ne posebej
     if (a1.hospitals > 0)
-      amenityRows.push({ icon: "🏥", label: "Bolnišnica v bližini", value: `${a1.hospitals}` });
+      amenityRows.push({ icon: "🏥", label: "Bolnišnica", value: `${a1.hospitals} v 1km` });
     if (a1.health_centres > 0)
-      amenityRows.push({ icon: "🩺", label: "Zdravstveni domovi", value: `${a1.health_centres}` });
+      amenityRows.push({ icon: "🩺", label: "Zdravstveni dom", value: `${a1.health_centres} v 1km` });
     if (a1.pharmacies > 0) {
       const dist = a5.pharmacies > 0 ? "· najbližja v 500m" : "· v 1km";
       amenityRows.push({ icon: "💊", label: "Lekarne", value: `${a1.pharmacies} ${dist}` });
@@ -84,7 +84,7 @@ export function NeighborhoodCard({ lat, lng }: Props) {
 
     // Šport & parki
     if (a1.sports_centres > 0)
-      amenityRows.push({ icon: "⚽", label: "Športni objekti", value: `${a1.sports_centres}` });
+      amenityRows.push({ icon: "⚽", label: "Športni objekti", value: `${a1.sports_centres} v 1km` });
     if (a5.parks > 0)
       amenityRows.push({ icon: "🌳", label: "Parki", value: `${a5.parks} v 500m` });
     else if (a1.parks > 0)
@@ -104,7 +104,7 @@ export function NeighborhoodCard({ lat, lng }: Props) {
       amenityRows.push({ icon: "🏦", label: "Banke", value: `${bankCount} v 500m` });
     }
     if (a1.postOffices > 0)
-      amenityRows.push({ icon: "📮", label: "Pošte", value: `${a1.postOffices}` });
+      amenityRows.push({ icon: "📮", label: "Pošte", value: `${a1.postOffices} v 1km` });
 
     if (a1.industrial > 0)
       amenityRows.push({ icon: "🏭", label: "Industrijska cona", value: "v bližini ⚠️" });
@@ -152,9 +152,8 @@ export function NeighborhoodCard({ lat, lng }: Props) {
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           {profile.noiseLdenDb != null && (
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium flex items-center gap-1 flex-wrap">
-                Hrupnost (Lden)
-                <span className="normal-case tracking-normal text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium border border-blue-100 whitespace-nowrap">ARSO 2020</span>
+              <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">
+                Hrupnost (Lden) <SourceBadge label="ARSO 2020" />
               </p>
               <p className="font-semibold text-gray-800">
                 {profile.noiseLdenDb} dB

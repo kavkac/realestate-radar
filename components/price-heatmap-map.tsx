@@ -121,7 +121,7 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
 
     const hasProp = centerLat != null && centerLng != null;
     const initCenter: [number, number] = hasProp ? [centerLat!, centerLng!] : [46.12, 14.99];
-    const initZoom = hasProp ? 13 : 9;
+    const initZoom = hasProp ? 15 : 9;
 
     const map = L.map(mapRef.current, {
       center: initCenter,
@@ -150,7 +150,7 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
       try {
         const bounds = map.getBounds();
         // High-res local fetch — use zoom 14 for small bbox
-        const zoom = hasProp ? 14 : 9;
+        const zoom = hasProp ? 15 : 9;
         const margin = hasProp ? 0.005 : 0;
         const url = `/api/heatmap?lat1=${bounds.getSouth() - margin}&lng1=${bounds.getWest() - margin}&lat2=${bounds.getNorth() + margin}&lng2=${bounds.getEast() + margin}&zoom=${zoom}`;
 
