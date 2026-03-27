@@ -45,7 +45,7 @@ function priceToNormAdaptive(price: number) {
   return Math.min(Math.max((price - viewportP05) / range, 0), 1);
 }
 
-function normToColor(t: number, alpha = 0.42): string {
+function normToColor(t: number, alpha = 0.28): string {
   let lower = COLOR_STOPS[0], upper = COLOR_STOPS[COLOR_STOPS.length - 1];
   for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
     if (t >= COLOR_STOPS[i][0] && t <= COLOR_STOPS[i + 1][0]) {
@@ -59,7 +59,7 @@ function normToColor(t: number, alpha = 0.42): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function priceToFill(price: number, alpha = 0.42): string {
+function priceToFill(price: number, alpha = 0.28): string {
   return normToColor(priceToNormAdaptive(price), alpha);
 }
 
@@ -139,7 +139,7 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OSM contributors",
-      opacity: 0.75,
+      opacity: 0.90,
     }).addTo(map);
 
     layerGroup.current = L.layerGroup().addTo(map);
@@ -263,10 +263,10 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
           L.geoJSON(geoJSON, {
             style: {
               fillColor: priceToFill(midPrice, 0.42),
-              fillOpacity: 1,
+              fillOpacity: 0.28,
               color: priceToFill(midPrice, 0.65),
               weight: 1.0,
-              opacity: 0.9,
+              opacity: 0.5,
             },
           }).addTo(layerGroup.current!);
         }
