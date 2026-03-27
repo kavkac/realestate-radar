@@ -2538,10 +2538,10 @@ function PropertyContextSection({
       <Label>Pred nakupom preveri</Label>
 
       {hasFloodRisk && (
-        <ContextRow label="🌊 Poplava" value={poplavnaNevarnost?.razred ?? "Poplavno ogroženo"} alert />
+        <ContextRow label="🌊 Poplava" value={poplavnaNevarnost?.razred ?? "Poplavno ogroženo"} alert={true} />
       )}
       {hasSeismicRisk && (
-        <ContextRow label="🪨 Potres" value="Visoka seizmičnost (MSK ≥ VIII)" alert />
+        <ContextRow label="🪨 Potres" value="Visoka seizmičnost (MSK ≥ VIII)" alert={true} />
       )}
       {hasAzbest && (
         <ContextRow
