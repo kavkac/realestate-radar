@@ -262,7 +262,15 @@ export async function POST(request: NextRequest) {
     const steviloEtazFinal: number | null = stavba.steviloEtaz
       ?? (stavbaDbRow?.st_etaz ? parseInt(stavbaDbRow.st_etaz) || null : null);
 
+    // ── Unit-level user corrections resolved after correctionMap (late-bound) ──
+    // correctedDvigalo / correctedVisinaM are assigned after correctionMap is built below
+    // but declared here so they're in scope for ceiling chain Priority 0
+    let correctedDvigalo: boolean | undefined = undefined;
+    let correctedVisinaM: number | null = null;
+    // (assigned at line ~441 after correctionMap is built)
+
     // ── Ceiling height priority chain ──────────────────────────────────────
+    // Priority 0: user correction (visina_etaze from correctionMap) — HIGHEST
     // Priority 1: ev_del_stavbe.visina_etaze_net / visina_etaze (per unit, from DB)
     // Priority 2: kn_etaze.visina_etaze matched by eid_stavba + floor number
     // Priority 3: GURS WFS visina/etaze (existing fallback in izracunajVisinoStropov)
@@ -308,6 +316,13 @@ export async function POST(request: NextRequest) {
             }
           }
         }
+      }
+    }
+
+    // Priority 0: user correction overrides everything — applies to all units of this stavba
+    if (correctedVisinaM != null) {
+      for (const eid of eidList) {
+        ceilingByUnit.set(String(eid), correctedVisinaM);
       }
     }
     // ── End ceiling height chain ────────────────────────────────────────────
@@ -421,13 +436,22 @@ export async function POST(request: NextRequest) {
     // Apply corrections to stavba data fields
     const correctionMap = Object.fromEntries(trustedCorrections.map(c => [c.atribut, c.vrednost]));
 
-    // Override stavba fields with trusted user corrections
-    if (correctionMap.fasada_leto) {
+    // Resolve unit-level corrections now that correctionMap is available
+    if (correctionMap.dvigalo != null)
+      correctedDvigalo = correctionMap.dvigalo === "Da" || correctionMap.dvigalo === "true" || correctionMap.dvigalo === "1";
+    if (correctionMap.visina_etaze) {
+      const _v = parseFloat(correctionMap.visina_etaze);
+      if (!isNaN(_v) && _v > 1.5 && _v < 6) correctedVisinaM = _v;
+    }
+
+    // Apply ALL trusted user corrections to stavba/unit fields
+    // These override GURS register data for valuation purposes
+    if (correctionMap.fasada_leto)
       stavba = { ...stavba, letoObnoveFasade: parseInt(correctionMap.fasada_leto) || stavba.letoObnoveFasade };
-    }
-    if (correctionMap.streha_leto) {
+    if (correctionMap.streha_leto)
       stavba = { ...stavba, letoObnoveStrehe: parseInt(correctionMap.streha_leto) || stavba.letoObnoveStrehe };
-    }
+    if (correctionMap.leto_izgradnje)
+      stavba = { ...stavba, letoIzgradnje: parseInt(correctionMap.leto_izgradnje) || stavba.letoIzgradnje };
 
     // Fire-and-forget: store OSM data in building record
     if (osmData) {
@@ -775,7 +799,8 @@ export async function POST(request: NextRequest) {
           : d.vrsta,
         letoObnoveInstalacij: d.letoObnoveInstalacij,
         letoObnoveOken: d.letoObnoveOken,
-        dvigalo: d.dvigalo,
+        // User correction overrides GURS register for dvigalo
+        dvigalo: correctedDvigalo !== undefined ? correctedDvigalo : d.dvigalo,
         prostori: d.prostori,
         etazaDelStavbe: d.etazaDelStavbe,
         vrstaStanovanjaUradno: d.vrstaStanovanjaUradno,
