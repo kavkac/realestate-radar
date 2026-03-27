@@ -382,6 +382,63 @@ async function fetchWfs(url: string): Promise<WfsResponse | null> {
 
 // --- Public API ---
 
+export interface StreetCandidate {
+  ulMid: number;
+  streetName: string;
+  naMid: number;
+  /** Settlement name — resolved async */
+  naName?: string;
+  /** Full display label, e.g. "Čopova ulica, Ljubljana" */
+  displayLabel?: string;
+}
+
+/**
+ * Returns all matching streets with settlement names resolved.
+ * Used for disambiguation when the same street name exists in multiple cities.
+ */
+export async function getStreetCandidates(streetName: string): Promise<StreetCandidate[]> {
+  const url = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:UL_G", `UL_UIME ILIKE '${streetName.trim()}'`);
+  const data = await fetchWfs(url);
+  if (!data || data.features.length === 0) return [];
+
+  const candidates: StreetCandidate[] = data.features
+    .filter(f => f.properties.STATUS === 'V')
+    .map(f => ({
+      ulMid: f.properties.UL_MID as number,
+      streetName: f.properties.UL_UIME as string,
+      naMid: f.properties.NA_MID as number,
+    }));
+
+  // Deduplicate by naMid (same street appears once per settlement)
+  const seen = new Set<number>();
+  const unique = candidates.filter(c => {
+    if (seen.has(c.naMid)) return false;
+    seen.add(c.naMid);
+    return true;
+  });
+
+  // Resolve settlement names in parallel
+  const naMids = unique.map(c => c.naMid).filter((v, i, a) => a.indexOf(v) === i);
+  const naNames = new Map<number, string>();
+  await Promise.all(
+    naMids.map(async naMid => {
+      const naUrl = buildWfsUrl(BASE_RPE, "SI.GURS.RPE:NA_G", `NA_MID=${naMid}`);
+      const naData = await fetchWfs(naUrl).catch(() => null);
+      if (naData && naData.features.length > 0) {
+        naNames.set(naMid, naData.features[0].properties.NA_UIME as string);
+      }
+    })
+  );
+
+  return unique.map(c => ({
+    ...c,
+    naName: naNames.get(c.naMid),
+    displayLabel: naNames.get(c.naMid)
+      ? `${c.streetName}, ${naNames.get(c.naMid)}`
+      : c.streetName,
+  }));
+}
+
 export async function getStreetId(streetName: string, city?: string): Promise<number | null> {
   const url = buildWfsUrl(
     BASE_RPE,
@@ -977,15 +1034,37 @@ export function parseAddress(raw: string): {
   };
 }
 
+export interface DisambiguationResult {
+  disambiguation: true;
+  candidates: Array<{ label: string; fullAddress: string }>;
+}
+
 /** Full lookup chain: address string → building + parts with rooms */
 export async function lookupByAddress(address: string): Promise<{
   stavba: StavbaData;
   deliStavbe: DelStavbeData[];
   lat: number | null;
   lng: number | null;
-} | null> {
+} | DisambiguationResult | null> {
   const parsed = parseAddress(address);
   if (!parsed) return null;
+
+  // Check for ambiguous street name (same name in multiple cities)
+  // Only when no city was specified in the address
+  if (!parsed.city) {
+    const candidates = await getStreetCandidates(parsed.street).catch(() => []);
+    if (candidates.length > 1) {
+      return {
+        disambiguation: true,
+        candidates: candidates.map(c => ({
+          label: c.displayLabel ?? c.streetName,
+          fullAddress: c.naName
+            ? `${c.streetName} ${parsed.number}${parsed.suffix ?? ''}, ${c.naName}`
+            : `${c.streetName} ${parsed.number}${parsed.suffix ?? ''}`,
+        })),
+      };
+    }
+  }
 
   const ulMid = await getStreetId(parsed.street, parsed.city);
 

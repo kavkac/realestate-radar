@@ -15,6 +15,8 @@ interface Prostor {
 interface LookupResult {
   success: boolean;
   error?: string;
+  disambiguation?: boolean;
+  candidates?: Array<{ label: string; fullAddress: string }>;
   naslov?: string;
   lat?: number | null;
   lng?: number | null;
@@ -140,6 +142,7 @@ type PropertyTab = {
   data: LookupResult | null;
   loading: boolean;
   error: string | null;
+  disambiguationCandidates?: Array<{ label: string; fullAddress: string }>;
 };
 
 const MAX_TABS = 5;
@@ -286,8 +289,9 @@ export function AddressSearch() {
                   ...t,
                   loading: false,
                   data: data.success ? data : null,
-                  error: data.success ? null : friendlyError(data.error ?? "Napaka pri iskanju"),
+                  error: data.success ? null : (data.disambiguation ? null : friendlyError(data.error ?? "Napaka pri iskanju")),
                   naslov: data.naslov ?? addr,
+                  disambiguationCandidates: data.disambiguation ? data.candidates : undefined,
                 }
               : t
           )
@@ -336,8 +340,9 @@ export function AddressSearch() {
                   ...t,
                   loading: false,
                   data: data.success ? data : null,
-                  error: data.success ? null : friendlyError(data.error ?? "Napaka pri iskanju"),
+                  error: data.success ? null : (data.disambiguation ? null : friendlyError(data.error ?? "Napaka pri iskanju")),
                   naslov: data.naslov ?? addr,
+                  disambiguationCandidates: data.disambiguation ? data.candidates : undefined,
                 }
               : t
           )
@@ -620,6 +625,33 @@ export function AddressSearch() {
 
 
 
+        {activeTab?.disambiguationCandidates && activeTab.disambiguationCandidates.length > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-medium text-amber-800 mb-2">
+              Ta ulica obstaja v več krajih — izberite pravega:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {activeTab.disambiguationCandidates.map((c) => (
+                <button
+                  key={c.fullAddress}
+                  type="button"
+                  onClick={() => {
+                    setAddress(c.fullAddress);
+                    setTabs(prev => prev.map(t =>
+                      t.id === activeTabId ? { ...t, disambiguationCandidates: undefined } : t
+                    ));
+                    // Auto-submit with disambiguated full address
+                    const parsedDel = delStavbe.trim() ? parseInt(delStavbe, 10) : undefined;
+                    performSearch(c.fullAddress, parsedDel);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-sm font-medium text-gray-700 hover:bg-amber-50 hover:border-amber-400 transition-colors shadow-sm"
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {activeTab?.error && (
           <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {activeTab.error}

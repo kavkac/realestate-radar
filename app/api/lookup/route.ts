@@ -175,7 +175,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let { stavba, deliStavbe, lat, lng } = result;
+    // Disambiguation: same street name in multiple cities — ask user to pick
+    if ("disambiguation" in result && result.disambiguation) {
+      return NextResponse.json(
+        { success: false, disambiguation: true, candidates: result.candidates },
+        { status: 300 },
+      );
+    }
+
+    let { stavba, deliStavbe, lat, lng } = result as Exclude<typeof result, import("@/lib/gurs-api").DisambiguationResult>;
 
     // Validate requested del stavbe
     if (delStavbe != null) {
