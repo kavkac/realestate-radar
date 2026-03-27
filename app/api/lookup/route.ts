@@ -312,6 +312,13 @@ export async function POST(request: NextRequest) {
     }
     // ── End ceiling height chain ────────────────────────────────────────────
 
+    // Neighborhood profile — prestart BEFORE Promise.all so it runs truly parallel
+    // This is the biggest sequential bottleneck (Overpass 5-8s)
+    const neighborhoodProfilePromise =
+      lat != null && lng != null
+        ? withTimeout(getNeighborhoodProfile(lat, lng).catch(() => null), 5000, () => timedOut.push('neighborhood'))
+        : Promise.resolve(null);
+
     // Gas infrastructure — non-blocking, moved into parallel batch below
     const gasInfrastructurePromise =
       lat != null && lng != null
@@ -517,26 +524,29 @@ export async function POST(request: NextRequest) {
     let neighborhoodTags: string[] | null = null;
     if (lat != null && lng != null) {
       try {
-        const nbProfile = await getNeighborhoodProfile(lat, lng).catch(() => null);
+        // Use pre-started promise (running since before main Promise.all)
+        const nbProfile = await neighborhoodProfilePromise;
         neighborhoodTags = nbProfile?.characterTags ?? null;
         if ((nbProfile as any)?.proximityScore != null) {
           proximityScore = (nbProfile as any).proximityScore;
         } else {
-          const walking = await getNearestWalkingTargets(lat, lng);
+          // OSRM walking targets — fast (own server), keep sequential but capped
+          const walking = await withTimeout(getNearestWalkingTargets(lat, lng), 3000) ?? [];
           const noiseDb = nbProfile?.noiseLdenDb ?? null;
           proximityScore = calcProximityScore(walking, noiseDb);
         }
       } catch { /* proximity je bonus, ne blokiramo valuacije */ }
     }
 
-    if (certEnergyClass && etnAnaliza && useableArea) {
-      const corrected = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja, proximityScore, neighborhoodTags)
-        .then(r => r ?? getEtnAnaliza(stavba.koId, useableArea, certEnergyClass, null, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja, proximityScore, neighborhoodTags).catch(() => null))
-        .catch(() => null);
-      if (corrected) etnAnalizaFinal = corrected;
-    } else if (etnAnalizaFinal && (idLega || stNadstropja)) {
-      const withLega = await getEtnAnaliza(stavba.koId, useableArea, certEnergyClass ?? null, etnDejanskaRaba, lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja, proximityScore, neighborhoodTags).catch(() => null);
-      if (withLega) etnAnalizaFinal = withLega;
+    // Single refined ETN call (with lega + energy class + proximity)
+    // Replaces the previous double sequential fallback pattern
+    if (useableArea && (certEnergyClass || idLega || stNadstropja)) {
+      const refined = await getEtnAnaliza(
+        stavba.koId, useableArea, certEnergyClass ?? null, etnDejanskaRaba,
+        lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja,
+        proximityScore, neighborhoodTags
+      ).catch(() => null);
+      if (refined) etnAnalizaFinal = refined;
     }
 
     // NLP signals — iz shranjenih opisov v listings_oglasi (če obstajajo)
