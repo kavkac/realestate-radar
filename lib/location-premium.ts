@@ -210,31 +210,42 @@ export function izracunajVisinoStropov(
 ): VisinaSstropov {
   // Metoda 1: Iz izmerjene višine stavbe / število etaž
   if (visinaStvabe && visinaStvabe > 0 && steviloEtaz && steviloEtaz > 0) {
-    // Odštejemo ~0.3m na etažo za medetažne plošče
-    const brutoNaEtazo = visinaStvabe / steviloEtaz;
-    const netoCm = Math.round((brutoNaEtazo - 0.3) * 100);
+    // GURS VISINA_H2–H3 vključuje strešno konstrukcijo za stare stavbe:
+    // - predvojna gradnja (< 1945): strma streha ~1.5m → odštejemo pred deljenjem
+    // - sodobna gradnja (>= 1945): ravna/nizka streha ~0.5m
+    // Dedukcija za medetažno ploščo je odvisna od gradnje:
+    // - zidana/kamena (< 1945): 0.40m (debelejše plošče)
+    // - železobeton (>= 1945): 0.30m
+    const roofOffset = letoIzgradnje != null && letoIzgradnje < 1945 ? 1.5 : 0.5;
+    const slabThickness = letoIzgradnje != null && letoIzgradnje < 1945 ? 0.40 : 0.30;
+
+    const adjustedHeight = Math.max(visinaStvabe - roofOffset, visinaStvabe * 0.8);
+    const brutoNaEtazo = adjustedHeight / steviloEtaz;
+    const netoCm = Math.round((brutoNaEtazo - slabThickness) * 100);
+
     if (netoCm >= 200 && netoCm <= 500) {
       const korekcija = netoCm >= 320 ? 0.05 : netoCm >= 290 ? 0.02 : netoCm < 250 ? -0.03 : 0;
       return {
         visinaCm: netoCm,
         metoda: "izmerjena",
-        opis: `${(visinaStvabe / steviloEtaz).toFixed(1)}m bruto / etažo`,
+        opis: `${brutoNaEtazo.toFixed(1)}m neto / etažo`,
         korekcija,
       };
     }
   }
 
-  // Metoda 2: Ocena iz leta izgradnje
+  // Metoda 2: Ocena iz leta izgradnje (kalibrirano na realne meritve)
+  // Vrednosti so svetla višina (neto), ne etažna višina
   if (letoIzgradnje) {
-    if (letoIzgradnje < 1918) return { visinaCm: 350, metoda: "ocenjena_leto", opis: "Predvojna gradnja", korekcija: 0.06 };
-    if (letoIzgradnje < 1945) return { visinaCm: 320, metoda: "ocenjena_leto", opis: "Medvojna gradnja", korekcija: 0.04 };
-    if (letoIzgradnje < 1965) return { visinaCm: 295, metoda: "ocenjena_leto", opis: "Povojska gradnja", korekcija: 0.02 };
-    if (letoIzgradnje < 1990) return { visinaCm: 265, metoda: "ocenjena_leto", opis: "Socialistična gradnja", korekcija: 0 };
-    if (letoIzgradnje < 2005) return { visinaCm: 270, metoda: "ocenjena_leto", opis: "Gradnja 90ih", korekcija: 0 };
-    return { visinaCm: 275, metoda: "ocenjena_leto", opis: "Sodobna gradnja", korekcija: 0.01 };
+    if (letoIzgradnje < 1918) return { visinaCm: 320, metoda: "ocenjena_leto", opis: "Predvojna gradnja", korekcija: 0.04 };
+    if (letoIzgradnje < 1945) return { visinaCm: 300, metoda: "ocenjena_leto", opis: "Medvojna gradnja", korekcija: 0.02 };
+    if (letoIzgradnje < 1965) return { visinaCm: 280, metoda: "ocenjena_leto", opis: "Povojska gradnja", korekcija: 0.01 };
+    if (letoIzgradnje < 1990) return { visinaCm: 260, metoda: "ocenjena_leto", opis: "Socialistična gradnja", korekcija: 0 };
+    if (letoIzgradnje < 2005) return { visinaCm: 265, metoda: "ocenjena_leto", opis: "Gradnja 90ih", korekcija: 0 };
+    return { visinaCm: 270, metoda: "ocenjena_leto", opis: "Sodobna gradnja", korekcija: 0.01 };
   }
 
-  return { visinaCm: 265, metoda: "ocenjena_default", opis: "Povprečna vrednost", korekcija: 0 };
+  return { visinaCm: 260, metoda: "ocenjena_default", opis: "Povprečna vrednost", korekcija: 0 };
 }
 
 export interface StavbnaKorekcija {
