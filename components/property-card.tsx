@@ -2518,51 +2518,56 @@ function PropertyContextSection({
   azbestRisk?: { hasRisk: boolean; level: string | null; note: string } | null;
   airbnbStats?: AirbnbStats | null;
 }) {
-  // Lokacija
-  const lokacijaKat = ctx.lokacija.kategorija;
-  const lokacijaLabel = lokacijaKat === 'center' ? 'Center mesta'
-    : lokacijaKat === 'primestno' ? 'Primestno'
-    : lokacijaKat === 'obrobje' ? 'Obrobje'
-    : lokacijaKat === 'ruralno' ? 'Ruralno'
-    : '—';
-  const lppLines = Math.min(placesData?.transit?.lppLineCount ?? 0, 20);
-  const lokacijaValue = [lokacijaLabel, lppLines > 0 ? `${lppLines} linij LPP` : null].filter(Boolean).join(' · ');
-
-  // Stavba
-  const leto = stavbaLetoIzgradnje;
-  const stavbaValue = leto ? `Leto ${leto}` : '—';
-  const stavbaAlert = ctx.stavba.score < 40;
-
-  // Trg
-  const stT = ctx.trg.steviloTransakcij ?? 0;
-  const trgLabel = stT >= 10 ? 'Likviden trg' : stT >= 5 ? 'Zmerno likviden' : 'Malo poslov';
-  const trgValue = stT > 0 ? `${trgLabel} · ${stT} poslov/leto` : trgLabel;
-
-  // Tveganja
   const hasFloodRisk = ctx.tveganja.poplavnaNevarnost;
   const hasSeismicRisk = ctx.tveganja.visokaSeizmicnost;
   const hasAzbest = azbestRisk?.hasRisk ?? false;
-  const tveganjaValues = [
-    hasFloodRisk && hasSeismicRisk ? 'Poplava + potres' : hasFloodRisk ? 'Poplavno ogroženo' : hasSeismicRisk ? 'Visoka seizmičnost' : null,
-    hasAzbest ? (azbestRisk?.level === 'visoko' ? 'Azbest (visoko tveganje)' : 'Azbest (možno tveganje)') : null,
-  ].filter(Boolean);
-  const tveganjaValue = tveganjaValues.length > 0 ? tveganjaValues.join(' · ') : 'Ni posebnih tveganj';
-  const tveganjaAlert = hasFloodRisk || hasSeismicRisk || hasAzbest;
 
-  // Airbnb kratkoročni najem
-  const airbnbValue = airbnbStats && airbnbStats.nListings >= 3
-    ? `Povp. ${airbnbStats.avgPriceNight} €/noč · ~${airbnbStats.avgOccupancyPct}% zasedenost · ${airbnbStats.nListings} oglasov`
+  const stT = ctx.trg.steviloTransakcij ?? 0;
+  const trgVrednost = stT >= 10
+    ? `${stT} poslov/leto — likviden trg`
+    : stT >= 5 ? `${stT} poslov/leto — zmerno likviden`
+    : stT > 0 ? `${stT} poslov/leto — redko se prodaja`
+    : null;
+
+  const airbnbRow = airbnbStats && airbnbStats.nListings >= 3
+    ? `~${airbnbStats.avgPriceNight} €/noč · ${airbnbStats.avgOccupancyPct}% zasedenost · ${airbnbStats.nListings} oglasov`
     : null;
 
   return (
     <div>
-      <Label>Kontekst nepremičnine</Label>
-      <ContextRow label="Lokacija" value={lokacijaValue} />
-      <ContextRow label="Stavba" value={stavbaValue} alert={stavbaAlert} />
-      <ContextRow label="Trg" value={trgValue} />
-      {airbnbValue && <ContextRow label="Kratkoročni najem" value={airbnbValue} />}
-      <ContextRow label="Tveganja" value={tveganjaValue} alert={tveganjaAlert} />
-      <ContextRow label="Bremena (ZK)" value="Preverite na e-ZK (sodisce.si)" />
+      <Label>Pred nakupom preveri</Label>
+
+      {hasFloodRisk && (
+        <ContextRow label="🌊 Poplava" value={poplavnaNevarnost?.razred ?? "Poplavno ogroženo"} alert />
+      )}
+      {hasSeismicRisk && (
+        <ContextRow label="🪨 Potres" value="Visoka seizmičnost (MSK ≥ VIII)" alert />
+      )}
+      {hasAzbest && (
+        <ContextRow
+          label="⚠️ Azbest"
+          value={azbestRisk?.level === 'visoko' ? "Visoko tveganje (pre-1978)" : "Možno tveganje — preverite"}
+          alert
+        />
+      )}
+      {!hasFloodRisk && !hasSeismicRisk && !hasAzbest && (
+        <ContextRow label="Tveganja" value="Ni posebnih tveganj" />
+      )}
+
+      {trgVrednost && <ContextRow label="Aktivnost trga" value={trgVrednost} />}
+      {airbnbRow && <ContextRow label="Kratkoročni najem" value={airbnbRow} />}
+
+      <div className="flex items-baseline justify-between py-2 text-sm">
+        <span className="text-gray-400 text-xs">Hipoteke / bremena</span>
+        <a
+          href="https://evlozisce.sodisce.si/esodstvo/index.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-medium text-blue-500 hover:text-blue-700 underline underline-offset-2"
+        >
+          Preverite na e-ZK →
+        </a>
+      </div>
     </div>
   );
 }
