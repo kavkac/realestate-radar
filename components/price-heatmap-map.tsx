@@ -17,18 +17,87 @@ const PRICE_BANDS = [
 
 const MIN_PRICE = 500, MAX_PRICE = 5500;
 
+// Color ramp — full spectrum blue→cyan→green→yellow→orange→red
+const COLOR_STOPS: [number, [number,number,number]][] = [
+  [0.00, [67,  56,  202]],
+  [0.12, [37, 130, 220]],
+  [0.25, [34, 197, 194]],
+  [0.40, [74, 200, 100]],
+  [0.55, [180, 215, 60]],
+  [0.68, [245, 190, 20]],
+  [0.80, [245, 130, 15]],
+  [0.90, [235, 70,  20]],
+  [1.00, [200, 20,  20]],
+];
+
+// Viewport-adaptive coloring: normalizes to local p05–p95 range
+// So whether you're in rural SLO (800–1200) or LJ center (3000–4500),
+// you always see the full color spectrum → maximum contrast
+let viewportP05 = MIN_PRICE;
+let viewportP95 = MAX_PRICE;
+
 function priceToNorm(price: number) {
   return Math.min(Math.max((price - MIN_PRICE) / (MAX_PRICE - MIN_PRICE), 0), 1);
 }
 
-function priceToFill(price: number, alpha = 0.42): string {
-  for (const b of PRICE_BANDS) {
-    if (price < b.max) {
-      return `rgba(${b.color[0]},${b.color[1]},${b.color[2]},${alpha})`;
+function priceToNormAdaptive(price: number) {
+  const range = Math.max(viewportP95 - viewportP05, 200);
+  return Math.min(Math.max((price - viewportP05) / range, 0), 1);
+}
+
+function normToColor(t: number, alpha = 0.42): string {
+  let lower = COLOR_STOPS[0], upper = COLOR_STOPS[COLOR_STOPS.length - 1];
+  for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
+    if (t >= COLOR_STOPS[i][0] && t <= COLOR_STOPS[i + 1][0]) {
+      lower = COLOR_STOPS[i]; upper = COLOR_STOPS[i + 1]; break;
     }
   }
-  const last = PRICE_BANDS[PRICE_BANDS.length - 1];
-  return `rgba(${last.color[0]},${last.color[1]},${last.color[2]},${alpha})`;
+  const f = (t - lower[0]) / (upper[0] - lower[0] + 0.001);
+  const r = Math.round(lower[1][0] + f * (upper[1][0] - lower[1][0]));
+  const g = Math.round(lower[1][1] + f * (upper[1][1] - lower[1][1]));
+  const b = Math.round(lower[1][2] + f * (upper[1][2] - lower[1][2]));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function priceToFill(price: number, alpha = 0.42): string {
+  return normToColor(priceToNormAdaptive(price), alpha);
+}
+
+function gaussianBlur(data: Float32Array, w: number, h: number, sigma: number): Float32Array {
+  const radius = Math.ceil(sigma * 2.5);
+  const kernel: number[] = [];
+  let ksum = 0;
+  for (let i = -radius; i <= radius; i++) {
+    const v = Math.exp(-0.5 * (i * i) / (sigma * sigma));
+    kernel.push(v);
+    ksum += v;
+  }
+  const kn = kernel.map(v => v / ksum);
+
+  const tmp = new Float32Array(w * h);
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      let sum = 0;
+      for (let k = -radius; k <= radius; k++) {
+        const nc = Math.max(0, Math.min(w - 1, c + k));
+        sum += data[r * w + nc] * kn[k + radius];
+      }
+      tmp[r * w + c] = sum;
+    }
+  }
+
+  const out = new Float32Array(w * h);
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      let sum = 0;
+      for (let k = -radius; k <= radius; k++) {
+        const nr = Math.max(0, Math.min(h - 1, r + k));
+        sum += tmp[nr * w + c] * kn[k + radius];
+      }
+      out[r * w + c] = sum;
+    }
+  }
+  return out;
 }
 
 interface Point { lat: number; lng: number; price: number }
@@ -96,8 +165,13 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
         const points: Point[] = data.points;
         pointsRef.current = points;
 
+        // Viewport-adaptive normalization — update global P05/P95 from local data
+        const pricesSorted = [...points].map(p => p.price).sort((a, b) => a - b);
+        viewportP05 = pricesSorted[Math.floor(pricesSorted.length * 0.05)] ?? MIN_PRICE;
+        viewportP95 = pricesSorted[Math.floor(pricesSorted.length * 0.95)] ?? MAX_PRICE;
+
         // High-res grid for local view
-        const cellSize = hasProp ? 0.003 : 0.02;
+        const cellSize = hasProp ? 0.006 : 0.025;
         const latMin = bounds.getSouth() - cellSize * 4;
         const latMax = bounds.getNorth() + cellSize * 4;
         const lngMin = bounds.getWest() - cellSize * 4;
@@ -127,32 +201,37 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
           }
         }
 
-        // IDW gap fill — wider radius for local high-res view
-        const fillRadius = hasProp ? 5 : 3;
+        // Step 1: Fill empty cells with IDW from nearby data cells
+        const fillRadius = hasProp ? 8 : 5;
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
             const idx = r * cols + c;
             if (hasData[idx]) continue;
-            let sum = 0, n = 0;
+            let wsum = 0, n = 0;
             for (let dr = -fillRadius; dr <= fillRadius; dr++) {
               for (let dc = -fillRadius; dc <= fillRadius; dc++) {
                 const nr = r + dr, nc = c + dc;
                 if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
                 const ni = nr * cols + nc;
-                if (hasData[ni]) {
-                  const dist = Math.sqrt(dr * dr + dc * dc) + 0.5;
-                  sum += normalized[ni] / dist;
-                  n += 1 / dist;
-                }
+                if (!hasData[ni]) continue;
+                const dist2 = dr * dr + dc * dc;
+                const w = 1.0 / (dist2 + 0.5);
+                wsum += normalized[ni] * w;
+                n += w;
               }
             }
-            normalized[idx] = n > 0 ? sum / n : priceToNorm(2000);
+            normalized[idx] = n > 0 ? wsum / n : priceToNorm(hasProp ? 2500 : 1800);
           }
         }
 
-        // Fixed price thresholds
-        const thresholds = [1000, 1500, 2000, 2500, 3000, 3500, 4500]
-          .map(p => priceToNorm(p));
+        // Step 2: Gaussian blur for smooth gradients (eliminates diamond artifacts)
+        const sigma = hasProp ? 2.0 : 1.5;
+        const blurred = gaussianBlur(normalized, cols, rows, sigma);
+        for (let i = 0; i < normalized.length; i++) normalized[i] = blurred[i];
+
+        // Granular price thresholds for smoother gradient
+        const priceThresholds = [800, 1100, 1400, 1700, 2000, 2300, 2600, 2900, 3200, 3600, 4000, 4500];
+        const thresholds = priceThresholds.map(p => priceToNorm(p));
 
         // @ts-ignore
         const gen = contours().size([cols, rows]).thresholds(thresholds).smooth(true);
@@ -164,8 +243,9 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
           const c = contourData[i];
           if (!c.coordinates.length) continue;
 
-          const midNorm = (c.value + (contourData[i + 1]?.value ?? 1)) / 2;
-          const midPrice = MIN_PRICE + midNorm * (MAX_PRICE - MIN_PRICE);
+          const midPrice = i < priceThresholds.length - 1
+            ? (priceThresholds[i] + priceThresholds[i + 1]) / 2
+            : priceThresholds[priceThresholds.length - 1] + 200;
 
           const geoJSON: GeoJSON.MultiPolygon = {
             type: "MultiPolygon",
@@ -269,16 +349,19 @@ export default function PriceHeatmapMap({ height = "420px", centerLat, centerLng
         )}
       </div>
 
-      <div className="px-4 py-2.5 bg-white border-t border-gray-100 flex items-center gap-2.5 text-[10px] text-gray-500 flex-wrap">
-        <span className="font-medium text-gray-600">€/m²:</span>
-        {PRICE_BANDS.slice(0, 6).map((b) => (
-          <span key={b.label} className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0 border border-black/10"
-              style={{ background: `rgba(${b.color.join(",")},0.7)` }} />
-            {b.label}
-          </span>
-        ))}
-        <span className="ml-auto text-gray-400">ETN · GURS</span>
+      <div className="px-4 py-2.5 bg-white border-t border-gray-100 flex items-center gap-2 text-[10px] text-gray-500">
+        <span className="font-medium text-gray-600 mr-1">€/m²:</span>
+        {/* Continuous gradient bar */}
+        <div className="flex items-center gap-1.5 flex-1">
+          <span className="text-gray-400">{viewportP05.toLocaleString("sl-SI")}</span>
+          <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{
+            background: `linear-gradient(to right, ${
+              COLOR_STOPS.map(([t, [r,g,b]]) => `rgba(${r},${g},${b},0.8) ${Math.round(t*100)}%`).join(", ")
+            })`
+          }} />
+          <span className="text-gray-400">{viewportP95.toLocaleString("sl-SI")}</span>
+        </div>
+        <span className="ml-2 text-gray-400 flex-shrink-0">ETN · GURS</span>
       </div>
     </div>
   );
