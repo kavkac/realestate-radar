@@ -548,6 +548,10 @@ export async function POST(request: NextRequest) {
 
     let etnAnalizaFinal = etnAnaliza;
     const certEnergyClass = energyCertResult?.cert?.energyClass;
+    // Če ni uradnega certifikata, uporabi algoritmično oceno (estimateEiz)
+    // ocenjena = true pomeni algoritmična ocena, ne uradni certifikat
+    const effectiveEnergyClass = certEnergyClass
+      ?? (energetskaIzkaznica?.ocenjena ? energetskaIzkaznica.razred : null);
     const osmAmenitiesCount = osmData ? (Object.values(osmData as Record<string, unknown[]>).flat().length) : null;
 
     // Proximity score — walking-time-based valuation signal
@@ -572,9 +576,9 @@ export async function POST(request: NextRequest) {
 
     // Single refined ETN call (with lega + energy class + proximity)
     // Replaces the previous double sequential fallback pattern
-    if (useableArea && (certEnergyClass || idLega || stNadstropja)) {
+    if (useableArea && (effectiveEnergyClass || idLega || stNadstropja)) {
       const refined = await getEtnAnaliza(
-        stavba.koId, useableArea, certEnergyClass ?? null, etnDejanskaRaba,
+        stavba.koId, useableArea, effectiveEnergyClass ?? null, etnDejanskaRaba,
         lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja,
         proximityScore, neighborhoodTags
       ).catch(() => null);
