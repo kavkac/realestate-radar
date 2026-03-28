@@ -710,12 +710,18 @@ export async function POST(request: NextRequest) {
       let etnWeight: number;
       let surfaceWeight: number;
       let blendMethod: string;
-      if (etnVir === "proximity" || etnComps >= 5) {
-        etnWeight = 1.0; surfaceWeight = 0.0; blendMethod = "etn-only";
+      // Dinamicni blend: heatmap nikoli 0 — doda prostorski kontekst (gradient sosescine)
+      // Vec ETN podatkov = vecji ETN weight, ampak heatmap vedno prispeva vsaj 15-20%
+      if (etnVir === "proximity" && etnComps >= 15) {
+        etnWeight = 0.80; surfaceWeight = 0.20; blendMethod = "etn-dominant";
+      } else if (etnVir === "proximity" && etnComps >= 8) {
+        etnWeight = 0.70; surfaceWeight = 0.30; blendMethod = "etn-dominant";
+      } else if (etnComps >= 5) {
+        etnWeight = 0.60; surfaceWeight = 0.40; blendMethod = "etn-balanced";
       } else if (etnComps >= 3) {
-        etnWeight = 0.7; surfaceWeight = 0.3; blendMethod = "etn-dominant";
+        etnWeight = 0.40; surfaceWeight = 0.60; blendMethod = "surface-dominant";
       } else {
-        etnWeight = 0.2; surfaceWeight = 0.8; blendMethod = "surface-dominant";
+        etnWeight = 0.20; surfaceWeight = 0.80; blendMethod = "surface-dominant";
       }
       blendedEstimate = {
         eur_m2: Math.round(etnWeight * etnEurM2 + surfaceWeight * surfaceEurM2),
