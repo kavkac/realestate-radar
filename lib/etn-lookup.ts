@@ -299,6 +299,25 @@ function casovnaUtez(starostMesecev: number): number {
   return 1;
 }
 
+// Exponential time decay weight: transakcija stara 0 mes = 1.0, 24 mes = ~0.37, 48 mes = ~0.14
+function timeDecayWeight(starostMesecev: number): number {
+  return Math.exp(-starostMesecev / 24);
+}
+
+// True weighted median (bolj točen kot duplication trick)
+function weightedMedianFn(items: { value: number; weight: number }[]): number {
+  if (items.length === 0) return 0;
+  if (items.length === 1) return items[0].value;
+  const sorted = [...items].sort((a, b) => a.value - b.value);
+  const totalWeight = sorted.reduce((s, x) => s + x.weight, 0);
+  let cumWeight = 0;
+  for (const item of sorted) {
+    cumWeight += item.weight;
+    if (cumWeight >= totalWeight / 2) return item.value;
+  }
+  return sorted[sorted.length - 1].value;
+}
+
 export interface EtnAnaliza {
   steviloTransakcij: number;
   povprecnaCenaM2: number;
@@ -1020,15 +1039,12 @@ export async function getEtnAnaliza(
   const max = Math.max(...rawPrices);
 
   // Time-weighted, seasonally-adjusted prices for median
-  // Recent transactions count more: <6mo=3x, 6-12mo=2x, >12mo=1x
-  const weightedPrices: number[] = [];
-  for (const r of selectedParsed) {
-    const weight = casovnaUtez(r.starostMesecev);
-    for (let i = 0; i < weight; i++) {
-      weightedPrices.push(r.cenaM2Adjusted);
-    }
-  }
-  const med = smartMedian(weightedPrices);
+  // Exponential decay: novejse transakcije imajo vecji vpliv (sigma=24 mesecev)
+  const weightedItems = selectedParsed.map(r => ({
+    value: r.cenaM2Adjusted,
+    weight: timeDecayWeight(r.starostMesecev)
+  }));
+  const med = weightedMedianFn(weightedItems);
 
   // Per-year breakdown (use raw prices for historical accuracy)
   const byYear = new Map<number, number[]>();

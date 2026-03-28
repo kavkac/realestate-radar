@@ -704,11 +704,22 @@ export async function POST(request: NextRequest) {
 
     if (etnEurM2 != null && surfaceEurM2 != null) {
       const etnComps = etnAnalizaFinal?.steviloTransakcij ?? 0;
-      const etnWeight = etnComps < 3 ? 0.2 : 0.6;
-      const surfaceWeight = 1 - etnWeight;
+      const etnVir = etnAnalizaFinal?.vir ?? null;
+      // Heatmap je fallback — ko ima ETN dobre podatke, ga ne mesamo
+      // proximity L1 ali >=5 transakcij → 100% ETN, heatmap ignoriramo
+      let etnWeight: number;
+      let surfaceWeight: number;
+      let blendMethod: string;
+      if (etnVir === "proximity" || etnComps >= 5) {
+        etnWeight = 1.0; surfaceWeight = 0.0; blendMethod = "etn-only";
+      } else if (etnComps >= 3) {
+        etnWeight = 0.7; surfaceWeight = 0.3; blendMethod = "etn-dominant";
+      } else {
+        etnWeight = 0.2; surfaceWeight = 0.8; blendMethod = "surface-dominant";
+      }
       blendedEstimate = {
         eur_m2: Math.round(etnWeight * etnEurM2 + surfaceWeight * surfaceEurM2),
-        method: etnComps < 3 ? "surface-dominant" : "etn-dominant",
+        method: blendMethod,
         etn_weight: etnWeight,
         surface_weight: surfaceWeight,
       };
