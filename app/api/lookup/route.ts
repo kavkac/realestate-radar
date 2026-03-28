@@ -783,6 +783,33 @@ export async function POST(request: NextRequest) {
       stavbneKorekcijeResult.skupniFaktor = Math.max(0.70, Math.min(1.30, raw));
     }
 
+    // Annotate vsak faktor z virom (zakaj je bil aktiviran) — za debug/pipeline prikaz
+    const varujeFallback = !(propSignals?.is_heritage ?? false) &&
+      (propertyContext?.stavba?.starostKategorija === "historicna" &&
+       propertyContext?.lokacija?.kategorija === "center");
+    for (const f of stavbneKorekcijeResult.faktorji) {
+      const n = f.naziv?.toLowerCase() ?? "";
+      if (n.includes("varstvo")) {
+        f.vir = propSignals?.is_heritage
+          ? `propertySignals.is_heritage = true`
+          : varujeFallback
+            ? `Fallback: letoIzgradnje=${stavba.letoIzgradnje} (historična) + lokacija.kategorija=center`
+            : `propertySignals.is_heritage = false`;
+      } else if (n.includes("dvigalo")) {
+        const unit = selectedUnit;
+        f.vir = `deliStavbe.dvigalo=${unit?.dvigalo ?? "?"}, steviloEtaz=${stavba.steviloEtaz ?? "?"}`;
+      } else if (n.includes("zastar")) {
+        f.vir = `letoIzgradnje=${stavba.letoIzgradnje}, nobene sveže obnove <10 let`;
+      } else if (n.includes("obnov") || n.includes("svež")) {
+        f.vir = `Sveža obnova: instalacije=${selectedUnit?.letoObnoveInstalacij ?? "?"}, okna=${selectedUnit?.letoObnoveOken ?? "?"}, fasada=${stavba.letoObnoveFasade ?? "?"}`;
+      } else if (n.includes("stropi") || n.includes("cm")) {
+        const unitCeil = selectedUnit ? (selectedUnit as unknown as Record<string, unknown>).visinaEtaze : null;
+        f.vir = unitCeil
+          ? `deliStavbe.visinaEtaze=${unitCeil}cm`
+          : `Ocena iz starosti stavbe: letoIzgradnje=${stavba.letoIzgradnje}`;
+      }
+    }
+
     // === PROPERTY SIGNAL MODIFIERS ===
     const appliedModifiers: string[] = [];
     if (blendedEstimate && propSignals) {

@@ -278,6 +278,7 @@ export interface StavbnaKorekcija {
   ikona: string;
   opis: string;
   korekcija: number;
+  vir?: string; // zakaj je bil faktor aktiviran — za debug/pipeline prikaz
 }
 
 export interface StavbneKorekcije {
