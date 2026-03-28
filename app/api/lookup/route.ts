@@ -740,7 +740,11 @@ export async function POST(request: NextRequest) {
     // === STAVBNE KOREKCIJE (server-side, enak izračun kot jakakavcic.com) ===
     const selectedUnitForKorekcije = selectedUnit;
     const stavbneKorekcijeResult = izracunajStavbneKorekcije({
-      varuje: propSignals?.is_heritage ?? false,
+      // Varstvo: iz property_signals DB, fallback na propertyContext heuristiko
+      // (historicna stavba v centru mesta → verjetno kulturno varstvo)
+      varuje: (propSignals?.is_heritage ?? false) ||
+        (propertyContext?.stavba?.starostKategorija === "historicna" &&
+         propertyContext?.lokacija?.kategorija === "center"),
       dvigalo: selectedUnitForKorekcije?.dvigalo ?? undefined,
       steviloEtaz: stavba.steviloEtaz ?? null,
       letoObnoveInstalacij: selectedUnitForKorekcije?.letoObnoveInstalacij ?? null,
