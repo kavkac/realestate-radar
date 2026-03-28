@@ -25,7 +25,7 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 
 // Slovenian city centers with premium radii
 const CITY_CENTERS = [
-  { name: "Ljubljana", lat: 46.0569, lng: 14.5058, radiusPremium: 2000, radiusCenter: 500 },
+  { name: "Ljubljana", lat: 46.0511, lng: 14.5058, radiusPremium: 2000, radiusCenter: 600 },
   { name: "Maribor", lat: 46.5547, lng: 15.6459, radiusPremium: 2000, radiusCenter: 500 },
   { name: "Celje", lat: 46.2311, lng: 15.2686, radiusPremium: 1500, radiusCenter: 400 },
   { name: "Koper", lat: 45.5480, lng: 13.7301, radiusPremium: 1500, radiusCenter: 400 },

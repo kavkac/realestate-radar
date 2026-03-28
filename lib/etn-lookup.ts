@@ -735,6 +735,7 @@ export async function getEtnAnaliza(
   stNadstropja?: number | null,
   proximityScore?: number | null,
   neighborhoodTags?: string[] | null,
+  isOcenjenaEiz?: boolean,
 ): Promise<EtnAnaliza | null> {
   const cutoff = new Date();
   cutoff.setFullYear(cutoff.getFullYear() - 2);
@@ -989,8 +990,12 @@ export async function getEtnAnaliza(
       const normalized = energyClass.toUpperCase().replace(/\s/g, "");
       const correction = ENERGY_CORRECTION[normalized];
       if (correction !== undefined) {
-        energyFactor = 1 + correction;
-        energetskaKorekcija = { razred: normalized, faktor: correction };
+        // Za ocenjene (ne uradne) EIZ: negativne korekcije apliciramo samo 50%
+        // Razlog: algoritmična ocena brez ogledov/meritev ima visoko negotovost
+        // Pozitivne korekcije (A/B) so zanesljivejše ker zahtevajo uradni certifikat
+        const effectiveCorrection = isOcenjenaEiz && correction < 0 ? correction * 0.5 : correction;
+        energyFactor = 1 + effectiveCorrection;
+        energetskaKorekcija = { razred: normalized, faktor: effectiveCorrection };
       }
     }
     const lokacijskiPremium = lat != null && lng != null

@@ -580,7 +580,8 @@ export async function POST(request: NextRequest) {
       const refined = await getEtnAnaliza(
         stavba.koId, useableArea, effectiveEnergyClass ?? null, etnDejanskaRaba,
         lat, lng, osmAmenitiesCount, stavba.stStavbe, idLega, stNadstropja,
-        proximityScore, neighborhoodTags
+        proximityScore, neighborhoodTags,
+        energetskaIzkaznica?.ocenjena ?? false  // isOcenjenaEiz — halve negative correction for estimates
       ).catch(() => null);
       if (refined) etnAnalizaFinal = refined;
     }
