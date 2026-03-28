@@ -1127,7 +1127,7 @@ export async function getEtnAnaliza(
   }
 
   // P25/P75 confidence interval (use weighted, adjusted prices for consistency with median)
-  const sortedWeightedPrices = [...weightedPrices].sort((a, b) => a - b);
+  const sortedWeightedPrices = weightedItems.map(x => x.value).sort((a, b) => a - b);
   const p25 = sortedWeightedPrices[Math.floor(sortedWeightedPrices.length * 0.25)];
   const p75 = sortedWeightedPrices[Math.floor(sortedWeightedPrices.length * 0.75)];
   const rangeLowM2 = p25 != null ? Math.round(p25 * kalibracijskiFaktor) : null;
