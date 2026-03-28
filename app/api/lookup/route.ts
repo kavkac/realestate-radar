@@ -870,21 +870,10 @@ export async function POST(request: NextRequest) {
         appliedModifiers.push(`heritage_neighborhood ${nbScore}/100 +${Math.round(nbFactor * 100)}%`);
       }
 
+      // energy_rating: že v Node 4 (energetskaKorekcija) — ne apliciramo dvakrat
+      // Samo prikažemo v Node 10 za informacijo (brez multiplikacije)
       if (propSignals.energy_rating) {
-        const rating = propSignals.energy_rating.toUpperCase();
-        const energyModifiers: Record<string, number> = {
-          A1: 0.08, A2: 0.08,
-          B1: 0.04, B2: 0.04,
-          C: 0,
-          D: -0.03,
-          E: -0.07,
-          F: -0.12, G: -0.12,
-        };
-        const mod = energyModifiers[rating];
-        if (mod != null && mod !== 0) {
-          multiplier *= (1 + mod);
-          appliedModifiers.push(`energy_rating ${rating} ${mod > 0 ? "+" : ""}${Math.round(mod * 100)}%`);
-        }
+        appliedModifiers.push(`energy_rating iz DB: ${propSignals.energy_rating} (korekcija že v Node 4)`);
       }
 
       if (multiplier !== 1.0) {
