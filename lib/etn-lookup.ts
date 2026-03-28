@@ -1325,13 +1325,14 @@ export interface PropertySignals {
   energy_rating: string | null;
 }
 
-export async function getPropertySignals(stavbaEid: number): Promise<PropertySignals | null> {
+export async function getPropertySignals(stavbaEid: string | number): Promise<PropertySignals | null> {
   try {
     type Row = { signals: Record<string, unknown> };
 
+    // NOTE: eidStavba > MAX_SAFE_INTEGER — pass as string with ::bigint cast to avoid precision loss
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT signals FROM property_signals WHERE stavba_eid = $1 LIMIT 1`,
-      stavbaEid
+      `SELECT signals FROM property_signals WHERE stavba_eid = $1::bigint LIMIT 1`,
+      String(stavbaEid)
     );
 
     if (!rows || rows.length === 0) return null;
@@ -1373,6 +1374,59 @@ export async function getSursGrid(e: number, n: number): Promise<Record<string, 
     return d && typeof d === "object" ? d : null;
   } catch (err) {
     console.error("[getSursGrid] error:", err);
+    return null;
+  }
+}
+
+// === LIDAR BUILDING FEATURES ===
+
+export interface LidarFeatures {
+  viewshedScore: number | null;
+  waterVisibility: boolean | null;
+  mountainVisibility: boolean | null;
+  buildingHeightM: number | null;
+  solarAnnual: number | null;
+  skyViewFactor: number | null;
+  greenVisibilityPct: number | null;
+  privacyScore: number | null;
+  opennesIndex: number | null;
+}
+
+export async function getLidarFeatures(eidStavba: string | number): Promise<LidarFeatures | null> {
+  try {
+    type Row = {
+      viewshed_score_360: number | null;
+      water_visibility_bool: boolean | null;
+      mountain_visibility_bool: boolean | null;
+      building_height_m: number | null;
+      solar_radiation_annual_kwh_m2: number | null;
+      sky_view_factor: number | null;
+      green_visibility_pct: number | null;
+      privacy_score: number | null;
+      openness_index: number | null;
+    };
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT viewshed_score_360, water_visibility_bool, mountain_visibility_bool,
+              building_height_m, solar_radiation_annual_kwh_m2, sky_view_factor,
+              green_visibility_pct, privacy_score, openness_index
+       FROM lidar_building_features WHERE eid_stavba = $1::bigint LIMIT 1`,
+      String(eidStavba)
+    );
+    if (!rows || rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      viewshedScore: r.viewshed_score_360 != null ? Number(r.viewshed_score_360) : null,
+      waterVisibility: r.water_visibility_bool ?? null,
+      mountainVisibility: r.mountain_visibility_bool ?? null,
+      buildingHeightM: r.building_height_m != null ? Number(r.building_height_m) : null,
+      solarAnnual: r.solar_radiation_annual_kwh_m2 != null ? Number(r.solar_radiation_annual_kwh_m2) : null,
+      skyViewFactor: r.sky_view_factor != null ? Number(r.sky_view_factor) : null,
+      greenVisibilityPct: r.green_visibility_pct != null ? Number(r.green_visibility_pct) : null,
+      privacyScore: r.privacy_score != null ? Number(r.privacy_score) : null,
+      opennesIndex: r.openness_index != null ? Number(r.openness_index) : null,
+    };
+  } catch (err) {
+    console.error("[getLidarFeatures] error:", err);
     return null;
   }
 }

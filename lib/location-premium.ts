@@ -315,6 +315,12 @@ interface StavbneKorekcijeInput {
   tramStopsCount?: number;
   // OSM wall material
   wallMaterial?: string | null;
+  // Etaža enote in skupno število etaž (za nadstropje premium)
+  stNadstropja?: number | null;
+  // LIDAR signals (viewshed, water/mountain visibility)
+  lidarViewshedScore?: number | null;
+  lidarWaterVisibility?: boolean | null;
+  lidarMountainVisibility?: boolean | null;
 }
 
 export function izracunajStavbneKorekcije(input: StavbneKorekcijeInput): StavbneKorekcije {
@@ -351,7 +357,38 @@ export function izracunajStavbneKorekcije(input: StavbneKorekcijeInput): Stavbne
     }
   }
 
-  // 3. OBNOVA — vsak svežo obnovljen element +2%
+  // 3. NADSTROPJE — pogled premium / pritličje malus
+  if (input.stNadstropja != null && input.steviloEtaz != null) {
+    const floor = input.stNadstropja;
+    const totalFloors = input.steviloEtaz;
+    if (floor === 0) {
+      faktorji.push({ naziv: "Pritličje", ikona: "🪟", opis: "Pritličje — manj svetlobe, manj pogleda, nižja varnost", korekcija: -0.05 });
+    } else if (floor === 1 && totalFloors >= 4) {
+      faktorji.push({ naziv: "1. nadstropje", ikona: "🏠", opis: "Nizko nadstropje v višji stavbi — omejen pogled", korekcija: -0.02 });
+    } else if (floor >= totalFloors - 1 && floor >= 3) {
+      // Top floor ali zadnje nadstropje
+      const viewBonus = (input.lidarViewshedScore != null && input.lidarViewshedScore > 0.5) ? 0.07
+        : (input.lidarWaterVisibility || input.lidarMountainVisibility) ? 0.06 : 0.04;
+      faktorji.push({
+        naziv: "Visoko nadstropje",
+        ikona: "🏙️",
+        opis: `${floor}. nadstropje od ${totalFloors}${input.lidarWaterVisibility ? " — pogled na vodo potrjen z LiDAR" : input.lidarMountainVisibility ? " — pogled na gore potrjen z LiDAR" : ""}`,
+        korekcija: viewBonus,
+      });
+    } else if (floor >= 3) {
+      faktorji.push({ naziv: "Višje nadstropje", ikona: "🏙️", opis: `${floor}. nadstropje — boljši pogled, večja svetloba`, korekcija: 0.02 });
+    }
+  }
+
+  // 3b. LIDAR signals — water/mountain visibility brez nadstropja konteksta
+  if (input.stNadstropja == null && input.lidarWaterVisibility === true) {
+    faktorji.push({ naziv: "Pogled na vodo (LiDAR)", ikona: "🌊", opis: "Direkten pogled na vodo potrjen z LiDAR analizo", korekcija: 0.05 });
+  }
+  if (input.stNadstropja == null && input.lidarMountainVisibility === true) {
+    faktorji.push({ naziv: "Pogled na gore (LiDAR)", ikona: "⛰️", opis: "Pogled na gore potrjen z LiDAR analizo", korekcija: 0.04 });
+  }
+
+  // 4. OBNOVA — vsak svežo obnovljen element +2%
   const obnovaElements: { leto: number | null | undefined; naziv: string }[] = [
     { leto: input.letoObnoveInstalacij, naziv: "instalacije" },
     { leto: input.letoObnoveOken, naziv: "okna" },

@@ -5,7 +5,7 @@ import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
 import { getAzbestRisk } from "@/lib/azbest";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { estimateEiz } from "@/lib/eiz-estimator";
-import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio, getEtnPropertySignals, getPriceSurfaceEstimate, getPropertySignals, getSursGrid } from "@/lib/etn-lookup";
+import { getEtnAnaliza, getEtnNajemAnaliza, getKoRentalYield, getSaleToListRatio, getEtnPropertySignals, getPriceSurfaceEstimate, getPropertySignals, getSursGrid, getLidarFeatures } from "@/lib/etn-lookup";
 import { wgs84ToD96 } from "@/lib/wgs84-to-d96";
 import { getOglasneAnalize } from "@/lib/listings-lookup";
 import { buildPropertyContext } from "@/lib/property-context";
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
     // Cap ownership lookups to first 8 units to avoid 20+ parallel GURS calls
     const ownershipUnits = deliStavbe.slice(0, 8);
 
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, evResults, namembnostResults, gasInfrastructure, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, lidarFeatures, evResults, namembnostResults, gasInfrastructure, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -403,8 +403,9 @@ export async function POST(request: NextRequest) {
       getKoRentalYield(stavba.koId).catch(() => null),
       getSaleToListRatio(stavba.koId).catch(() => null),
       d96Coords ? getPriceSurfaceEstimate(d96Coords.e, d96Coords.n).catch(() => null) : Promise.resolve(null),
-      stavba.eidStavba ? getPropertySignals(parseInt(stavba.eidStavba, 10)).catch(() => null) : Promise.resolve(null),
+      stavba.eidStavba ? getPropertySignals(stavba.eidStavba).catch(() => null) : Promise.resolve(null),
       d96Coords ? getSursGrid(d96Coords.e, d96Coords.n).catch(() => null) : Promise.resolve(null),
+      stavba.eidStavba ? getLidarFeatures(stavba.eidStavba).catch(() => null) : Promise.resolve(null),
       Promise.all(
         deliStavbe.map((d) =>
           prisma.evidencaVrednotenja
@@ -755,6 +756,12 @@ export async function POST(request: NextRequest) {
       konstrukcija: stavba.nosilnaKonstrukcija ?? null,
       letniPodatki: etnAnalizaFinal?.letniPodatki ?? undefined,
       steviloTransakcij: etnAnalizaFinal?.steviloTransakcij ?? undefined,
+      // Nadstropje — floor premium/malus
+      stNadstropja: stNadstropja ?? null,
+      // LIDAR — viewshed, water/mountain visibility
+      lidarViewshedScore: lidarFeatures?.viewshedScore ?? null,
+      lidarWaterVisibility: lidarFeatures?.waterVisibility ?? null,
+      lidarMountainVisibility: lidarFeatures?.mountainVisibility ?? null,
     });
 
     // Višina stropov (stropi korekcija) — iz visinaEtaze enote ali iz starosti stavbe
@@ -943,6 +950,7 @@ export async function POST(request: NextRequest) {
       priceSurface: priceSurface ?? null,
       propertySignals: propSignals ?? null,
       sursGrid: sursGrid ?? null,
+      lidarFeatures: lidarFeatures ?? null,
       stavbneKorekcije: stavbneKorekcijeResult,
       blendedEstimate: blendedEstimate
         ? {
