@@ -189,9 +189,23 @@ export function izracunajLokacijskiPremium(
     faktorji.push({ naziv: "Oddaljena lokacija", opis: `${Math.round(distCenter * 1000)}m od centra ${nearestCity.name}`, korekcija: -0.05, ikona: "📍" });
   }
 
-  // Composite factor — additive corrections, capped at ±25%
+  // Premium synergy: ko >=3 pozitivni premium signali skupaj (reka, varstvo, grad, mestno jedro, proximity)
+  // → premium tier nepremičnina, dodaj sinergijski bonus + dvigni cap
+  const pozitivniFaktorji = faktorji.filter(f => f.korekcija > 0.03);
+  const isPremiumTier = pozitivniFaktorji.length >= 3;
+  if (isPremiumTier) {
+    faktorji.push({
+      naziv: "Premium sinergija",
+      opis: `${pozitivniFaktorji.length} premium signalov skupaj — kupec plača za celoten paket, ne vsoto delov`,
+      korekcija: 0.08,
+      ikona: "⭐",
+    });
+  }
+
+  // Cap: ±25% normalno, ±35% za premium tier
+  const cap = isPremiumTier ? 0.35 : 0.25;
   const skupna = faktorji.reduce((sum, f) => sum + f.korekcija, 0);
-  const skupniFaktor = 1 + Math.max(-0.25, Math.min(0.25, skupna));
+  const skupniFaktor = 1 + Math.max(-cap, Math.min(cap, skupna));
 
   return { skupniFaktor, faktorji };
 }

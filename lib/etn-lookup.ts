@@ -836,10 +836,11 @@ export async function getEtnAnaliza(
           AND p.vrsta_kupoprodajnega_posla = '1'
           AND ev.e IS NOT NULL AND ev.n IS NOT NULL AND ev.e != '' AND ev.n != ''
           AND (ev.e::float - $2)^2 + (ev.n::float - $3)^2 <= $4
+          AND ($5::float <= 0 OR (d.povrsina_dela_stavbe::float BETWEEN $5 * 0.40 AND $5 * 1.60))
           ${tipFilter}
         ORDER BY TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') DESC
         LIMIT 200`,
-        cutoffStr, e, n, radiusM * radiusM,
+        cutoffStr, e, n, radiusM * radiusM, area ?? 0,
       );
       let parsed = parseRows(proximityRows);
 
@@ -868,10 +869,11 @@ export async function getEtnAnaliza(
             AND p.vrsta_kupoprodajnega_posla = '1'
             AND ev.e IS NOT NULL AND ev.n IS NOT NULL AND ev.e != '' AND ev.n != ''
             AND (ev.e::float - $2)^2 + (ev.n::float - $3)^2 <= $4
+            AND ($5::float <= 0 OR (d.povrsina_dela_stavbe::float BETWEEN $5 * 0.40 AND $5 * 1.60))
             ${tipFilter}
           ORDER BY TO_DATE(p.datum_sklenitve_pogodbe,'DD.MM.YYYY') DESC
           LIMIT 200`,
-          cutoffStr4y, e, n, radiusM * radiusM,
+          cutoffStr4y, e, n, radiusM * radiusM, area ?? 0,
         );
         const parsed4y = parseRows(proximityRows4y);
         if (parsed4y.length > parsed.length) {
@@ -915,10 +917,11 @@ export async function getEtnAnaliza(
         AND d.povrsina_dela_stavbe::float > 0
         AND p.trznost_posla IN ('1','2','5')
         AND p.vrsta_kupoprodajnega_posla = '1'
+        AND ($3::float <= 0 OR (d.povrsina_dela_stavbe::float BETWEEN $3 * 0.20 AND $3 * 1.80))
         ${tipFilter}
       ORDER BY TO_DATE(p.datum_sklenitve_pogodbe, 'DD.MM.YYYY') DESC
       LIMIT 500`,
-      koStr, cutoffStr,
+      koStr, cutoffStr, area ?? 0,
     );
     const parsed = parseRows(koRows);
     if (parsed.length >= 5) {
