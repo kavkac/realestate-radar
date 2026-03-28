@@ -16,6 +16,7 @@ import { getAirbnbStats } from "@/lib/airbnb";
 import { prisma } from "@/lib/prisma";
 import { getNeighborhoodProfile, calcProximityScore, getNearestWalkingTargets } from "@/lib/neighborhood-service";
 import { parseListingText, calcListingValuationDelta, type ListingSignals } from "@/lib/listing-nlp";
+import { izracunajStavbneKorekcije, izracunajVisinoStropov } from "@/lib/location-premium";
 
 // Helper: race a promise against a timeout — returns null if timeout fires
 function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T | null> {
@@ -736,6 +737,48 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    // === STAVBNE KOREKCIJE (server-side, enak izračun kot jakakavcic.com) ===
+    const selectedUnitForKorekcije = selectedUnit;
+    const stavbneKorekcijeResult = izracunajStavbneKorekcije({
+      varuje: propSignals?.is_heritage ?? false,
+      dvigalo: selectedUnitForKorekcije?.dvigalo ?? undefined,
+      steviloEtaz: stavba.steviloEtaz ?? null,
+      letoObnoveInstalacij: selectedUnitForKorekcije?.letoObnoveInstalacij ?? null,
+      letoObnoveOken: selectedUnitForKorekcije?.letoObnoveOken ?? null,
+      letoObnoveFasade: stavba.letoObnoveFasade ?? null,
+      letoObnoveSrehe: stavba.letoObnoveStrehe ?? null,
+      letoIzgradnje: stavba.letoIzgradnje ?? null,
+      konstrukcija: stavba.nosilnaKonstrukcija ?? null,
+      letniPodatki: etnAnalizaFinal?.letniPodatki ?? undefined,
+      steviloTransakcij: etnAnalizaFinal?.steviloTransakcij ?? undefined,
+    });
+
+    // Višina stropov (stropi korekcija) — iz visinaEtaze enote ali iz starosti stavbe
+    const unitCeilingCm = selectedUnitForKorekcije
+      ? (selectedUnitForKorekcije as { visinaEtaze?: number | null }).visinaEtaze ?? null
+      : null;
+    const visinaStropovResult = izracunajVisinoStropov(
+      (typeof stavba.visina === "number" ? stavba.visina : null),
+      stavba.steviloEtaz ?? null,
+      stavba.letoIzgradnje ?? null,
+      idLega ?? null,
+    );
+    // Prefer unit-level ceiling if available, else use building estimate
+    const stropiKorekcija = unitCeilingCm != null && unitCeilingCm > 150
+      ? (unitCeilingCm >= 320 ? 0.05 : unitCeilingCm >= 290 ? 0.02 : unitCeilingCm < 250 ? -0.03 : 0)
+      : visinaStropovResult.korekcija;
+    if (stropiKorekcija !== 0) {
+      stavbneKorekcijeResult.faktorji.unshift({
+        naziv: `${unitCeilingCm ?? visinaStropovResult.visinaCm}cm stropi`,
+        ikona: "📐",
+        opis: `Svetla višina ${unitCeilingCm ?? visinaStropovResult.visinaCm}cm`,
+        korekcija: stropiKorekcija,
+      });
+      // Recompute skupniFaktor with stropi
+      const raw = stavbneKorekcijeResult.faktorji.reduce((acc, f) => acc * (1 + f.korekcija), 1);
+      stavbneKorekcijeResult.skupniFaktor = Math.max(0.70, Math.min(1.30, raw));
+    }
+
     // === PROPERTY SIGNAL MODIFIERS ===
     const appliedModifiers: string[] = [];
     if (blendedEstimate && propSignals) {
@@ -869,7 +912,16 @@ export async function POST(request: NextRequest) {
       priceSurface: priceSurface ?? null,
       propertySignals: propSignals ?? null,
       sursGrid: sursGrid ?? null,
-      blendedEstimate: blendedEstimate ? { ...blendedEstimate, appliedModifiers } : null,
+      stavbneKorekcije: stavbneKorekcijeResult,
+      blendedEstimate: blendedEstimate
+        ? {
+            ...blendedEstimate,
+            // Apliciramo stavbneFaktor na blend (energy + location sta v etn dela že)
+            eur_m2_corrected: Math.round(blendedEstimate.eur_m2 * stavbneKorekcijeResult.skupniFaktor),
+            stavbne_factor: stavbneKorekcijeResult.skupniFaktor,
+            appliedModifiers,
+          }
+        : null,
       propertyContext,
       trustedCorrections,
       correctionMap,
