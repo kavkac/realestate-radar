@@ -2270,17 +2270,13 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng, naslov }: {
         <Label vir="Register energetskih izkaznic · MOP">Poraba energije</Label>
         <div className="space-y-4">
           <div>
-            <div className="flex items-center gap-2">
-              <EnergyMeter razred={data.razred} />
-              {data.source === "stavba" && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">
-                  stavba
-                </span>
-              )}
-            </div>
+            <EnergyMeter razred={data.razred} />
             <div className="text-sm text-gray-500 mt-1">
               <p>Veljavna do {data.veljaDo}</p>
               {data.tip && <p className="mt-0.5">Tip: {data.tip}</p>}
+              {data.source === "stavba" && (
+                <p className="mt-0.5 text-gray-400">Izkaznica velja za celotno stavbo</p>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
