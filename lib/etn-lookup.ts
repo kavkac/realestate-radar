@@ -1094,8 +1094,9 @@ export async function getEtnAnaliza(
     const normalized = energyClass.toUpperCase().replace(/\s/g, "");
     const correction = ENERGY_CORRECTION[normalized];
     if (correction !== undefined) {
-      energyFactor = 1 + correction;
-      energetskaKorekcija = { razred: normalized, faktor: correction };
+      const effectiveCorrection = isOcenjenaEiz && correction < 0 ? correction * 0.5 : correction;
+      energyFactor = 1 + effectiveCorrection;
+      energetskaKorekcija = { razred: normalized, faktor: effectiveCorrection };
     }
   }
 
