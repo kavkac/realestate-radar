@@ -1281,7 +1281,8 @@ export async function getPriceSurfaceEstimate(e: number, n: number): Promise<Pri
     };
 
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT price_eur_m2, ci_lo, ci_hi, n_comps, vitality_score, amenity_score, acc_transit
+      `SELECT price_eur_m2, ci_lo, ci_hi, n_comps,
+              NULL::float AS vitality_score, NULL::float AS amenity_score, NULL::float AS acc_transit
        FROM continuous_price_surface
        WHERE e BETWEEN $1 - 1000 AND $1 + 1000
          AND n BETWEEN $2 - 1000 AND $2 + 1000
