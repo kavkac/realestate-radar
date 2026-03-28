@@ -822,19 +822,14 @@ export async function POST(request: NextRequest) {
     if (blendedEstimate && propSignals) {
       let multiplier = 1.0;
 
-      if (propSignals.river_view === true) {
-        multiplier *= 1.03;
-        appliedModifiers.push("river_view +3%");
-      }
-
-      if (propSignals.is_heritage === true) {
-        multiplier *= 1.02 * 0.95; // +2% prestige, -5% cost → net ~-3%
-        appliedModifiers.push("heritage +2% prestige, -5% cost (net -3%)");
-      }
-
+      // river_view: samo z LIDAR potrditvijo (water_visibility_bool) — brez tega je Ob Ljubljanici +10% že v lokaciji
+      // is_heritage: že v stavbneKorekcije (Varstvo +12%) — ne dodajamo dvakrat
+      // heritage_neighborhood: OK — soseska, ne stavba, unikaten signal
       if (propSignals.heritage_neighborhood_score != null && propSignals.heritage_neighborhood_score >= 5) {
-        multiplier *= 1.01;
-        appliedModifiers.push("heritage_neighborhood +1%");
+        const nbScore = propSignals.heritage_neighborhood_score;
+        const nbFactor = nbScore >= 50 ? 0.02 : 0.01; // 50+ → +2%, 5-49 → +1%
+        multiplier *= (1 + nbFactor);
+        appliedModifiers.push(`heritage_neighborhood ${nbScore}/100 +${Math.round(nbFactor * 100)}%`);
       }
 
       if (propSignals.energy_rating) {
