@@ -822,7 +822,55 @@ export async function POST(request: NextRequest) {
     if (blendedEstimate && propSignals) {
       let multiplier = 1.0;
 
-      // river_view: samo z LIDAR potrditvijo (water_visibility_bool) — brez tega je Ob Ljubljanici +10% že v lokaciji
+      // river_view: multi-source scoring
+      // Ob Ljubljanici +10% (v lokaciji) pokriva geografsko bližino soseske.
+      // river_view signal = SAMO za enoto ki dejansko GLEDA na reko — unikaten bonus.
+      // Kombiniramo: LIDAR viewshed (najboljši) + razdalja + nadstropje
+      {
+        const distM = propSignals.transit_nearest_m != null ? null : null; // ni razdalja do reke
+        // Razdalja do reke je v lokacijskiPremium (izračunana zgoraj) — dobimo jo iz ETN analize
+        const lokDistReka = etnAnalizaFinal?.lokacijskiPremium?.faktorji?.find((f: { naziv: string }) =>
+          f.naziv?.includes("Ljubljanici") || f.naziv?.includes("Reka") || f.naziv?.includes("Voda")
+        );
+        const rekaDistM: number | null = lokDistReka?.opis
+          ? parseInt(lokDistReka.opis.match(/(\d+)m/)?.[1] ?? "9999")
+          : null;
+
+        const lidarWater = lidarFeatures?.waterVisibility ?? null;
+        const lidarViewshed = lidarFeatures?.viewshedScore ?? null;
+        const etaza = stNadstropja ?? null;
+
+        let riverViewPremium = 0;
+        let riverViewSource = "";
+
+        if (lidarWater === true) {
+          // LIDAR potrjen — najboljši vir
+          const viewBonus = (lidarViewshed != null && lidarViewshed > 0.6) ? 0.07
+            : (etaza != null && etaza >= 3) ? 0.06 : 0.05;
+          riverViewPremium = viewBonus;
+          riverViewSource = `LiDAR viewshed potrjen${etaza != null ? `, ${etaza}. nadstropje` : ""}`;
+        } else if (lidarWater === false) {
+          // LIDAR pravi da ni pogleda — ne dodajamo
+          riverViewPremium = 0;
+          riverViewSource = "LiDAR: ni direktnega pogleda na vodo";
+        } else if (rekaDistM != null && rekaDistM < 80) {
+          // Brez LIDAR: blizu reke — ocenimo iz etaže
+          if (etaza != null && etaza >= 3) {
+            riverViewPremium = 0.04;
+            riverViewSource = `Verjetni pogled: ${rekaDistM}m od reke, ${etaza}. nadstropje (brez LiDAR)`;
+          } else if (etaza == null) {
+            riverViewPremium = 0.02;
+            riverViewSource = `Možni pogled: ${rekaDistM}m od reke, etaža neznana (brez LiDAR)`;
+          }
+          // pritličje/1. nad + blizu reke → verjetno blokirano → 0
+        }
+
+        if (riverViewPremium > 0) {
+          multiplier *= (1 + riverViewPremium);
+          appliedModifiers.push(`river_view +${Math.round(riverViewPremium * 100)}% (${riverViewSource})`);
+        }
+      }
+
       // is_heritage: že v stavbneKorekcije (Varstvo +12%) — ne dodajamo dvakrat
       // heritage_neighborhood: OK — soseska, ne stavba, unikaten signal
       if (propSignals.heritage_neighborhood_score != null && propSignals.heritage_neighborhood_score >= 5) {
