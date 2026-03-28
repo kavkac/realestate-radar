@@ -15,6 +15,8 @@ d = pd.read_sql("""
     FROM etn_delistavb d
     JOIN etn_posli p ON d.id_posla = p.id_posla
     WHERE p.trznost_posla IN ('1','2','5')
+      -- STANOVANJE FILTER: heatmap mora biti samo za stanovanja, ne mešati z garažami/poslovnimi
+      AND (d.dejanska_raba_dela_stavbe ILIKE '%stanovan%' OR d.vrsta_dela_stavbe IN ('1','2') OR d.dejanska_raba_dela_stavbe IS NULL)
 """, conn)
 
 d['cena'] = pd.to_numeric(d['pogodbena_cena_odskodnina'], errors='coerce')
