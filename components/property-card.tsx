@@ -102,7 +102,8 @@ interface EnergyData {
   primaryEnergy?: number | null;
   co2?: number | null;
   kondicionirana?: number | null;
-  source?: "stanovanje" | "stavba" | "ocena" | null;
+  source?: "stanovanje" | "stavba" | "del_iste_stavbe" | "ocena" | null;
+  sourceStDela?: number | null;
   // Algoritmična ocena (EN 13790) — samo če source === "ocena"
   ocenjena?: boolean;
   ocenaZaupanje?: "high" | "medium" | "low";
@@ -2276,6 +2277,11 @@ function EnergyCertificateSection({ data, stavba, part, lat, lng, naslov }: {
               {data.tip && <p className="mt-0.5">Tip: {data.tip}</p>}
               {data.source === "stavba" && (
                 <p className="mt-0.5 text-gray-400">Izkaznica velja za celotno stavbo</p>
+              )}
+              {data.source === "del_iste_stavbe" && (
+                <p className="mt-0.5 text-amber-600 text-xs">
+                  ⚠️ Prevzeto iz enote {data.sourceStDela ?? "?"} iste stavbe — uradna EIZ za to enoto ni na voljo
+                </p>
               )}
             </div>
           </div>

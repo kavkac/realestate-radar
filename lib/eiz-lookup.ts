@@ -8,11 +8,12 @@ interface EizLookupParams {
   stDelaStavbe?: number;
 }
 
-export type EizSource = "stanovanje" | "stavba" | null;
+export type EizSource = "stanovanje" | "stavba" | "del_iste_stavbe" | null;
 
 export interface EizLookupResult {
   cert: Awaited<ReturnType<typeof prisma.energyCertificate.findFirst>>;
   source: EizSource;
+  sourceStDela?: number | null; // kateri del stavbe je vir (pri del_iste_stavbe)
 }
 
 /**
@@ -45,8 +46,19 @@ export async function lookupEnergyCertificate({
   });
   if (buildingCert) return { cert: buildingCert, source: "stavba" };
 
-  // Fallback #3 je bil tukaj — prikazoval EIZ drug enot v isti stavbi.
-  // Odstranjeno: napačno je prikazovalo certifikat soseda kot lastnika.
+  // 3. Fallback: katera koli veljavna EIZ za isto stavbo (drug del)
+  // Transparentno označeno v UI — dobre enote delijo ovojnico, ogrevanje, izolacijo
+  const anyUnitCert = await prisma.energyCertificate.findFirst({
+    where: {
+      koId,
+      stStavbe,
+      stDelaStavbe: { not: null, gt: 0 },
+      validUntil: { gte: new Date() },
+    },
+    orderBy: { issueDate: "desc" },
+  });
+  if (anyUnitCert) return { cert: anyUnitCert, source: "del_iste_stavbe", sourceStDela: anyUnitCert.stDelaStavbe };
+
   return { cert: null, source: null };
 }
 

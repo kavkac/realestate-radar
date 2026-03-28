@@ -499,6 +499,7 @@ export async function POST(request: NextRequest) {
         co2: cert.co2Emissions,
         kondicionirana: cert.conditionedArea,
         source: energyCertResult.source,
+        sourceStDela: energyCertResult.sourceStDela ?? null,
         ocenjena: false,
       };
     } else if (stavba.eidStavba && lat != null && lng != null) {
