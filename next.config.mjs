@@ -3,9 +3,20 @@ const nextConfig = {
   experimental: {
     typedRoutes: true,
   },
+  async headers() {
+    return [
+      {
+        source: "/api/lookup",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "https://rer-pipeline.vercel.app" },
+          { key: "Access-Control-Allow-Methods", value: "GET,POST,OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type" },
+        ],
+      },
+    ];
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // pg uses Node.js native modules — stub them out for client bundle
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,

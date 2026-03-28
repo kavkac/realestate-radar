@@ -878,3 +878,15 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// CORS preflight for rer-pipeline.vercel.app
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "https://rer-pipeline.vercel.app",
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
