@@ -155,7 +155,8 @@ async function main() {
           ${parseFloat_(row[7])}, ${parseFloat_(row[8])}, ${parseFloat_(row[9])}, ${parseFloat_(row[10])},
           ${parseFloat_(row[11])}, ${parseFloat_(row[12])}, ${parseFloat_(row[13])},
           NOW(), NOW())
-        ON CONFLICT ("certificateId") DO UPDATE SET
+        ON CONFLICT ("koId", "stStavbe", "stDelaStavbe") DO UPDATE SET
+          "certificateId" = EXCLUDED."certificateId",
           "koId" = EXCLUDED."koId",
           "stStavbe" = EXCLUDED."stStavbe",
           "stDelaStavbe" = EXCLUDED."stDelaStavbe",
