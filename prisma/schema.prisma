@@ -69,7 +69,7 @@ model BuildingPart {
 
 model EnergyCertificate {
   id                String   @id @default(cuid())
-  certificateId     String   @unique
+  certificateId     String
   koId              Int
   stStavbe          Int
   stDelaStavbe      Int?
@@ -87,7 +87,8 @@ model EnergyCertificate {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  @@index([koId, stStavbe, stDelaStavbe])
+  @@unique([koId, stStavbe, stDelaStavbe])
+  @@index([certificateId])
   @@map("energy_certificates")
 }
 

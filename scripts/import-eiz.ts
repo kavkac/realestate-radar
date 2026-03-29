@@ -106,6 +106,7 @@ async function main() {
 
       const koId = parseInt_(row[3]);
       const stStavbe = parseInt_(row[4]);
+      const stDelaStavbe = parseInt_(row[5]);
       if (koId == null || stStavbe == null) {
         skipped++;
         continue;
@@ -141,12 +142,14 @@ async function main() {
         continue;
       }
 
+      // Make cert ID unique per unit: "certId__stDela" or "certId__0" for building-level
+      const uniqueCertId = stDelaStavbe != null ? `${certificateId}__${stDelaStavbe}` : `${certificateId}__0`;
       await prisma.energyCertificate.upsert({
-        where: { certificateId },
+        where: { certificateId: uniqueCertId },
         update: {
           koId,
           stStavbe,
-          stDelaStavbe: parseInt_(row[5]),
+          stDelaStavbe,
           issueDate,
           validUntil,
           energyClass,
@@ -160,10 +163,10 @@ async function main() {
           conditionedArea: parseFloat_(row[13]),
         },
         create: {
-          certificateId,
+          certificateId: uniqueCertId,
           koId,
           stStavbe,
-          stDelaStavbe: parseInt_(row[5]),
+          stDelaStavbe,
           issueDate,
           validUntil,
           energyClass,
