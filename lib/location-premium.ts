@@ -367,7 +367,7 @@ export function izracunajStavbneKorekcije(input: StavbneKorekcijeInput): Stavbne
       faktorji.push({ naziv: "1. nadstropje", ikona: "🏠", opis: "Nizko nadstropje v višji stavbi — omejen pogled", korekcija: -0.02 });
     } else if (floor >= totalFloors - 1 && floor >= 3) {
       // Top floor ali zadnje nadstropje
-      const viewBonus = (input.lidarViewshedScore != null && input.lidarViewshedScore > 0.5) ? 0.07
+      const viewBonus = (input.lidarViewshedScore != null && input.lidarViewshedScore > 50) ? 0.07
         : (input.lidarWaterVisibility || input.lidarMountainVisibility) ? 0.06 : 0.04;
       faktorji.push({
         naziv: "Visoko nadstropje",

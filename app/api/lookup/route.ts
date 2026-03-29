@@ -511,6 +511,7 @@ export async function POST(request: NextRequest) {
           lat,
           lng,
           municipality: null, // TODO: resolve from koId → obcina name
+          lidarHeightM: lidarFeatures?.buildingHeightM ?? null,
         });
         if (eizOcena) {
           energetskaIzkaznica = {
@@ -836,7 +837,7 @@ export async function POST(request: NextRequest) {
         let riverViewSource = "";
 
         if (lidarWater === true) {
-          const viewBonus = (lidarViewshed != null && lidarViewshed > 0.6) ? 0.07
+          const viewBonus = (lidarViewshed != null && lidarViewshed > 60) ? 0.07
             : (etaza != null && etaza >= 3) ? 0.06 : 0.05;
           riverViewPremium = viewBonus;
           riverViewSource = `LiDAR viewshed potrjen${etaza != null ? `, ${etaza}. nadstropje` : ""}`;
