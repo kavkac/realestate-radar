@@ -25,7 +25,7 @@ import { estimateHeatingSystem as estimateHeating, HEATING_SPECS } from "./heati
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type EnergyClass = "A+" | "A" | "B" | "C" | "D" | "E" | "F" | "G";
+export type EnergyClass = "A1" | "A2" | "B1" | "B2" | "C" | "D" | "E" | "F" | "G";
 type EnvelopeSource = "gurs_renovation" | "tabula" | "default";
 
 export interface EizEstimate {
@@ -111,13 +111,15 @@ function getClimateData(municipality?: string | null) {
 // ─── Energy class thresholds (SLO PURES 2010 / Pravilnik o metodologiji) ─────
 // kWh/(m²·a) heating need (QNH) — standalone residential
 function classifyEnergyClass(heatingNeedKwhM2: number): EnergyClass {
-  if (heatingNeedKwhM2 <= 15)  return "A+";
-  if (heatingNeedKwhM2 <= 25)  return "A";
-  if (heatingNeedKwhM2 <= 50)  return "B";
-  if (heatingNeedKwhM2 <= 100) return "C";
-  if (heatingNeedKwhM2 <= 150) return "D";
-  if (heatingNeedKwhM2 <= 200) return "E";
-  if (heatingNeedKwhM2 <= 250) return "F";
+  // SLO PURES 2010/2021 — A1/A2/B1/B2/C/D/E/F/G klasifikacija po ogrevalni potrebi QNH
+  if (heatingNeedKwhM2 <= 10)  return "A1";
+  if (heatingNeedKwhM2 <= 15)  return "A2";
+  if (heatingNeedKwhM2 <= 25)  return "B1";
+  if (heatingNeedKwhM2 <= 35)  return "B2";
+  if (heatingNeedKwhM2 <= 60)  return "C";
+  if (heatingNeedKwhM2 <= 105) return "D";
+  if (heatingNeedKwhM2 <= 150) return "E";
+  if (heatingNeedKwhM2 <= 200) return "F";
   return "G";
 }
 
