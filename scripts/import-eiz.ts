@@ -144,42 +144,34 @@ async function main() {
 
       // Make cert ID unique per unit: "certId__stDela" or "certId__0" for building-level
       const uniqueCertId = stDelaStavbe != null ? `${certificateId}__${stDelaStavbe}` : `${certificateId}__0`;
-      await prisma.energyCertificate.upsert({
-        where: { certificateId: uniqueCertId },
-        update: {
-          koId,
-          stStavbe,
-          stDelaStavbe,
-          issueDate,
-          validUntil,
-          energyClass,
-          type,
-          heatingNeed: parseFloat_(row[7]),
-          deliveredEnergy: parseFloat_(row[8]),
-          totalEnergy: parseFloat_(row[9]),
-          electricEnergy: parseFloat_(row[10]),
-          primaryEnergy: parseFloat_(row[11]),
-          co2Emissions: parseFloat_(row[12]),
-          conditionedArea: parseFloat_(row[13]),
-        },
-        create: {
-          certificateId: uniqueCertId,
-          koId,
-          stStavbe,
-          stDelaStavbe,
-          issueDate,
-          validUntil,
-          energyClass,
-          type,
-          heatingNeed: parseFloat_(row[7]),
-          deliveredEnergy: parseFloat_(row[8]),
-          totalEnergy: parseFloat_(row[9]),
-          electricEnergy: parseFloat_(row[10]),
-          primaryEnergy: parseFloat_(row[11]),
-          co2Emissions: parseFloat_(row[12]),
-          conditionedArea: parseFloat_(row[13]),
-        },
-      });
+      // Use raw SQL INSERT ... ON CONFLICT DO UPDATE to avoid needing a specific DB constraint
+      await prisma.$executeRaw`
+        INSERT INTO energy_certificates (id, "certificateId", "koId", "stStavbe", "stDelaStavbe",
+          "issueDate", "validUntil", "energyClass", type,
+          "heatingNeed", "deliveredEnergy", "totalEnergy", "electricEnergy",
+          "primaryEnergy", "co2Emissions", "conditionedArea", "createdAt", "updatedAt")
+        VALUES (gen_random_uuid()::text, ${uniqueCertId}, ${koId}, ${stStavbe}, ${stDelaStavbe},
+          ${issueDate}, ${validUntil}, ${energyClass ?? ""}, ${type},
+          ${parseFloat_(row[7])}, ${parseFloat_(row[8])}, ${parseFloat_(row[9])}, ${parseFloat_(row[10])},
+          ${parseFloat_(row[11])}, ${parseFloat_(row[12])}, ${parseFloat_(row[13])},
+          NOW(), NOW())
+        ON CONFLICT ("certificateId") DO UPDATE SET
+          "koId" = EXCLUDED."koId",
+          "stStavbe" = EXCLUDED."stStavbe",
+          "stDelaStavbe" = EXCLUDED."stDelaStavbe",
+          "issueDate" = EXCLUDED."issueDate",
+          "validUntil" = EXCLUDED."validUntil",
+          "energyClass" = EXCLUDED."energyClass",
+          "type" = EXCLUDED."type",
+          "heatingNeed" = EXCLUDED."heatingNeed",
+          "deliveredEnergy" = EXCLUDED."deliveredEnergy",
+          "totalEnergy" = EXCLUDED."totalEnergy",
+          "electricEnergy" = EXCLUDED."electricEnergy",
+          "primaryEnergy" = EXCLUDED."primaryEnergy",
+          "co2Emissions" = EXCLUDED."co2Emissions",
+          "conditionedArea" = EXCLUDED."conditionedArea",
+          "updatedAt" = NOW()
+      `;
 
       upserted++;
       if (upserted % 1000 === 0) {
