@@ -764,6 +764,16 @@ export async function POST(request: NextRequest) {
       lidarViewshedScore: lidarFeatures?.viewshedScore ?? null,
       lidarWaterVisibility: lidarFeatures?.waterVisibility ?? null,
       lidarMountainVisibility: lidarFeatures?.mountainVisibility ?? null,
+      lidarPoiVisibility: lidarFeatures?.poiVisibility ?? null,
+      lidarMountainDetail: lidarFeatures?.mountainVisibilityDetail ?? null,
+      lidarFacadeOrientations: lidarFeatures?.facadeOrientations ?? null,
+      lidarRoofAreaM2: lidarFeatures?.roofAreaM2 ?? null,
+      lidarFacadeAreaM2: lidarFeatures?.facadeAreaM2 ?? null,
+      lidarFloorHeightM: lidarFeatures?.floorHeightM ?? null,
+      lidarWaterFloorMin: lidarFeatures?.waterVisibilityFloorMin ?? null,
+      lidarWaterDistanceM: lidarFeatures?.waterVisibilityDistanceM ?? null,
+      lidarCanopyCover200m: lidarFeatures?.canopyCover200mPct ?? null,
+      lidarQualityFlag: lidarFeatures?.qualityFlag ?? null,
     });
 
     // Višina stropov (stropi korekcija) — iz visinaEtaze enote ali iz starosti stavbe

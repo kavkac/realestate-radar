@@ -321,6 +321,17 @@ interface StavbneKorekcijeInput {
   lidarViewshedScore?: number | null;
   lidarWaterVisibility?: boolean | null;
   lidarMountainVisibility?: boolean | null;
+  // Extended LiDAR fields
+  lidarPoiVisibility?: Record<string, any> | null;
+  lidarMountainDetail?: Record<string, any> | null;
+  lidarFacadeOrientations?: any[] | null;
+  lidarRoofAreaM2?: number | null;
+  lidarFacadeAreaM2?: number | null;
+  lidarFloorHeightM?: number | null;
+  lidarWaterFloorMin?: number | null;
+  lidarWaterDistanceM?: number | null;
+  lidarCanopyCover200m?: number | null;
+  lidarQualityFlag?: number | null;
 }
 
 export function izracunajStavbneKorekcije(input: StavbneKorekcijeInput): StavbneKorekcije {
@@ -386,6 +397,62 @@ export function izracunajStavbneKorekcije(input: StavbneKorekcijeInput): Stavbne
   }
   if (input.stNadstropja == null && input.lidarMountainVisibility === true) {
     faktorji.push({ naziv: "Pogled na gore (LiDAR)", ikona: "⛰️", opis: "Pogled na gore potrjen z LiDAR analizo", korekcija: 0.04 });
+  }
+
+  // 3c. POI visibility — detailed water view using poi_visibility
+  const poiVis = input.lidarPoiVisibility;
+  if (poiVis) {
+    const floorKey = `floor_${input.stNadstropja != null ? input.stNadstropja : 1}`;
+    const floorData = (poiVis as Record<string, any>)[floorKey];
+    if (floorData) {
+      const rivers = Object.entries(floorData).filter(([_k, v]: any) => v && v.visible);
+      if (rivers.length > 0) {
+        const maxAngle = Math.max(...rivers.map(([_k, v]: any) => v.h_angle_deg || 0));
+        const bonus = maxAngle >= 45 ? 0.10 : maxAngle >= 20 ? 0.06 : maxAngle >= 10 ? 0.04 : 0.02;
+        faktorji.push({
+          naziv: "Pogled na vodo (LiDAR)",
+          ikona: "🌊",
+          opis: `Pogled na ${(rivers[0][0] as string).replace(/_/g, ' ')} — ${maxAngle.toFixed(0)}° zorni kot${input.stNadstropja != null ? ` iz ${input.stNadstropja}. nadstropja` : ''}`,
+          korekcija: bonus,
+        });
+      }
+    }
+  }
+
+  // 3d. Mountain detail view
+  const mtDetail = input.lidarMountainDetail;
+  if (mtDetail) {
+    const visiblePeaks = Object.entries(mtDetail).filter(([_k, v]: any) => v && v.visible);
+    if (visiblePeaks.length > 0) {
+      const hasTriglav = visiblePeaks.some(([k]) => k === 'triglav');
+      const bonus = hasTriglav ? 0.06 : visiblePeaks.length >= 3 ? 0.05 : 0.03;
+      faktorji.push({
+        naziv: hasTriglav ? "Pogled na Triglav" : "Pogled na gore",
+        ikona: "⛰️",
+        opis: `${visiblePeaks.map(([k]) => k.replace(/_/g, ' ')).join(', ')} vidni z LiDAR analize`,
+        korekcija: bonus,
+      });
+    }
+  }
+
+  // 3e. Canopy/green premium
+  if (input.lidarCanopyCover200m != null && input.lidarCanopyCover200m > 30) {
+    const bonus = input.lidarCanopyCover200m > 60 ? 0.03 : 0.015;
+    faktorji.push({
+      naziv: "Zelena okolica",
+      ikona: "🌳",
+      opis: `${input.lidarCanopyCover200m.toFixed(0)}% drevesne krošnje v 200m radiju`,
+      korekcija: bonus,
+    });
+  }
+
+  // 3f. Floor height premium (svetla višina)
+  if (input.lidarFloorHeightM != null) {
+    if (input.lidarFloorHeightM >= 3.0) {
+      faktorji.push({ naziv: "Visoki stropi", ikona: "⬆️", opis: `Svetla višina ${input.lidarFloorHeightM.toFixed(2)}m — nadstandardna`, korekcija: 0.04 });
+    } else if (input.lidarFloorHeightM < 2.4) {
+      faktorji.push({ naziv: "Nizki stropi", ikona: "⬇️", opis: `Svetla višina ${input.lidarFloorHeightM.toFixed(2)}m — podstandardna`, korekcija: -0.03 });
+    }
   }
 
   // 4. OBNOVA — vsak svežo obnovljen element +2%

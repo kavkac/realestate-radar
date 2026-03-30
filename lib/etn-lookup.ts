@@ -1390,6 +1390,20 @@ export interface LidarFeatures {
   greenVisibilityPct: number | null;
   privacyScore: number | null;
   opennesIndex: number | null;
+  roofAreaM2: number | null;
+  facadeAreaM2: number | null;
+  roofHeightM: number | null;
+  roofEaveHeightM: number | null;
+  floorHeightM: number | null;
+  basementFloors: number | null;
+  poiVisibility: Record<string, any> | null;
+  mountainVisibilityDetail: Record<string, any> | null;
+  facadeOrientations: any[] | null;
+  ceilingHeightConflictM: number | null;
+  qualityFlag: number | null;
+  waterVisibilityFloorMin: number | null;
+  waterVisibilityDistanceM: number | null;
+  canopyCover200mPct: number | null;
 }
 
 export async function getLidarFeatures(eidStavba: string | number): Promise<LidarFeatures | null> {
@@ -1404,16 +1418,39 @@ export async function getLidarFeatures(eidStavba: string | number): Promise<Lida
       green_visibility_pct: number | null;
       privacy_score: number | null;
       openness_index: number | null;
+      roof_area_m2: number | null;
+      facade_area_m2: number | null;
+      roof_height_m: number | null;
+      roof_eave_height_m: number | null;
+      floor_height_m: number | null;
+      basement_floors: number | null;
+      poi_visibility: any | null;
+      mountain_visibility_detail: any | null;
+      facade_orientations: any | null;
+      ceiling_height_conflict_m: number | null;
+      quality_flag: number | null;
+      water_visibility_floor_min: number | null;
+      water_visibility_distance_m: number | null;
+      canopy_cover_200m_pct: number | null;
     };
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT viewshed_score_360, water_visibility_bool, mountain_visibility_bool,
               building_height_m, solar_radiation_annual_kwh_m2, sky_view_factor,
-              green_visibility_pct, privacy_score, openness_index
+              green_visibility_pct, privacy_score, openness_index,
+              roof_area_m2, facade_area_m2, roof_height_m, roof_eave_height_m,
+              floor_height_m, basement_floors, poi_visibility, mountain_visibility_detail,
+              facade_orientations, ceiling_height_conflict_m, quality_flag,
+              water_visibility_floor_min, water_visibility_distance_m, canopy_cover_200m_pct
        FROM lidar_building_features WHERE eid_stavba = $1::bigint LIMIT 1`,
       String(eidStavba)
     );
     if (!rows || rows.length === 0) return null;
     const r = rows[0];
+    const parseJsonb = (v: any): any => {
+      if (v == null) return null;
+      if (typeof v === 'object') return v;
+      try { return JSON.parse(v); } catch { return null; }
+    };
     return {
       viewshedScore: r.viewshed_score_360 != null ? Number(r.viewshed_score_360) : null,
       waterVisibility: r.water_visibility_bool ?? null,
@@ -1424,6 +1461,20 @@ export async function getLidarFeatures(eidStavba: string | number): Promise<Lida
       greenVisibilityPct: r.green_visibility_pct != null ? Number(r.green_visibility_pct) : null,
       privacyScore: r.privacy_score != null ? Number(r.privacy_score) : null,
       opennesIndex: r.openness_index != null ? Number(r.openness_index) : null,
+      roofAreaM2: r.roof_area_m2 != null ? Number(r.roof_area_m2) : null,
+      facadeAreaM2: r.facade_area_m2 != null ? Number(r.facade_area_m2) : null,
+      roofHeightM: r.roof_height_m != null ? Number(r.roof_height_m) : null,
+      roofEaveHeightM: r.roof_eave_height_m != null ? Number(r.roof_eave_height_m) : null,
+      floorHeightM: r.floor_height_m != null ? Number(r.floor_height_m) : null,
+      basementFloors: r.basement_floors != null ? Number(r.basement_floors) : null,
+      poiVisibility: parseJsonb(r.poi_visibility),
+      mountainVisibilityDetail: parseJsonb(r.mountain_visibility_detail),
+      facadeOrientations: parseJsonb(r.facade_orientations),
+      ceilingHeightConflictM: r.ceiling_height_conflict_m != null ? Number(r.ceiling_height_conflict_m) : null,
+      qualityFlag: r.quality_flag != null ? Number(r.quality_flag) : null,
+      waterVisibilityFloorMin: r.water_visibility_floor_min != null ? Number(r.water_visibility_floor_min) : null,
+      waterVisibilityDistanceM: r.water_visibility_distance_m != null ? Number(r.water_visibility_distance_m) : null,
+      canopyCover200mPct: r.canopy_cover_200m_pct != null ? Number(r.canopy_cover_200m_pct) : null,
     };
   } catch (err) {
     console.error("[getLidarFeatures] error:", err);
