@@ -520,6 +520,17 @@ export async function POST(request: NextRequest) {
           lidarRoofAreaM2: lidarFeatures?.roofAreaM2 ?? null,
           lidarWallAreaM2: lidarFeatures?.facadeAreaM2 ?? null,
           lidarFacadeOrientations: (lidarFeatures?.facadeOrientations as Array<{ azimuth_deg: number; length_m: number; shared_wall: boolean }> | null) ?? null,
+          // Shading from neighboring buildings: derived from LiDAR sky_view_factor + south viewshed
+          // sky_view_factor 1.0 = open field (no shading), 0.5 = heavily built-up area
+          // viewshedS 1.0 = full southern horizon open, 0.0 = blocked
+          // Combined: shadingFactor = 0.5 * skyViewFactor + 0.5 * viewshedS, clamped 0.5-1.0
+          lidarShadingFactorSouth: (() => {
+            const svf = lidarFeatures?.skyViewFactor ?? null;
+            const vs = lidarFeatures?.viewshedS ?? null;
+            if (svf == null && vs == null) return null;
+            const combined = (svf ?? 0.85) * 0.5 + (vs ?? 0.85) * 0.5;
+            return Math.max(0.5, Math.min(1.0, combined));
+          })(),
         });
         if (eizOcena) {
           energetskaIzkaznica = {

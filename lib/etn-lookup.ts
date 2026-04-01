@@ -1387,6 +1387,7 @@ export interface LidarFeatures {
   buildingHeightM: number | null;
   solarAnnual: number | null;
   skyViewFactor: number | null;
+  viewshedS: number | null;
   greenVisibilityPct: number | null;
   privacyScore: number | null;
   opennesIndex: number | null;
@@ -1415,6 +1416,7 @@ export async function getLidarFeatures(eidStavba: string | number): Promise<Lida
       building_height_m: number | null;
       solar_radiation_annual_kwh_m2: number | null;
       sky_view_factor: number | null;
+      viewshed_s: number | null;
       green_visibility_pct: number | null;
       privacy_score: number | null;
       openness_index: number | null;
@@ -1435,7 +1437,7 @@ export async function getLidarFeatures(eidStavba: string | number): Promise<Lida
     };
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT viewshed_score_360, water_visibility_bool, mountain_visibility_bool,
-              building_height_m, solar_radiation_annual_kwh_m2, sky_view_factor,
+              building_height_m, solar_radiation_annual_kwh_m2, sky_view_factor, viewshed_s,
               green_visibility_pct, privacy_score, openness_index,
               roof_area_m2, facade_area_m2, roof_height_m, roof_eave_height_m,
               floor_height_m, basement_floors, poi_visibility, mountain_visibility_detail,
@@ -1458,6 +1460,7 @@ export async function getLidarFeatures(eidStavba: string | number): Promise<Lida
       buildingHeightM: r.building_height_m != null ? Number(r.building_height_m) : null,
       solarAnnual: r.solar_radiation_annual_kwh_m2 != null ? Number(r.solar_radiation_annual_kwh_m2) : null,
       skyViewFactor: r.sky_view_factor != null ? Number(r.sky_view_factor) : null,
+      viewshedS: r.viewshed_s != null ? Number(r.viewshed_s) : null,
       greenVisibilityPct: r.green_visibility_pct != null ? Number(r.green_visibility_pct) : null,
       privacyScore: r.privacy_score != null ? Number(r.privacy_score) : null,
       opennesIndex: r.openness_index != null ? Number(r.openness_index) : null,
