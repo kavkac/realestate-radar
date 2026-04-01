@@ -890,6 +890,54 @@ export async function POST(request: NextRequest) {
         appliedModifiers.push(`energy_rating iz DB: ${propSignals.energy_rating} (korekcija že v Node 4)`);
       }
 
+      // --- FLOOD RISK (poplavnaNevarnost) ---
+      // Vir: ARSO OPKP Shapefile (arso_flood_zones), 4479 poligonov
+      // Literatura: Bin & Polasky (2004): -6% visoka, Lamond et al: -3% srednja
+      if (poplavnaNevarnost?.stopnja === "visoka") {
+        multiplier *= 0.94;
+        appliedModifiers.push(`flood_risk visoka -6% (ARSO OPKP)`);
+      } else if (poplavnaNevarnost?.stopnja === "srednja") {
+        multiplier *= 0.97;
+        appliedModifiers.push(`flood_risk srednja -3% (ARSO OPKP)`);
+      } else if (poplavnaNevarnost?.stopnja === "nizka") {
+        multiplier *= 0.99;
+        appliedModifiers.push(`flood_risk nizka -1% (ARSO OPKP)`);
+      }
+
+      // --- NOISE LEVEL (nivojHrupa) ---
+      // Vir: ARSO karte hrupa, real-time ArcGIS REST
+      // Literatura: Nelson (2004): -0.5% per dB nad 55 dB; Bateman (2001): -0.6% per dB
+      if (nivojHrupa?.lden != null) {
+        const lden = nivojHrupa.lden;
+        if (lden >= 65) {
+          const dbOver = Math.min(lden - 65, 20); // cap at 20dB
+          const discount = -(dbOver * 0.006 + 0.05); // -5% base + -0.6% per dB nad 65
+          multiplier *= (1 + discount);
+          appliedModifiers.push(`noise_hrupno ${lden}dB ${Math.round(discount * 100)}% (${nivojHrupa.vir ?? "ARSO"})`);
+        } else if (lden >= 55) {
+          const dbOver = lden - 55;
+          const discount = -(dbOver * 0.005); // -0.5% per dB nad 55
+          multiplier *= (1 + discount);
+          appliedModifiers.push(`noise_zmerno ${lden}dB ${Math.round(discount * 100)}% (${nivojHrupa.vir ?? "ARSO"})`);
+        }
+        // lden < 55 = tiho = ni korekcije (ali blagi +1% za mir)
+        if (lden < 45) {
+          multiplier *= 1.01;
+          appliedModifiers.push(`noise_tiho ${lden}dB +1% (${nivojHrupa.vir ?? "ARSO"})`);
+        }
+      }
+
+      // --- AIR QUALITY (kakovostZraka) ---
+      // Vir: OpenAQ v3, ARSO postaje
+      // Literatura: Ridker & Henning (1967), Kim et al (2003): -1.5% slaba kakovost
+      if (kakovostZraka?.index === "slaba") {
+        multiplier *= 0.985;
+        appliedModifiers.push(`air_quality slaba (PM2.5=${kakovostZraka.pm25}, NO2=${kakovostZraka.no2}) -1.5%`);
+      } else if (kakovostZraka?.index === "dobra" && (kakovostZraka.station_distance_km ?? 99) < 10) {
+        multiplier *= 1.005;
+        appliedModifiers.push(`air_quality dobra (PM2.5=${kakovostZraka.pm25}) +0.5%`);
+      }
+
       if (multiplier !== 1.0) {
         blendedEstimate.eur_m2 = Math.round(blendedEstimate.eur_m2 * multiplier);
       }
