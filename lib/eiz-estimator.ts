@@ -22,6 +22,7 @@ import { calibrateQnh, applyPuresConstraint, isLikelyDistrictHeating, getPanelBu
 import { estimateVentilation, calculateHeatedVolume } from "./ventilation-model";
 import { getClimate } from "./climate-service";
 import { estimateHeatingSystem as estimateHeating, HEATING_SPECS } from "./heating-service";
+import { getWindowModel } from "./window-model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -260,6 +261,7 @@ export async function estimateEiz(params: {
   lidarWallAreaM2?: number | null;
   lidarRoofAreaM2?: number | null;
   lidarShadingFactorSouth?: number | null;
+  lidarFacadeOrientations?: Array<{ azimuth_deg: number; length_m: number; shared_wall: boolean }> | null;
   // User overrides (logged-in owner)
   userOverrides?: {
     windowRatio?: number;
@@ -270,7 +272,7 @@ export async function estimateEiz(params: {
   };
 }): Promise<EizEstimate | null> {
   const { eidStavba, eidDelStavbe, lat, lng, municipality, lidarHeightM, lidarVolumeM3,
-          lidarWallAreaM2, lidarRoofAreaM2, lidarShadingFactorSouth, userOverrides } = params;
+          lidarWallAreaM2, lidarRoofAreaM2, lidarShadingFactorSouth, lidarFacadeOrientations, userOverrides } = params;
 
   try {
     // ── 1. Fetch GURS data ────────────────────────────────────────────────────
@@ -308,6 +310,7 @@ export async function estimateEiz(params: {
     // ── 2. Parse GURS values ──────────────────────────────────────────────────
     const yearBuilt = parseInt(stavba.leto_izg_sta) || 1970;
     const konstrukcijaId = parseInt(stavba.id_konstrukcija) as GursKonstrukcijaId;
+    const tipStavbeId = parseInt(stavba.id_tip_stavbe) || null;
     const floors = parseInt(stavba.st_etaz) || 2;
     const grossAreaM2 = parseFloat(stavba.pov_stavbe) || 100;
     const conditionedAreaM2 = parseFloat(delStavbe?.upor_pov || "0") || grossAreaM2 * 0.85;
@@ -377,10 +380,15 @@ export async function estimateEiz(params: {
 
     const windowRatio = userOverrides?.windowRatio ?? windowData.windowRatio;
     const totalWindowAreaM2 = wallAreaM2 * windowRatio;
-    // Distribute windows by orientation: south 40%, north 20%, E/W 40%
-    const windowSouthM2 = totalWindowAreaM2 * 0.40;
-    const windowNorthM2 = totalWindowAreaM2 * 0.20;
-    const windowEastWestM2 = totalWindowAreaM2 * 0.40;
+    // Distribute windows by facade orientation (LiDAR azimuth or statistical model)
+    const windowOrient = getWindowModel({
+      tipStavbe: tipStavbeId,
+      yearBuilt,
+      facadeOrientations: lidarFacadeOrientations ?? null,
+    });
+    const windowSouthM2 = totalWindowAreaM2 * windowOrient.southFraction;
+    const windowNorthM2 = totalWindowAreaM2 * windowOrient.northFraction;
+    const windowEastWestM2 = totalWindowAreaM2 * windowOrient.eastWestFraction;
 
     // ── 6. Heating system — spatial DH zone + statistical prior ──────────────
     const heatingEst = estimateHeating({

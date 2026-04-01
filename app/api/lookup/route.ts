@@ -519,6 +519,7 @@ export async function POST(request: NextRequest) {
           lidarHeightM: lidarFeatures?.buildingHeightM ?? null,
           lidarRoofAreaM2: lidarFeatures?.roofAreaM2 ?? null,
           lidarWallAreaM2: lidarFeatures?.facadeAreaM2 ?? null,
+          lidarFacadeOrientations: (lidarFeatures?.facadeOrientations as Array<{ azimuth_deg: number; length_m: number; shared_wall: boolean }> | null) ?? null,
         });
         if (eizOcena) {
           energetskaIzkaznica = {
