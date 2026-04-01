@@ -80,3 +80,118 @@ export async function getSeizmicnaCona(lat: number, lng: number): Promise<Seizmi
     return fallbackCona(lat, lng);
   }
 }
+
+// ─── AIR QUALITY — OpenAQ v3 ──────────────────────────────────────────────
+
+export interface KakovostZraka {
+  pm25: number | null;
+  no2: number | null;
+  station_name: string | null;
+  station_distance_km: number | null;
+  index: "dobra" | "sprejemljiva" | "slaba" | "neznana";
+}
+
+function airIndex(pm25: number | null, no2: number | null): KakovostZraka["index"] {
+  if (pm25 === null && no2 === null) return "neznana";
+  if ((pm25 ?? 999) < 10 && (no2 ?? 999) < 40) return "dobra";
+  if ((pm25 ?? 0) >= 25 || (no2 ?? 0) >= 100) return "slaba";
+  return "sprejemljiva";
+}
+
+export async function getAirQualityNearby(lat: number, lng: number): Promise<KakovostZraka> {
+  const fallback: KakovostZraka = { pm25: null, no2: null, station_name: null, station_distance_km: null, index: "neznana" };
+  try {
+    // 1. Find nearest station in Slovenia
+    const locUrl = `https://api.openaq.org/v3/locations?country=SI&limit=10&coordinates=${lat},${lng}&radius=50000&order_by=distance`;
+    const locRes = await fetch(locUrl, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+    if (!locRes.ok) return fallback;
+    const locData = await locRes.json();
+    const location = locData?.results?.[0];
+    if (!location) return fallback;
+
+    const locationId: number = location.id;
+    const stationName: string = location.name ?? null;
+    const distanceM: number = location.distance ?? null;
+    const distanceKm = distanceM !== null ? Math.round(distanceM / 100) / 10 : null;
+
+    // 2. Get sensors for this location
+    const sensUrl = `https://api.openaq.org/v3/sensors?locations_id=${locationId}`;
+    const sensRes = await fetch(sensUrl, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+    if (!sensRes.ok) return { ...fallback, station_name: stationName, station_distance_km: distanceKm };
+    const sensData = await sensRes.json();
+    const sensors: Array<{ id: number; parameter: { name: string } }> = sensData?.results ?? [];
+
+    const pm25Sensor = sensors.find(s => s.parameter?.name === "pm25");
+    const no2Sensor = sensors.find(s => s.parameter?.name === "no2");
+
+    // 3. Get latest measurements
+    async function getLatest(sensorId: number): Promise<number | null> {
+      try {
+        const r = await fetch(`https://api.openaq.org/v3/sensors/${sensorId}/measurements/latest`, {
+          cache: "no-store", signal: AbortSignal.timeout(3000)
+        });
+        if (!r.ok) return null;
+        const d = await r.json();
+        return d?.results?.[0]?.value ?? null;
+      } catch { return null; }
+    }
+
+    const [pm25, no2] = await Promise.all([
+      pm25Sensor ? getLatest(pm25Sensor.id) : Promise.resolve(null),
+      no2Sensor  ? getLatest(no2Sensor.id)  : Promise.resolve(null),
+    ]);
+
+    return { pm25, no2, station_name: stationName, station_distance_km: distanceKm, index: airIndex(pm25, no2) };
+  } catch {
+    return fallback;
+  }
+}
+
+// ─── NOISE LEVEL — ARSO Strateške karte hrupa ────────────────────────────
+
+export interface NivojHrupa {
+  lden: number | null;  // dB, day-evening-night
+  lnoc: number | null;  // dB, night only
+  vir: "MOL" | "DARS" | "DRSI" | "zeleznica" | null;
+  ocena: "tiho" | "zmerno" | "hrupno" | "neznano";
+}
+
+function noiseOcena(lden: number | null): NivojHrupa["ocena"] {
+  if (lden === null) return "neznano";
+  if (lden < 55) return "tiho";
+  if (lden < 65) return "zmerno";
+  return "hrupno";
+}
+
+const NOISE_LAYERS: Array<{ id: number; vir: NivojHrupa["vir"] }> = [
+  { id: 344, vir: "MOL" },
+  { id: 358, vir: "DARS" },
+  { id: 352, vir: "DRSI" },
+  { id: 354, vir: "zeleznica" },
+];
+
+export async function getNivojHrupa(lat: number, lng: number): Promise<NivojHrupa> {
+  const fallback: NivojHrupa = { lden: null, lnoc: null, vir: null, ocena: "neznano" };
+  const base = "https://gis.arso.gov.si/arcgis/rest/services/Atlasokolja_javni_D96_test/MapServer";
+  const params = `geometry=${lng},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json`;
+
+  for (const layer of NOISE_LAYERS) {
+    try {
+      const url = `${base}/${layer.id}/query?${params}`;
+      const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(3000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const attrs = data?.features?.[0]?.attributes;
+      if (!attrs) continue;
+
+      // Field names vary per layer — try all candidates
+      const lden: number | null = attrs.LDEN ?? attrs.Lden ?? attrs.lden ?? attrs.DB_LDEN ?? attrs.NIVO_LDEN ?? null;
+      const lnoc: number | null = attrs.LNOC ?? attrs.Lnoc ?? attrs.lnoc ?? attrs.DB_LNOC ?? attrs.NIVO_LNOC ?? null;
+
+      if (lden === null) continue; // no data on this layer, try next
+
+      return { lden, lnoc, vir: layer.vir, ocena: noiseOcena(lden) };
+    } catch { continue; }
+  }
+  return fallback;
+}
