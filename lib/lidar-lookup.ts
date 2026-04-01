@@ -6,6 +6,11 @@ export interface LidarFeatures {
   buildingHeightM: number | null;
   buildingHeightMeanM: number | null;
   roofType: string | null;
+  roofAreaM2: number | null;       // 3D roof surface area from LiDAR (not footprint!)
+  facadeAreaM2: number | null;     // total facade area from LiDAR
+  roofHeightM: number | null;      // height from eave to ridge
+  roofRidgeHeightM: number | null;
+  roofEaveHeightM: number | null;
   floorHeightM: number | null;
   viewshedScore360: number | null;
   viewshedN: number | null; viewshedNe: number | null;
@@ -70,7 +75,7 @@ export async function getLidarFeatures(
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT
         eid_stavba, elevation_m, building_height_m, building_height_mean_m,
-        roof_type, floor_height_m,
+        roof_type, roof_area_m2, facade_area_m2, roof_height_m, roof_ridge_height_m, roof_eave_height_m, floor_height_m,
         viewshed_score_360, viewshed_n, viewshed_ne, viewshed_e, viewshed_se,
         viewshed_s, viewshed_sw, viewshed_w, viewshed_nw,
         horizon_distance_avg_m, mountain_visibility_bool, mountain_visibility_distance_m,
@@ -123,6 +128,11 @@ export async function getLidarFeatures(
       buildingHeightM: num(r.building_height_m),
       buildingHeightMeanM: num(r.building_height_mean_m),
       roofType: r.roof_type ? String(r.roof_type) : null,
+      roofAreaM2: num(r.roof_area_m2),
+      facadeAreaM2: num(r.facade_area_m2),
+      roofHeightM: num(r.roof_height_m),
+      roofRidgeHeightM: num(r.roof_ridge_height_m),
+      roofEaveHeightM: num(r.roof_eave_height_m),
       floorHeightM: num(r.floor_height_m),
       viewshedScore360: num(r.viewshed_score_360),
       viewshedN: num(r.viewshed_n), viewshedNe: num(r.viewshed_ne),

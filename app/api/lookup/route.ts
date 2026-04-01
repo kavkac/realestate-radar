@@ -514,6 +514,8 @@ export async function POST(request: NextRequest) {
           lng,
           municipality: null, // TODO: resolve from koId → obcina name
           lidarHeightM: lidarFeatures?.buildingHeightM ?? null,
+          lidarRoofAreaM2: lidarFeatures?.roofAreaM2 ?? null,
+          lidarWallAreaM2: lidarFeatures?.facadeAreaM2 ?? null,
         });
         if (eizOcena) {
           energetskaIzkaznica = {
