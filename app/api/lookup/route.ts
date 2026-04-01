@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { getNeighborhoodProfile, calcProximityScore, getNearestWalkingTargets } from "@/lib/neighborhood-service";
 import { parseListingText, calcListingValuationDelta, type ListingSignals } from "@/lib/listing-nlp";
 import { izracunajStavbneKorekcije, izracunajVisinoStropov } from "@/lib/location-premium";
+import { getSursMarketTrends } from "@/lib/surs-api";
 
 // Helper: race a promise against a timeout — returns null if timeout fires
 function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout?: () => void): Promise<T | null> {
@@ -383,7 +384,7 @@ export async function POST(request: NextRequest) {
     // Cap ownership lookups to first 8 units to avoid 20+ parallel GURS calls
     const ownershipUnits = deliStavbe.slice(0, 8);
 
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, kakovostZraka, nivojHrupa, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, lidarFeatures, evResults, namembnostResults, gasInfrastructure, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, kakovostZraka, nivojHrupa, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, lidarFeatures, evResults, namembnostResults, gasInfrastructure, sursMarketTrends, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -424,6 +425,8 @@ export async function POST(request: NextRequest) {
       ),
       // Gas infrastructure now parallel (was sequential await before)
       gasInfrastructurePromise,
+      // SURS market trends (cached 6h)
+      getSursMarketTrends().catch(() => null),
       ...ownershipUnits.map((d) => withTimeout(getOwnership(d.eidDelStavbe).catch(() => [] as Awaited<ReturnType<typeof getOwnership>>), 5000, () => timedOut.push('ownership')).then(r => r ?? [])),
     ]);
 
@@ -1094,6 +1097,7 @@ export async function POST(request: NextRequest) {
       priceSurface: priceSurface ?? null,
       propertySignals: propSignals ?? null,
       sursGrid: sursGrid ?? null,
+      sursMarketTrends: sursMarketTrends ?? null,
       lidarFeatures: lidarFeatures ?? null,
       stavbneKorekcije: stavbneKorekcijeResult,
       blendedEstimate: blendedEstimate
