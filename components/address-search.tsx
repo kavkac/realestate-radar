@@ -739,6 +739,8 @@ export function AddressSearch() {
               placesData={(activeTab.data as unknown as { placesData?: import('@/components/property-card').PlacesDataCard }).placesData}
               seizmicniPodatki={activeTab.data.seizmicniPodatki as never}
               poplavnaNevarnost={activeTab.data.poplavnaNevarnost as never}
+              nivojHrupa={(activeTab.data as unknown as { nivojHrupa?: import('@/components/property-card').PropertyCardProps['nivojHrupa'] }).nivojHrupa}
+              kakovostZraka={(activeTab.data as unknown as { kakovostZraka?: import('@/components/property-card').PropertyCardProps['kakovostZraka'] }).kakovostZraka}
               listingNlpSignals={(activeTab.data as unknown as { listingNlpSignals?: import('@/lib/listing-nlp').ListingSignals }).listingNlpSignals}
               listingNlpDatum={(activeTab.data as unknown as { listingNlpDatum?: string }).listingNlpDatum}
               blendedEstimate={(activeTab.data as unknown as { blendedEstimate?: import('@/components/property-card').PropertyCardProps['blendedEstimate'] }).blendedEstimate}

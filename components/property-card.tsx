@@ -278,6 +278,8 @@ export interface PropertyCardProps {
   koRentalYield?: KoRentalYield | null;
   saleToListRatio?: SaleToListRatio | null;
   azbestRisk?: { hasRisk: boolean; level: string | null; note: string } | null;
+  nivojHrupa?: { lden: number | null; lnoc: number | null; vir: string | null; ocena: string } | null;
+  kakovostZraka?: { pm25: number | null; no2: number | null; station_name: string | null; station_distance_km: number | null; index: string } | null;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
   propertyContext?: PropertyContextData | null;
   placesData?: PlacesDataCard | null;
@@ -408,6 +410,8 @@ export function PropertyCard({
   koRentalYield,
   saleToListRatio,
   azbestRisk,
+  nivojHrupa,
+  kakovostZraka,
   tipProdaje,
   propertyContext,
   placesData,
@@ -886,6 +890,8 @@ export function PropertyCard({
                 poplavnaNevarnost={poplavnaNevarnost}
                 azbestRisk={azbestRisk}
                 airbnbStats={airbnbStats}
+                nivojHrupa={nivojHrupa}
+                kakovostZraka={kakovostZraka}
               />
             </div>
           )}
@@ -2510,6 +2516,8 @@ function PropertyContextSection({
   poplavnaNevarnost,
   azbestRisk,
   airbnbStats,
+  nivojHrupa,
+  kakovostZraka,
 }: {
   ctx: PropertyContextData;
   tipProdaje?: 'enota' | 'stavba' | 'parcela_s_stavbo' | null;
@@ -2519,6 +2527,8 @@ function PropertyContextSection({
   poplavnaNevarnost?: PoplavnaNevarnost | null;
   azbestRisk?: { hasRisk: boolean; level: string | null; note: string } | null;
   airbnbStats?: AirbnbStats | null;
+  nivojHrupa?: { lden: number | null; lnoc: number | null; vir: string | null; ocena: string } | null;
+  kakovostZraka?: { pm25: number | null; no2: number | null; station_name: string | null; station_distance_km: number | null; index: string } | null;
 }) {
   const hasFloodRisk = ctx.tveganja.poplavnaNevarnost;
   const hasSeismicRisk = ctx.tveganja.visokaSeizmicnost;
@@ -2552,7 +2562,16 @@ function PropertyContextSection({
           alert
         />
       )}
-      {!hasFloodRisk && !hasSeismicRisk && !hasAzbest && (
+      {nivojHrupa?.ocena === "hrupno" && nivojHrupa.lden != null && (
+        <ContextRow label="🔊 Hrup" value={`${nivojHrupa.lden} dB Lden — hrupno (${nivojHrupa.vir ?? "promet"})`} alert={true} />
+      )}
+      {nivojHrupa?.ocena === "zmerno" && nivojHrupa.lden != null && (
+        <ContextRow label="🔉 Hrup" value={`${nivojHrupa.lden} dB Lden — zmerno (${nivojHrupa.vir ?? "promet"})`} alert={false} />
+      )}
+      {kakovostZraka?.index === "slaba" && (
+        <ContextRow label="💨 Zrak" value={`Slaba kakovost — PM2.5: ${kakovostZraka.pm25 ?? "?"} µg/m³, NO2: ${kakovostZraka.no2 ?? "?"} µg/m³`} alert={true} />
+      )}
+      {!hasFloodRisk && !hasSeismicRisk && !hasAzbest && nivojHrupa?.ocena !== "hrupno" && kakovostZraka?.index !== "slaba" && (
         <ContextRow label="Tveganja" value="Ni posebnih tveganj" />
       )}
 
