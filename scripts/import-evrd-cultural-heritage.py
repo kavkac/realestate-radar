@@ -21,27 +21,21 @@ Odvisnosti:
   pip install psycopg2-binary shapely pyproj requests
 """
 
-import psycopg2, psycopg2.extras, json, time, sys, os, argparse
+import psycopg2, psycopg2.extras, json, time, sys, os, argparse, tempfile, zipfile
 import urllib.request, urllib.parse
 from shapely.geometry import shape, mapping
 from shapely.ops import transform
 from pyproj import Transformer
+import fiona
 
 DB_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql://postgres:BXevJxzMDrFQUvjwDkZunQdpNHSJgdTz@switchback.proxy.rlwy.net:31940/railway"
 )
 
-# MK ArcGIS REST API — eVRD layers
-# Odkrito via: https://data-mk-indok.opendata.arcgis.com/
-MK_BASE = "https://gisportal.gov.si/arcgis/rest/services/KD/eVRD_varstveni_rezimi/MapServer"
-
-LAYERS = [
-    { "id": 0, "naziv": "Kulturni spomeniki državnega pomena", "tip": "spomenik_drzavni" },
-    { "id": 1, "naziv": "Kulturni spomeniki lokalnega pomena",  "tip": "spomenik_lokalni" },
-    { "id": 2, "naziv": "Varstvena območja kulturne dediščine", "tip": "varstveno_obmocje" },
-    { "id": 3, "naziv": "Vplivna območja kulturne dediščine",   "tip": "vplivno_obmocje" },
-]
+# eVRD Shapefile ZIP — OPSI odprti podatki (CC BY 4.0)
+# https://podatki.gov.si/dataset/varstveni-rezimi-kulturne-dediscine-evrd
+EVRD_ZIP_URL = "https://podatki.gov.si/dataset/2772d7b1-d1de-452c-bfcf-99e0df04f859/resource/b45281c4-f55e-4e11-a974-050553cd381c/download/evrd.zip"
 
 # D96/TM → WGS84
 transformer = Transformer.from_crs("EPSG:3794", "EPSG:4326", always_xy=True)
@@ -52,129 +46,103 @@ def to_wgs84(geom_dict):
     wgs = transform(transformer.transform, geom)
     return mapping(wgs)
 
-def fetch_layer_page(layer_id, offset=0, batch=500):
-    params = {
-        "where": "1=1",
-        "outFields": "ESD_ID,IME,TIP_ENOTE,STATUS,ZVRST_TEXT",
-        "returnGeometry": "true",
-        "outSR": "3794",
-        "resultOffset": str(offset),
-        "resultRecordCount": str(batch),
-        "f": "json",
-    }
-    url = f"{MK_BASE}/{layer_id}/query?" + urllib.parse.urlencode(params)
-    try:
-        with urllib.request.urlopen(url, timeout=30) as r:
-            return json.loads(r.read())
-    except Exception as e:
-        print(f"  WARN fetch layer {layer_id} offset {offset}: {e}")
-        return None
+def download_and_extract_zip(url, dest_dir):
+    print(f"Downloading eVRD ZIP from OPSI...")
+    zip_path = os.path.join(dest_dir, "evrd.zip")
+    urllib.request.urlretrieve(url, zip_path)
+    print(f"  Downloaded {os.path.getsize(zip_path)//1024} KB")
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        z.extractall(dest_dir)
+    shp_files = []
+    for root, dirs, files in os.walk(dest_dir):
+        for f in files:
+            if f.endswith(".shp"):
+                shp_files.append(os.path.join(root, f))
+    print(f"  Found shapefiles: {[os.path.basename(s) for s in shp_files]}")
+    return shp_files
 
 def ensure_table(cur):
+    # No PostGIS — store geometry as JSONB (same pattern as kn_namenske_rabe, arso_noise_ldvn)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS cultural_heritage_zones (
             id              SERIAL PRIMARY KEY,
             esd_id          TEXT,
             ime             TEXT,
-            tip             TEXT NOT NULL,        -- tip iz LAYERS
-            tip_enote       TEXT,                 -- TIP_ENOTE iz vira
+            tip             TEXT NOT NULL,
+            tip_enote       TEXT,
             status          TEXT,
-            zvrst           TEXT,                 -- ZVRST_TEXT
-            geometry        GEOMETRY(Geometry, 4326) NOT NULL,
+            zvrst           TEXT,
+            geom            JSONB NOT NULL,
             imported_at     TIMESTAMPTZ DEFAULT NOW()
         );
-        CREATE INDEX IF NOT EXISTS idx_chz_geometry
-            ON cultural_heritage_zones USING GIST(geometry);
-        CREATE INDEX IF NOT EXISTS idx_chz_tip
-            ON cultural_heritage_zones(tip);
-        CREATE INDEX IF NOT EXISTS idx_chz_esd_id
-            ON cultural_heritage_zones(esd_id);
+        CREATE INDEX IF NOT EXISTS idx_chz_tip ON cultural_heritage_zones(tip);
+        CREATE INDEX IF NOT EXISTS idx_chz_esd_id ON cultural_heritage_zones(esd_id);
     """)
     print("Table cultural_heritage_zones ready")
 
-def import_layer(conn, layer, dry_run=False):
-    layer_id = layer["id"]
-    tip = layer["tip"]
-    naziv = layer["naziv"]
-    print(f"\n--- Layer {layer_id}: {naziv} ---")
+def import_shapefile(conn, shp_path, dry_run=False):
+    filename = os.path.basename(shp_path)
+    print(f"\n--- Importing: {filename} ---")
 
-    offset = 0
-    batch = 500
+    # Guess tip from filename
+    fname_lower = filename.lower()
+    if "drz" in fname_lower or "drzavni" in fname_lower:
+        tip = "spomenik_drzavni"
+    elif "lok" in fname_lower or "lokalni" in fname_lower:
+        tip = "spomenik_lokalni"
+    elif "vplivn" in fname_lower:
+        tip = "vplivno_obmocje"
+    elif "varstveni" in fname_lower or "obmocj" in fname_lower:
+        tip = "varstveno_obmocje"
+    else:
+        tip = "neznano"
+
     total = 0
     skipped = 0
 
-    with conn.cursor() as cur:
-        while True:
-            data = fetch_layer_page(layer_id, offset, batch)
-            if data is None:
-                print(f"  ERROR: failed to fetch, stopping layer")
-                break
+    with fiona.open(shp_path) as src:
+        crs = src.crs
+        print(f"  CRS: {crs}, features: {len(src)}")
 
-            features = data.get("features", [])
-            if not features:
-                print(f"  No more features at offset {offset}")
-                break
+        # Set up transformer if needed
+        needs_transform = crs and ("3794" in str(crs) or "MGI" in str(crs) or "D96" in str(crs))
 
-            rows = []
-            for feat in features:
-                attrs = feat.get("attributes", {})
-                geom_raw = feat.get("geometry")
-                if not geom_raw:
-                    skipped += 1
-                    continue
+        rows = []
+        for feat in src:
+            try:
+                geom = shape(feat["geometry"])
+                if needs_transform:
+                    geom = transform(transformer.transform, geom)
+                geom_json = json.dumps(mapping(geom))
 
-                # Build GeoJSON geometry from ArcGIS format
-                try:
-                    if "rings" in geom_raw:
-                        geom_dict = {"type": "Polygon", "coordinates": geom_raw["rings"]}
-                    elif "paths" in geom_raw:
-                        geom_dict = {"type": "MultiLineString", "coordinates": geom_raw["paths"]}
-                    elif "points" in geom_raw:
-                        geom_dict = {"type": "MultiPoint", "coordinates": geom_raw["points"]}
-                    else:
-                        skipped += 1
-                        continue
-
-                    geom_wgs84 = to_wgs84(geom_dict)
-                    geom_json = json.dumps(geom_wgs84)
-                except Exception as e:
-                    skipped += 1
-                    continue
-
+                attrs = feat.get("properties", {}) or {}
                 rows.append((
-                    str(attrs.get("ESD_ID") or ""),
-                    str(attrs.get("IME") or ""),
+                    str(attrs.get("ESD_ID") or attrs.get("esd_id") or ""),
+                    str(attrs.get("IME") or attrs.get("ime") or attrs.get("NAZIV") or ""),
                     tip,
                     str(attrs.get("TIP_ENOTE") or ""),
                     str(attrs.get("STATUS") or ""),
-                    str(attrs.get("ZVRST_TEXT") or ""),
+                    str(attrs.get("ZVRST_TEXT") or attrs.get("ZVRST") or ""),
                     geom_json,
                 ))
+            except Exception as e:
+                skipped += 1
+                continue
 
-            if rows and not dry_run:
+        if rows and not dry_run:
+            with conn.cursor() as cur:
                 psycopg2.extras.execute_values(cur, """
                     INSERT INTO cultural_heritage_zones
-                        (esd_id, ime, tip, tip_enote, status, zvrst, geometry)
+                        (esd_id, ime, tip, tip_enote, status, zvrst, geom)
                     VALUES %s
                     ON CONFLICT DO NOTHING
                 """, [
-                    (r[0], r[1], r[2], r[3], r[4], r[5],
-                     psycopg2.extras.Json(json.loads(r[6])) if False else
-                     f"ST_SetSRID(ST_GeomFromGeoJSON('{r[6]}'), 4326)")
+                    (r[0], r[1], r[2], r[3], r[4], r[5], psycopg2.extras.Json(json.loads(r[6])))
                     for r in rows
-                ], template="(%s, %s, %s, %s, %s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))")
+                ])
                 conn.commit()
-
-            total += len(rows)
-            print(f"  offset={offset}, fetched={len(features)}, imported={len(rows)}, skipped_geom={skipped}")
-
-            if len(features) < batch:
-                break
-
-            offset += batch
-            time.sleep(0.2)  # be polite to the API
-
-    print(f"  Layer {layer_id} done: {total} records")
+        total = len(rows)
+        print(f"  imported={total}, skipped_geom={skipped}")
     return total
 
 def main():
@@ -193,12 +161,16 @@ def main():
         ensure_table(cur)
         conn.commit()
 
-    grand_total = 0
-    for layer in LAYERS:
-        if args.layer is not None and layer["id"] != args.layer:
-            continue
-        n = import_layer(conn, layer, dry_run=args.dry_run)
-        grand_total += n
+    with tempfile.TemporaryDirectory() as tmp:
+        shp_files = download_and_extract_zip(EVRD_ZIP_URL, tmp)
+        if not shp_files:
+            print("ERROR: no shapefiles found in ZIP")
+            sys.exit(1)
+
+        grand_total = 0
+        for shp in shp_files:
+            n = import_shapefile(conn, shp, dry_run=args.dry_run)
+            grand_total += n
 
     print(f"\n✅ eVRD import complete: {grand_total} total records")
     conn.close()
