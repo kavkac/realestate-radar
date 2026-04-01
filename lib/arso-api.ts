@@ -125,7 +125,7 @@ export async function getAirQualityNearby(lat: number, lng: number): Promise<Kak
     const no2Sensor = sensors.find(s => s.parameter?.name === "no2");
 
     // 3. Get latest measurements
-    async function getLatest(sensorId: number): Promise<number | null> {
+    const getLatest = async (sensorId: number): Promise<number | null> => {
       try {
         const r = await fetch(`https://api.openaq.org/v3/sensors/${sensorId}/measurements/latest`, {
           cache: "no-store", signal: AbortSignal.timeout(3000)
@@ -134,7 +134,7 @@ export async function getAirQualityNearby(lat: number, lng: number): Promise<Kak
         const d = await r.json();
         return d?.results?.[0]?.value ?? null;
       } catch { return null; }
-    }
+    };
 
     const [pm25, no2] = await Promise.all([
       pm25Sensor ? getLatest(pm25Sensor.id) : Promise.resolve(null),
@@ -194,4 +194,14 @@ export async function getNivojHrupa(lat: number, lng: number): Promise<NivojHrup
     } catch { continue; }
   }
   return fallback;
+}
+
+// ─── CULTURAL HERITAGE — eVRD (MK) ───────────────────────────────────────
+// Data is pre-imported in cultural_heritage_zones table (32k records)
+// Lookup via DB spatial query (point-in-bounding-box of stored GeoJSON)
+// For real spatial join use property_signals or dedicated DB lookup endpoint
+
+export interface KulturnaDesicina {
+  je_v_obmocju: boolean;
+  zapisi: Array<{ ime: string; tip: string; rezim: string; esd_id: string }>;
 }

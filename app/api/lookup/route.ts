@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { lookupByAddress, getParcele, getRenVrednost, getOwnership, getParcelByNumber, getBuildingsByParcel, getBuildingParts, checkGasInfrastructure, getTipPolozajaStavbe, VRSTA_DEJANSKE_RABE, GursServiceUnavailableError } from "@/lib/gurs-api";
-import { getSeizmicnaCona, getPoplavnaNevarnost } from "@/lib/arso-api";
+import { getSeizmicnaCona, getPoplavnaNevarnost, getAirQualityNearby, getNivojHrupa } from "@/lib/arso-api";
 import { getAzbestRisk } from "@/lib/azbest";
 import { lookupEnergyCertificate } from "@/lib/eiz-lookup";
 import { estimateEiz } from "@/lib/eiz-estimator";
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
     // Cap ownership lookups to first 8 units to avoid 20+ parallel GURS calls
     const ownershipUnits = deliStavbe.slice(0, 8);
 
-    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, lidarFeatures, evResults, namembnostResults, gasInfrastructure, ...ownershipResults] = await Promise.all([
+    const [energyCertResult, parcele, renVrednost, etnAnaliza, etnNajemAnaliza, tipPolozaja, seizmicniPodatki, poplavnaNevarnost, kakovostZraka, nivojHrupa, osmData, lppLines, airbnbStats, koRentalYield, saleToListRatio, priceSurface, propSignals, sursGrid, lidarFeatures, evResults, namembnostResults, gasInfrastructure, ...ownershipResults] = await Promise.all([
       lookupEnergyCertificate({
         koId: stavba.koId,
         stStavbe: stavba.stStavbe,
@@ -397,6 +397,8 @@ export async function POST(request: NextRequest) {
       withTimeout(getTipPolozajaStavbe(stavba.eidStavba, stavba.koId).catch(() => null), 5000, () => timedOut.push('tipPolozaja')),
       lat != null && lng != null ? withTimeout(getSeizmicnaCona(lat, lng).catch(() => null), 5000, () => timedOut.push('seizmicniPodatki')) : Promise.resolve(null),
       lat != null && lng != null ? withTimeout(getPoplavnaNevarnost(lat, lng).catch(() => null), 5000, () => timedOut.push('poplavnaNevarnost')) : Promise.resolve(null),
+      lat != null && lng != null ? withTimeout(getAirQualityNearby(lat, lng).catch(() => null), 5000, () => timedOut.push('kakovostZraka')) : Promise.resolve(null),
+      lat != null && lng != null ? withTimeout(getNivojHrupa(lat, lng).catch(() => null), 5000, () => timedOut.push('nivojHrupa')) : Promise.resolve(null),
       osmDataPromise,
       lppLinesPromise,
       airbnbStatsPromise,
@@ -969,6 +971,8 @@ export async function POST(request: NextRequest) {
       selectedUnitArea,
       seizmicniPodatki,
       poplavnaNevarnost,
+      kakovostZraka,
+      nivojHrupa,
       azbestRisk: getAzbestRisk(stavba.letoIzgradnje),
       osmData: osmData ?? null,
       placesData,
