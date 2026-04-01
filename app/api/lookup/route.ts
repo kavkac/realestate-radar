@@ -943,12 +943,68 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Build structured property alerts for frontend banners/badges
+    const propertyAlerts: Array<{
+      id: string;
+      severity: "danger" | "warning" | "info";
+      title: string;
+      description: string;
+      icon: string;
+    }> = [];
+
+    if (poplavnaNevarnost?.stopnja === "visoka") {
+      propertyAlerts.push({
+        id: "flood_high",
+        severity: "danger",
+        title: "Visoka poplavna nevarnost",
+        description: poplavnaNevarnost.opis ?? "Lokacija leži v območju visoke poplavne nevarnosti (ARSO OPKP). Pogosto poplavljeno območje.",
+        icon: "🌊",
+      });
+    } else if (poplavnaNevarnost?.stopnja === "srednja") {
+      propertyAlerts.push({
+        id: "flood_medium",
+        severity: "warning",
+        title: "Srednja poplavna nevarnost",
+        description: poplavnaNevarnost.opis ?? "Lokacija leži v območju srednje poplavne nevarnosti (ARSO OPKP). Občasno poplavljeno območje.",
+        icon: "⚠️",
+      });
+    } else if (poplavnaNevarnost?.stopnja === "nizka") {
+      propertyAlerts.push({
+        id: "flood_low",
+        severity: "info",
+        title: "Nizka poplavna nevarnost",
+        description: poplavnaNevarnost.opis ?? "Lokacija leži v območju nizke poplavne nevarnosti (ARSO OPKP).",
+        icon: "💧",
+      });
+    }
+
+    if (nivojHrupa?.ocena === "hrupno" && nivojHrupa.lden != null) {
+      propertyAlerts.push({
+        id: "noise_high",
+        severity: "warning",
+        title: `Visok hrup (${nivojHrupa.lden} dB Lden)`,
+        description: `Lokacija je izpostavljena visoki ravni hrupa (vir: ${nivojHrupa.vir ?? "promet"}). Vrednost ${nivojHrupa.lden} dB presega priporočenih 65 dB.`,
+        icon: "🔊",
+      });
+    }
+
+    if (kakovostZraka?.index === "slaba") {
+      propertyAlerts.push({
+        id: "air_poor",
+        severity: "warning",
+        title: "Slaba kakovost zraka",
+        description: `PM2.5: ${kakovostZraka.pm25 ?? "?"} µg/m³, NO2: ${kakovostZraka.no2 ?? "?"} µg/m³ (postaja: ${kakovostZraka.station_name ?? "ARSO"}, ${kakovostZraka.station_distance_km ?? "?"}km)`,
+        icon: "💨",
+      });
+    }
+
     return NextResponse.json({
       success: true,
       _meta: {
         fast: true,
         timedOut: Array.from(new Set(timedOut)),
       },
+      propertyAlerts,
       naslov: address,
       lat,
       lng,
